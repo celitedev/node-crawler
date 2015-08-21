@@ -7,5 +7,18 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "JSONStream": "^1.0.4",
+    "event-stream": "^3.3.1",
+    "highland": "^2.5.1",
+    "lodash": "^3.10.1",
+    "node-uuid": "^1.4.3",
+    "oboe": "^2.1.2",
+    "stream-json": "^0.4.0",
+    "through": "^2.3.8",
+    "through2": "^2.0.0",
+    "uuid": "^2.0.1",
+    "x-ray": "^2.0.2"
+  }
 }
