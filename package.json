@@ -14,11 +14,9 @@
     "highland": "^2.5.1",
     "lodash": "^3.10.1",
     "node-uuid": "^1.4.3",
-    "oboe": "^2.1.2",
-    "stream-json": "^0.4.0",
-    "through": "^2.3.8",
-    "through2": "^2.0.0",
     "uuid": "^2.0.1",
-    "x-ray": "^2.0.2"
+    "x-ray": "git+https://github.com/Kwhen/x-ray.git#bugfix/nested-crawling",
+    "x-ray-phantom": "^1.0.1",
+    "yargs": "^3.30.0"
   }
 }
