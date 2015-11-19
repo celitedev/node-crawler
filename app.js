@@ -1,17 +1,168 @@
-var Xray = require('x-ray');
-var x = Xray();
-
-//https: //github.com/dominictarr/JSONStream
-var JSONStream = require('JSONStream');
-var es = require('event-stream');
-var jsf = require('json-stream-formatter');
 var _ = require("lodash");
+var Xray = require('x-ray');
+var JSONStream = require('JSONStream');
+var h = require("highland");
 var uuid = require("uuid");
+var argv = require('yargs').argv;
+var path = require("path");
 
+if (!argv.crawler) {
+	throw new Error("command-line arg 'crawler' not defined");
+}
+
+var x = Xray(),
+	crawlSchema,
+	crawlResultSchema,
+	outputschema;
+
+//////////
+//stats //
+//////////
+var downloadedDetailPages = 0;
+
+/////////////////
+//load schemas + some validation //
+/////////////////
+try {
+	var crawlerSchemaPath = path.resolve(__dirname + "/crawlers/" + argv.crawler);
+
+	crawlSchema = require(crawlerSchemaPath);
+
+	if (crawlSchema.schema.requiresJS) {
+		var phantom = require('x-ray-phantom');
+		x.driver(phantom());
+	}
+
+	crawlResultSchema = _.extend(crawlSchema.schema.results.schema(x), {
+		calcPageDone: function(el, cb) {
+			downloadedDetailPages++;
+			cb();
+		}
+	});
+
+} catch (err) {
+	throw new Error("crawler not found: " + argv.crawler);
+}
+
+try {
+	var outputSchemaName = crawlSchema.entity.type.toLowerCase();
+	var outputSchemaPath = path.resolve(__dirname + "/schemas/" + outputSchemaName);
+	outputschema = require(outputSchemaPath);
+} catch (err) {
+	throw new Error("outputschema not found for entitytype: " + outputSchemaName);
+}
+
+
+////////////////////////
+//start feedback loop //
+////////////////////////
+var isDone = false;
+(function signalProcess() {
+	console.log("nr of detail pages downloaded", downloadedDetailPages);
+	if (!isDone) {
+		setTimeout(signalProcess, 1000);
+	}
+}());
+
+
+/////////////////////
+//Start processing, which involves streaming results
+//
+//LATER: we might improve on this since currenly we only start streaming when batch is done completely
+//which is completely moot. Instead we might want to look into how to process 1 result at a time when done
+/////////////////////
+var rawObjectStream = x(crawlSchema.schema.seed.config.seedUrl, "html", {
+		paginate: function distributedPaginate(el, cb) {
+			if (crawlSchema.schema.seed.urlToNextPage !== "urlToNextPage") {
+				//no pagination
+				return cb();
+			}
+			//upload next url to queue
+			console.log("PAGINATE URL STORED IN QUEUE", crawlSchema.schema.seed.config.nextUrl(el));
+			//TODO: execute stop criterium
+			cb();
+		},
+		results: x(crawlSchema.schema.results.selector, [crawlResultSchema])
+	})
+	.write()
+	.on('error', function(err) {
+		console.log("rawstream ERROR ", err);
+	})
+	.on('close', function(err) {
+		console.log("rawstream CLOSE ", err);
+	})
+	.pipe(JSONStream.parse('results.*'));
+
+
+////////////////////
+//filter a stream //
+////////////////////
+var jsonObjectStream = h(rawObjectStream)
+	.map(function(obj) {
+		return iterTrim(obj);
+	})
+	.map(function(obj) {
+		var detail = obj.detail,
+			sourceId = obj.sourceId,
+			sourceUrl = obj.sourceUrl;
+
+		delete obj.detail;
+		delete obj.sourceId;
+		delete obj.sourceUrl;
+
+		return _.extend({
+			id: uuid.v4(),
+			//TODO: check what attributes should always exist in msg: 
+			//- check book
+			//- check guigelines for Kafka
+			meta: {
+				type: crawlSchema.entity.type,
+				crawl: {
+					crawlJob: 123, //the large job. TODO: based on crawling manager
+					taskId: 132903712, //the specific mini job/batch within this crawlJob. TODO: based on crawling manager
+					dateTime: new Date().toISOString(),
+					crawlSchema: crawlSchema.schema.version, //specific version for this schema, i.e.: Eventful Events v1.0
+					msgSchema: outputschema.version, //specific version of the target message schema. 
+				},
+				source: {
+					name: crawlSchema.source.name,
+					id: sourceId,
+					url: sourceUrl
+				}
+			},
+
+		}, obj, detail);
+
+	})
+	.filter(function(obj) {
+		return obj.meta.source.id;
+	})
+	.map(stringify)
+	.on('error', function(err) {
+		console.log("jsonObjectStream ERROR ", err);
+	})
+	.on('end', function() {
+		//succesfull end of stream. 
+		//Everything read and processed. 
+
+		//TODO: 
+		//- add msg to S3 (enrich with DT of complete) (NOTE: make sure clocks are in sync)
+		//- deleted msg from input queue
+		console.log("signal batch is done. E.g.: remove from Kafka");
+		isDone = true;
+	})
+	.pipe(process.stdout);
+
+
+
+////////////
+//HELPERS //
+////////////
 function stringify(json) {
 	return JSON.stringify(json, null, 4) + '\n';
 }
 
+//iteratively walks object and trims all strings
 function iterTrim(obj, key) {
 	if (_.isDate(obj)) {
 		return obj;
@@ -29,64 +180,3 @@ function iterTrim(obj, key) {
 		return obj;
 	}
 }
-
-//TODO
-//1. look into redis streams. Useful? 
-var stream = x('https://www.eventbrite.com/d/verenigde-staten--new-york-city/events/', '.l-block-2', [{
-		id: "a@data-eid",
-		schemaType: '@additionaltype',
-		url: 'a@href',
-		img: '.js-poster-image@src',
-		label: '.list-card__label',
-		priceCurrency: '[itemprop=priceCurrency]@content',
-		lowPrice: '[itemprop=lowPrice]@content',
-		highPrice: '[itemprop=highPrice]@content',
-		startDT: "[itemprop=startDate]@content",
-		name: ".list-card__title",
-		organizer: x('[itemprop=organizer]', {
-			name: '[itemprop=name]@content',
-			url: '[itemprop=name]@url',
-		}),
-		place: x('[itemprop=location]', {
-			name: '[itemprop=name]@content',
-			latitude: '[itemprop=latitude]@content',
-			longitude: '[itemprop=longitude]@content',
-			address: x('[itemprop=address]', {
-				name: '[itemprop=name]@content',
-				country: '[itemprop=addressCountry]@content',
-				locality: '[itemprop=addressLocality]@content',
-				streetAddress: '[itemprop=streetAddress]@content',
-				postalCode: '[itemprop=postalCode]@content'
-			})
-		}),
-	}])
-	// .paginate('.next_page@href')
-	// .limit(3)
-	.write()
-	.pipe(JSONStream.parse("*"))
-	.pipe(es.map(function(eventDTO, cb) {
-		if (!eventDTO.id) {
-			return cb(); //skip
-		}
-
-		if (eventDTO.place) {
-			eventDTO.placeId_transient = eventDTO.place.id_transient = uuid.v4();
-			var placeDTO = eventDTO.place;
-			delete eventDTO.place;
-			this.push(placeDTO);
-			// this.emit('data', placeDTO);
-		}
-		// if (eventDTO.organizer) {
-		// 	eventDTO.organizer_transient = eventDTO.organizer.id_transient = uuid.v4();
-		// 	var organizerDTO = eventDTO.organizer;
-		// 	delete eventDTO.organizer;
-		// 	this.emit('data', organizerDTO);
-		// }
-
-		cb(undefined, eventDTO);
-	}))
-	.on('error', function(e) {
-		console.log(e);
-	})
-	.pipe(es.stringify())
-	.pipe(process.stdout);
