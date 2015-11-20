@@ -5,6 +5,7 @@ var h = require("highland");
 var uuid = require("uuid");
 var argv = require('yargs').argv;
 var path = require("path");
+var proxyDriver = require("./drivers/proxyDriver");
 
 if (!argv.crawler) {
 	throw new Error("command-line arg 'crawler' not defined");
@@ -29,9 +30,11 @@ try {
 	crawlSchema = require(crawlerSchemaPath);
 
 	if (crawlSchema.schema.requiresJS) {
-		var phantom = require('x-ray-phantom');
-		x.driver(phantom());
+		throw new Error("requiresJS not supported atm, since we've not implemented caching + prxying yet");
+		// var phantom = require('x-ray-phantom');
+		// x.driver(phantom());
 	}
+
 
 	crawlResultSchema = _.extend(crawlSchema.schema.results.schema(x), {
 		calcPageDone: function(el, cb) {
@@ -43,6 +46,17 @@ try {
 } catch (err) {
 	throw new Error("crawler not found: " + argv.crawler);
 }
+
+
+//install own dirver which does: 
+//- proxying through crawlera
+//- caching using S3
+x.driver(proxyDriver({
+	ctx: {
+		headers: crawlSchema.schema.headers
+	}
+}));
+
 
 try {
 	var outputSchemaName = crawlSchema.entity.type.toLowerCase();
@@ -135,6 +149,9 @@ var jsonObjectStream = h(rawObjectStream)
 
 	})
 	.filter(function(obj) {
+		//This is a general filter that removes all ill-selected results, e.g.: headers and footers
+		//The fact that a sourceId is required allows is to select based on this. 
+		//It's extremely unlikely that ill-selected results have an id (as fetched by the schema) 
 		return obj.meta.source.id;
 	})
 	.map(stringify)
