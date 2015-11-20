@@ -66,8 +66,7 @@ module.exports = {
 			isUpdated: "hash",
 		},
 		headers: { //Default Headers for all requests
-			// 'API-Key': 'foobar',
-			// Accept: 'application/json'
+			"Accept-Encoding": 'gzip, deflate'
 		},
 		results: {
 			selector: ".search-results > li", //selector for results

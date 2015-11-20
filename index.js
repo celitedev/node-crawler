@@ -80,6 +80,8 @@ var isDone = false;
 		setTimeout(signalProcess, 1000);
 	}
 }());
+
+
 /////////////////////
 //Start processing, which involves streaming results
 //
@@ -170,7 +172,8 @@ var jsonObjectStream = h(rawObjectStream)
 		isDone = true;
 
 		//shutdown redis
-		proxyAndCacheDriver.redisCache.db.end();
+		proxyAndCacheDriver.redisCache.db.quit();
+		setTimeout(process.exit, 1000);
 	})
 	.pipe(process.stdout);
 
