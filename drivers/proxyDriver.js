@@ -47,7 +47,7 @@ function driver(opts) {
     agent
       .get(ctx.url)
       .set(ctx.headers)
-      // .proxy("socks://localhost:5566")
+      .proxy("socks://localhost:5566")
       .end(function(err, res) {
         if (err && !err.status) return fn(err);
 
