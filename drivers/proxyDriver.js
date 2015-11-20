@@ -18,6 +18,7 @@ var redisCache = new redisModule({
 });
 
 require('superagent-proxy')(superagent);
+require('superagent-retry')(superagent);
 require('superagent-cache')(superagent, redisCache);
 
 /**
@@ -47,7 +48,9 @@ function driver(opts) {
     agent
       .get(ctx.url)
       .set(ctx.headers)
-      .proxy("socks://localhost:5566")
+      .retry(3)
+      .timeout(20000) //have a timeout. Seems by default superagent doesn't set one, which can lead to hands
+      .proxy("socks://localhost:5566") //TOR
       .end(function(err, res) {
         if (err && !err.status) return fn(err);
 
@@ -56,7 +59,7 @@ function driver(opts) {
 
         ctx.body = 'application/json' == ctx.type ? res.body : res.text;
 
-        // console.log("body", ctx.body.length);
+        console.log("body", ctx.body.length);
 
         // update the URL if there were redirects
         ctx.url = res.redirects.length ? res.redirects.pop() : ctx.url;
