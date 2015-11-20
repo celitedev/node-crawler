@@ -5,21 +5,20 @@
 var _ = require("lodash");
 var superagent = require('superagent');
 
-var nodeCacheModule = require('cache-service-node-cache');
-var cs = require('cache-service');
+///////////////////
+//TODO: S3 cache //
+///////////////////
+var redisModule = require('cache-service-redis');
 
-//TODO: make S3 Cache
-var nodeCache = new nodeCacheModule({
-  defaultExpiration: 500
+var redisCache = new redisModule({
+  redisData: {
+    port: 6379,
+    hostname: "127.0.0.1"
+  },
 });
 
-//Instantiate cache-service
-var cacheService = new cs({
-  verbose: false
-}, [nodeCache]);
-
 // require('superagent-proxy')(superagent);
-// require('superagent-cache')(superagent, cacheService);
+require('superagent-cache')(superagent, redisCache);
 
 /**
  * Export `driver`
@@ -58,7 +57,8 @@ function driver(opts) {
         ctx.body = 'application/json' == ctx.type ? res.body : res.text;
 
         // update the URL if there were redirects
-        ctx.url = res.redirects.length ? res.redirects.pop() : ctx.url;
+        // TODO: THIS IS MOOT SINCE CACHE RETURNS FAKE RESPOONSE OBJECT WHICH DOESN'T CONTAIN 'REDIRECTS'
+        // ctx.url =  res.redirects &&  res.redirects.length ? res.redirects.pop() : ctx.url;
 
         return fn(null, ctx);
       });
