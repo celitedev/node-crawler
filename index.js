@@ -53,11 +53,12 @@ try {
 //install own dirver which does: 
 //- proxying through crawlera
 //- caching using S3
-x.driver(proxyDriver({
+var proxyAndCacheDriver = proxyDriver({
 	ctx: {
 		headers: crawlSchema.schema.headers
 	}
-}));
+});
+x.driver(proxyAndCacheDriver);
 
 
 try {
@@ -167,6 +168,9 @@ var jsonObjectStream = h(rawObjectStream)
 		//- deleted msg from input queue
 		console.log("signal batch is done. E.g.: remove from Kafka");
 		isDone = true;
+
+		//shutdown redis
+		proxyAndCacheDriver.redisCache.db.end();
 	})
 	.pipe(process.stdout);
 

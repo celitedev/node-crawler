@@ -39,7 +39,7 @@ function driver(opts) {
 
   var agent = superagent.agent(opts || {});
 
-  return function http_driver(ctx, fn) {
+  var fn = function http_driver(ctx, fn) {
 
     //allow to input headers etc
     _.defaults(ctx, ctxDefaults);
@@ -57,10 +57,14 @@ function driver(opts) {
         ctx.body = 'application/json' == ctx.type ? res.body : res.text;
 
         // update the URL if there were redirects
-        // TODO: THIS IS MOOT SINCE CACHE RETURNS FAKE RESPOONSE OBJECT WHICH DOESN'T CONTAIN 'REDIRECTS'
-        // ctx.url =  res.redirects &&  res.redirects.length ? res.redirects.pop() : ctx.url;
+        ctx.url = res.redirects.length ? res.redirects.pop() : ctx.url;
 
         return fn(null, ctx);
       });
   };
+
+  fn.redisCache = redisCache;
+
+  return fn;
+
 }
