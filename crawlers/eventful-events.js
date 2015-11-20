@@ -65,6 +65,10 @@ module.exports = {
 			//- headers: bsaed on cache headers
 			isUpdated: "hash",
 		},
+		headers: { //Default Headers for all requests
+			// 'API-Key': 'foobar',
+			// Accept: 'application/json'
+		},
 		results: {
 			selector: ".search-results > li", //selector for results
 			schema: function(x) { //schema for each individual result
