@@ -95,6 +95,8 @@ function waitUntilWork(job, done) {
 				return cb();
 			}
 
+			console.log("NEW URL", crawlSchema.seed.config.nextUrl(el));
+
 			//upload next url to queue
 			//
 			//TODO: execute stop criterium
