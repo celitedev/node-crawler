@@ -49,17 +49,16 @@ function driver(opts) {
       .proxy(opts.proxy) //TOR
       .end(function(err, res) {
         if (err && !err.status) {
-          console.log("EASDASDAS", err);
-
           return fn(err);
         }
+
+        //TODO: #14
+        //Driver continues when err with status code
 
         ctx.status = res.status;
         ctx.set(res.headers);
 
         ctx.body = 'application/json' == ctx.type ? res.body : res.text;
-
-        console.log("body", ctx.body.length);
 
         // update the URL if there were redirects
         ctx.url = res.redirects.length ? res.redirects.pop() : ctx.url;

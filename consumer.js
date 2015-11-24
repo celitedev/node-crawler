@@ -48,16 +48,15 @@ var resourcesPerCrawlerType = {};
 //TODO: from config
 //THIS SHOULD BE <SOURCE,TYPE> SPECIFIC!
 //Moreover, concurrency should be distributed.
-var concurrentBatches = 1;
+var concurrentBatches = 10;
 queue.process(utils.queues.seedUrlQueueName, concurrentBatches, waitUntilWork);
 
 
 function waitUntilWork(job, done) {
 
-
 	var data = job.data;
 
-	console.log("START JOB", data.url);
+	// console.log("START JOB", data.url);
 
 	if (!data.source) {
 		throw new Error("'source' not defined on job: " + JSON.strinfify(job));
@@ -88,26 +87,30 @@ function waitUntilWork(job, done) {
 		x = crawlerResource.x;
 
 
-	var crawlBatch = Promise.promisify(x(crawlSchema.seed.config.seedUrl, "html", {
-		paginate: function distributedPaginate(el, cb) {
-			if (crawlSchema.seed.urlToNextPage !== "urlToNextPage") {
-				//no pagination
-				return cb();
-			}
-
-			console.log("NEW URL", crawlSchema.seed.config.nextUrl(el));
-
-			//upload next url to queue
-			//
-			//TODO: execute stop criterium
-			utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, crawlSchema.seed.config.nextUrl(el), cb);
-		},
-		results: x(crawlSchema.results.selector, [crawlResultSchema])
-	}));
-
 
 	Promise.resolve()
-		.then(crawlBatch)
+		.then(function() {
+			return new Promise(function(resolve, reject) {
+				x(data.url, "html", {
+					paginate: function distributedPaginate(el, cb) {
+						if (crawlSchema.seed.type !== "urlToNextPage") {
+							//no pagination
+							return cb();
+						}
+
+						//upload next url to queue
+						//TODO: execute stop criterium
+						utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, crawlSchema.seed.config.nextUrl(el), cb);
+					},
+					results: x(crawlSchema.results.selector, [crawlResultSchema])
+				})(function(err, obj) {
+					if (err) {
+						return reject(err);
+					}
+					resolve(obj);
+				});
+			});
+		})
 		.then(function(obj) {
 			return iterTrim(obj);
 		})
@@ -168,7 +171,7 @@ function waitUntilWork(job, done) {
 		})
 		.then(done)
 		.finally(function() {
-			console.log("END JOB");
+			// console.log("END JOB");
 		});
 }
 
