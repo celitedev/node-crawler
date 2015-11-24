@@ -35,24 +35,24 @@ module.exports = driver;
  */
 
 function driver(opts) {
-  var ctxDefaults = opts.ctx || {};
-  delete opts.ctx;
 
-  var agent = superagent.agent(opts || {});
+  //TODO: passing options is for certificate and cookies only 
+  var agent = superagent.agent();
 
   var fn = function http_driver(ctx, fn) {
 
-    //allow to input headers etc
-    _.defaults(ctx, ctxDefaults);
-    ctx.headers = _.defaults(ctx.headers, ctxDefaults.headers);
     agent
       .get(ctx.url)
-      .set(ctx.headers)
-      .retry(3)
-      .timeout(20000) //have a timeout. Seems by default superagent doesn't set one, which can lead to hands
-      .proxy("socks://localhost:5566") //TOR
+      .set(_.defaults(ctx.headers, opts.headers))
+      .retry(opts.retry || 3)
+      .timeout(opts.timeoutMS || 20000) //have a timeout. Seems by default superagent doesn't set one, which can lead to hands
+      .proxy(opts.proxy) //TOR
       .end(function(err, res) {
-        if (err && !err.status) return fn(err);
+        if (err && !err.status) {
+          console.log("EASDASDAS", err);
+
+          return fn(err);
+        }
 
         ctx.status = res.status;
         ctx.set(res.headers);
