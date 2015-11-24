@@ -104,7 +104,8 @@ function waitUntilWork(job, done) {
 	}));
 
 
-	crawlBatch()
+	Promise.resolve()
+		.then(crawlBatch)
 		.then(function(obj) {
 			return iterTrim(obj);
 		})
@@ -167,9 +168,6 @@ function waitUntilWork(job, done) {
 		.finally(function() {
 			console.log("END JOB");
 		});
-
-
-
 }
 
 
@@ -184,11 +182,7 @@ function createCrawlerResource(jobData) {
 	//install own driver which does: 
 	//- proxying through crawlera
 	//- caching using S3
-	var proxyAndCacheDriver = proxyDriver({
-		ctx: {
-			headers: crawlerResource.crawlConfig.schema.headers
-		}
-	});
+	var proxyAndCacheDriver = proxyDriver(crawlerResource.crawlConfig.driver);
 
 	x.driver(proxyAndCacheDriver);
 
@@ -220,6 +214,7 @@ function displayStats() {
 	});
 }
 
+
 (function checkIfDone() {
 	async.parallel([
 		function(cb) {
@@ -249,13 +244,24 @@ function displayStats() {
 		if (countTotal) { //busy -> check when 
 			setTimeout(checkIfDone, 5000);
 		} else {
-			console.log("DONE");
-			//TODO: for each proxyAndCacheDriver
-			// proxyAndCacheDriver.redisCache.db.quit();
-			// setTimeout(process.exit, 1000);
+
+			shutdown();
 		}
 	});
 }());
+
+function shutdown() {
+	_.each(resourcesPerCrawlerType, function(resource) {
+		resource.proxyAndCacheDriver.redisCache.db.quit();
+	});
+	console.log("Redit shut down");
+	queue.shutdown(5000, function(err) {
+		console.log('Kue shutdown ', err || '');
+		console.log("DONE");
+		// process.exit(0);
+	});
+}
+
 
 
 ////////////

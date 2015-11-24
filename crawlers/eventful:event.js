@@ -14,6 +14,15 @@ module.exports = {
 	source: {
 		name: "Eventful"
 	},
+	driver: {
+		// caching: true, //always true / not configurable: see #9 for more info
+		retry: 3,
+		timeoutMS: 20000,
+		proxy: "socks://localhost:5566", //local proxy, e.g.: TOR
+		headers: { //Default Headers for all requests
+			"Accept-Encoding": 'gzip, deflate'
+		}
+	},
 	schema: {
 		version: "0.1", //version of this schema
 		type: "masterDetail", //signifies overall type of scroll. For now: only 'masterDetail'

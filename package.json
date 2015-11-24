@@ -21,7 +21,7 @@
     "node-uuid": "^1.4.3",
     "superagent": "^1.4.0",
     "superagent-cache": "git+https://github.com/gebrits/superagent-cache.git",
-    "superagent-proxy": "^1.0.0",
+    "superagent-proxy": "git+https://github.com/gebrits/superagent-proxy.git#patch-1",
     "superagent-retry": "^0.5.1",
     "through": "^2.3.8",
     "uuid": "^2.0.1",
