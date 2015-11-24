@@ -14,19 +14,26 @@ var utils = require("./utils");
 /////////
 //init //
 /////////
+
+if (!argv.source) {
+	throw new Error("command-line arg 'source' not defined");
+}
+if (!argv.type) {
+	throw new Error("command-line arg 'type' not defined");
+}
+
 var schema = utils.init({
-	crawler: argv.crawler,
-	isSeeder: true
+	source: argv.source,
+	type: argv.type
 });
 
-var crawlSchema = schema.crawlSchema,
-	crawlResultSchema = schema.crawlResultSchema,
-	outputschema = schema.outputschema;
+var crawlConfig = schema.crawlConfig,
+	outputMessageSchema = schema.outputMessageSchema;
 
 var queue = kue.createQueue();
 var batchid = "1";
 
-utils.addSeedJob(queue, batchid, crawlSchema, function(err) {
+utils.addCrawlJob(queue, batchid, crawlConfig, crawlConfig.schema.seed.config.seedUrl, function(err) {
 	if (err) {
 		throw err;
 	}
@@ -44,6 +51,6 @@ utils.addSeedJob(queue, batchid, crawlSchema, function(err) {
 	//
 	queue.shutdown(5000, function(err) {
 		console.log('Kue shutdown: ', err || '');
-		console.log("done seeding (source, type, batchid)", crawlSchema.source.name, crawlSchema.entity.type, batchid);
+		console.log("done seeding (source, type, batchid)", crawlConfig.source.name, crawlConfig.entity.type, batchid);
 	});
 });
