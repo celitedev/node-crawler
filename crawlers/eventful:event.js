@@ -17,7 +17,7 @@ module.exports = {
 	driver: {
 		//timeout on individual request. 
 		//Result: fail job and put back in queue as oer config.job.retries
-		timeoutMS: 20000,
+		timeoutMS: 40000,
 		proxy: "socks://localhost:5566", //local proxy, e.g.: TOR
 		headers: { //Default Headers for all requests
 			"Accept-Encoding": 'gzip, deflate'
@@ -32,7 +32,7 @@ module.exports = {
 		//
 		//#6: distribute concurrency per <source,type> or <source>
 		//for mrre controlled throttling.
-		concurrentJobs: 5,
+		concurrentJobs: 10,
 		retries: 5,
 		ttl: 100 * 1000, // fail job if not complete in 100 seconds
 	},
