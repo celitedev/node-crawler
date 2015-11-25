@@ -22,13 +22,10 @@ if (!argv.type) {
 	throw new Error("command-line arg 'type' not defined");
 }
 
-var schema = utils.init({
+var crawlConfig = utils.fetchCrawlConfig({
 	source: argv.source,
 	type: argv.type
 });
-
-var crawlConfig = schema.crawlConfig,
-	outputMessageSchema = schema.outputMessageSchema;
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,

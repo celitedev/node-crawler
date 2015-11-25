@@ -7,8 +7,8 @@ module.exports = {
 	URL_DONE_MASTER_PREFIX: "url_done_master",
 	URL_DONE_DETAIL_PREFIX: "url_done_detail",
 	KUE_PREFIX: "kwhenqueue2",
-	init: function(config) {
 
+	fetchCrawlConfig: function(config) {
 		config.source = config.source.toLowerCase();
 		config.type = config.type.toLowerCase();
 
@@ -39,25 +39,14 @@ module.exports = {
 				crawlConfig.source.name.toLowerCase() + ", " + crawlerName);
 		}
 
-		try {
-			var outputSchemaName = crawlConfig.entity.type.toLowerCase();
-			var outputSchemaPath = path.resolve(__dirname + "/schemas/" + outputSchemaName);
-			outputschema = require(outputSchemaPath);
-		} catch (err) {
-			throw new Error("outputschema not found for entitytype: " + outputSchemaName);
-		}
+		return crawlConfig;
+	},
 
-		return {
-			crawlConfig: crawlConfig,
-			outputMessageSchema: outputschema
-		};
-	},
-	queues: {
-		seedUrlQueueName: "seedUrls",
-		seedJobQueueName: "seedJob"
-	},
 	addCrawlJob: function(queue, batchId, crawlConfig, url, cb) {
-		return queue.create(this.queues.seedUrlQueueName, {
+
+		var crawlerQueueName = this.calculated.getCrawlerQueueName(crawlConfig);
+
+		return queue.create(crawlerQueueName, {
 				crawlJobId: batchId,
 				taskid: uuid.v4(), //id of this specific mini batch
 				source: crawlConfig.source.name,
@@ -98,6 +87,12 @@ module.exports = {
 				name = source + ":" + type;
 			}
 			return name.toLowerCase();
+		},
+
+
+		getCrawlerQueueName: function(crawlConfig) {
+			var crawlerName = this.getCrawlerName(crawlConfig.source.name, crawlConfig.entity.type);
+			return "crawl-" + crawlerName;
 		}
 	}
 };

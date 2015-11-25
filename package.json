@@ -18,6 +18,7 @@
     "highland": "^2.5.1",
     "kue": "^0.10.2",
     "lodash": "^3.10.1",
+    "moving-average": "0.0.5",
     "node-uuid": "^1.4.3",
     "superagent": "^1.4.0",
     "superagent-cache": "git+https://github.com/gebrits/superagent-cache.git",
