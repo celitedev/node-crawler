@@ -6,6 +6,7 @@ var path = require("path");
 var fs = require("fs");
 var proxyDriver = require("./drivers/proxyDriver");
 var kue = require('kue');
+var colors = require('colors');
 
 var utils = require("./utils");
 
@@ -18,6 +19,8 @@ var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
 });
 
+//DNS caching such as http://manpages.ubuntu.com/manpages/natty/man8/nscd.8.html
+console.log("Remembered to install proper DNS caching on the box such as nscd?".green);
 
 /////////////////////////////////////////////////////////////////////////////////
 //TODO                                                                         //
@@ -185,9 +188,19 @@ function processJob(job, done) {
 		})
 		.then(done)
 		.catch(function(err) {
-			//Error: move job back to queue
+
+			// if (err.code === "ENOTFOUND") {
+			// 	throw err; //CHECK THIS
+			// }
+
+			// if (err.code === "ECONNABORTED") {
+			// 	//likely timeout -> move back to queue
+
+			// }
+
 			console.log("ERR", err);
 			done(new Error("job error: orig: " + err.message));
+
 		});
 
 }
