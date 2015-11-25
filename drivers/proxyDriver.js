@@ -5,21 +5,7 @@
 var _ = require("lodash");
 var superagent = require('superagent');
 
-///////////////////
-//TODO: S3 cache //
-///////////////////
-var redisModule = require('cache-service-redis');
-
-var redisCache = new redisModule({
-  redisData: {
-    port: 6379,
-    hostname: "127.0.0.1"
-  },
-});
-
 require('superagent-proxy')(superagent);
-require('superagent-retry')(superagent);
-require('superagent-cache')(superagent, redisCache);
 
 /**
  * Export `driver`
@@ -44,7 +30,6 @@ function driver(opts) {
     agent
       .get(ctx.url)
       .set(_.defaults(ctx.headers, opts.headers))
-      .retry(opts.retry || 3)
       .timeout(opts.timeoutMS || 20000) //have a timeout. Seems by default superagent doesn't set one, which can lead to hands
       .proxy(opts.proxy) //TOR
       .end(function(err, res) {

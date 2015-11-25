@@ -30,7 +30,10 @@ var schema = utils.init({
 var crawlConfig = schema.crawlConfig,
 	outputMessageSchema = schema.outputMessageSchema;
 
-var queue = kue.createQueue();
+var queue = kue.createQueue({
+	prefix: utils.KUE_PREFIX,
+});
+
 var batchid = "1";
 
 utils.addCrawlJob(queue, batchid, crawlConfig, crawlConfig.schema.seed.config.seedUrl, function(err) {

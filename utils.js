@@ -6,6 +6,7 @@ module.exports = {
 	URL_SEED_PREFIX: "url_seed",
 	URL_DONE_MASTER_PREFIX: "url_done_master",
 	URL_DONE_DETAIL_PREFIX: "url_done_detail",
+	KUE_PREFIX: "kwhenqueue2",
 	init: function(config) {
 
 		config.source = config.source.toLowerCase();

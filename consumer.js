@@ -12,7 +12,9 @@ var utils = require("./utils");
 var Promise = require("bluebird");
 var async = require('async');
 
-var queue = kue.createQueue();
+var queue = kue.createQueue({
+	prefix: utils.KUE_PREFIX,
+});
 
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -263,7 +265,7 @@ function shutdown() {
 	queue.shutdown(5000, function(err) {
 		console.log('Kue shutdown ', err || '');
 		console.log("DONE");
-		// process.exit(0);
+		process.exit(0);
 	});
 }
 
