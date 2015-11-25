@@ -1,11 +1,33 @@
 {
   "name": "crawltest",
-  "version": "1.0.0",
+  "version": "0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "JSONStream": "^1.0.4",
+    "async": "^1.5.0",
+    "bluebird": "^3.0.5",
+    "cache-service": "^1.3.2",
+    "cache-service-redis": "^1.1.1",
+    "event-stream": "^3.3.2",
+    "highland": "^2.5.1",
+    "kue": "^0.10.2",
+    "lodash": "^3.10.1",
+    "moving-average": "0.0.5",
+    "node-uuid": "^1.4.3",
+    "superagent": "^1.4.0",
+    "superagent-cache": "git+https://github.com/gebrits/superagent-cache.git",
+    "superagent-proxy": "git+https://github.com/gebrits/superagent-proxy.git#patch-1",
+    "superagent-retry": "^0.5.1",
+    "through": "^2.3.8",
+    "uuid": "^2.0.1",
+    "x-ray": "git+https://github.com/Kwhen/x-ray.git#bugfix/nested-crawling",
+    "x-ray-phantom": "^1.0.1",
+    "yargs": "^3.30.0"
+  }
 }
