@@ -100,6 +100,8 @@ function processJob(job, done) {
 		.then(function() {
 			return new Promise(function(resolve, reject) {
 				x(data.url, "html", {
+
+					//pagination
 					paginate: function distributedPaginate(el, cb) {
 						if (crawlSchema.seed.type !== "urlToNextPage") {
 							//no pagination
@@ -117,6 +119,8 @@ function processJob(job, done) {
 						//TODO: execute stop criterium
 						utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, paginateConfig.nextUrl(el), cb);
 					},
+
+					//results crawling
 					results: x(crawlSchema.results.selector, [crawlResultSchema])
 				})(function(err, obj) {
 					if (err) {
@@ -312,6 +316,8 @@ function generateStats(resource) {
 		});
 	}
 
+	resource.stats.totalMS = resource.stats.totalMS + resource.stats.intervalMS || 0;
+
 	//calculate delta. I.e.: totals changed since last check (in resource.stats.intervalMS interval)
 	var delta = _.reduce(resource.stats.total, function(agg, v, k) {
 		agg[k] = v - resource.stats.totalPrev[k];
@@ -324,20 +330,30 @@ function generateStats(resource) {
 		return agg;
 	}, {});
 
-	//from perSecond -> exponential moving average
-	var movingAverageStats = _.reduce(perSecond, function(agg, v, k) {
-		var ma = resource.stats.movingAverages[k];
-		ma.push(Date.now(), v);
-		agg[k] = ma.movingAverage();
-		return agg;
-	}, {});
+
 
 	resource.stats.totalPrev = _.cloneDeep(resource.stats.total);
 	return {
+
 		"TOTAL": resource.stats.total,
+
 		// "DELTA": delta,
+
 		"PER_SECOND": perSecond,
-		"MA_PER_SECOND": movingAverageStats
+
+		//exponential moving average / second
+		"MAE_PER_SECOND": _.reduce(perSecond, function(agg, v, k) {
+			var ma = resource.stats.movingAverages[k];
+			ma.push(Date.now(), v);
+			agg[k] = parseFloat((ma.movingAverage()).toFixed(2));
+			return agg;
+		}, {}),
+
+		//Total average / second
+		"AVG_PER_SECOND": _.reduce(resource.stats.total, function(agg, v, k) {
+			agg[k] = parseFloat((resource.stats.totalMS ? v * 1000 / resource.stats.totalMS : 0).toFixed(2));
+			return agg;
+		}, {})
 	};
 }
 
