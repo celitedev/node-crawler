@@ -55,11 +55,11 @@ module.exports = {
 				created: new Date().toISOString(),
 				title: this.calculated.getSeedUrlTitle(crawlConfig.source.name, crawlConfig.entity.type, crawlConfig.schema.seed.config.seedUrl)
 			})
-			.ttl(100 * 1000) // fail job if not complete in 100 seconds
+			.ttl(crawlConfig.job.ttl)
 			//fail means retry: return to queue to be picked up later. Allows us to mimic 'at-least-once'-semantics
 			//except for that fact that redis isn't durable. 
 			//TODO: look into this as alternative to propert queueing? 
-			.attempts(5)
+			.attempts(crawlConfig.job.retries)
 			.removeOnComplete(true)
 			.save(cb || noop);
 	},

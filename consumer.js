@@ -96,7 +96,6 @@ function processJob(job, done) {
 		//x-ray instance specific to <source,type>
 		x = crawlerResource.x;
 
-
 	Promise.resolve()
 		.then(function() {
 			return new Promise(function(resolve, reject) {
@@ -107,9 +106,16 @@ function processJob(job, done) {
 							return cb();
 						}
 
+						var paginateConfig = crawlSchema.seed.config;
+
+						//disable pagination (used for testing)
+						if (paginateConfig.disable) {
+							return cb();
+						}
+
 						//upload next url to queue
 						//TODO: execute stop criterium
-						utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, crawlSchema.seed.config.nextUrl(el), cb);
+						utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, paginateConfig.nextUrl(el), cb);
 					},
 					results: x(crawlSchema.results.selector, [crawlResultSchema])
 				})(function(err, obj) {
@@ -170,20 +176,17 @@ function processJob(job, done) {
 		})
 		.then(function(results) {
 			_.each(results, function(result) {
-				// console.log(result);
+				//push them to other queue
 			});
 		})
+		.then(done)
 		.catch(function(err) {
 			//Error: move job back to queue
 			console.log("ERR", err);
 			done(new Error("job error: orig: " + err.message));
-		})
-		.then(done)
-		.finally(function() {
-			// console.log("END JOB");
 		});
-}
 
+}
 
 ///////////////////////////////
 // Start <source,type> queue //
@@ -232,9 +235,10 @@ function startCrawlerQueue(crawlConfig) {
 		})
 	};
 
+	//start queue for this crawl
 	queue.process(
 		resource.queueName,
-		crawlConfig.concurrency.concurrentJobs,
+		crawlConfig.job.concurrentJobs,
 		processJob
 	);
 

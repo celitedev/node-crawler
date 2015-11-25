@@ -15,15 +15,15 @@ module.exports = {
 		type: "Event"
 	},
 	driver: {
-		// caching: true, //always true / not configurable: see #9 for more info
-		retry: 3,
+		//timeout on individual request. 
+		//Result: fail job and put back in queue as oer config.job.retries
 		timeoutMS: 20000,
 		proxy: "socks://localhost:5566", //local proxy, e.g.: TOR
 		headers: { //Default Headers for all requests
 			"Accept-Encoding": 'gzip, deflate'
 		}
 	},
-	concurrency: {
+	job: {
 		//x concurrent kue jobs
 		//
 		//NOTE: depending on the type of crawl this can be a master page, which 
@@ -32,7 +32,9 @@ module.exports = {
 		//
 		//#6: distribute concurrency per <source,type> or <source>
 		//for mrre controlled throttling.
-		concurrentJobs: 10,
+		concurrentJobs: 8,
+		retries: 5,
+		ttl: 100 * 1000, // fail job if not complete in 100 seconds
 	},
 	schema: {
 		version: "0.1", //version of this schema
@@ -44,7 +46,7 @@ module.exports = {
 			// - urlSeed: function to build seed urls to visit. 
 			type: "urlToNextPage",
 			config: {
-				disable: true, //for testing. 
+				disable: false, //for testing. 
 				seedUrl: "http://newyorkcity.eventful.com/events/categories",
 				nextUrl: function(el) {
 					return el.find(".next > a").attr("href");
