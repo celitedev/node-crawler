@@ -32,7 +32,7 @@ module.exports = {
 		//
 		//#6: distribute concurrency per <source,type> or <source>
 		//for mrre controlled throttling.
-		concurrentJobs: 8,
+		concurrentJobs: 5,
 		retries: 5,
 		ttl: 100 * 1000, // fail job if not complete in 100 seconds
 	},
