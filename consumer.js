@@ -3,7 +3,7 @@ var Xray = require('x-ray');
 var uuid = require("uuid");
 var argv = require('yargs').argv;
 var path = require("path");
-
+var fs = require("fs");
 var proxyDriver = require("./drivers/proxyDriver");
 var kue = require('kue');
 
@@ -11,6 +11,8 @@ var utils = require("./utils");
 
 var Promise = require("bluebird");
 var async = require('async');
+
+var MA = require('moving-average');
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
@@ -46,19 +48,24 @@ var queue = kue.createQueue({
 //  - specific custom headers per <source, type>
 var resourcesPerCrawlerType = {};
 
+////////////////////////////
+//initialize all crawlers //
+////////////////////////////
+var normalizedPath = path.join(__dirname, "crawlers");
+fs.readdirSync(normalizedPath).forEach(function(file) {
+	var stat = fs.statSync(path.join(normalizedPath, file));
+	if (stat.isFile()) {
+		startCrawlerQueue(require("./crawlers/" + file));
+	}
+});
 
-//TODO: from config
-//THIS SHOULD BE <SOURCE,TYPE> SPECIFIC!
-//Moreover, concurrency should be distributed.
-var concurrentBatches = 10;
-queue.process(utils.queues.seedUrlQueueName, concurrentBatches, waitUntilWork);
 
-
-function waitUntilWork(job, done) {
+////////////////////////
+//Process actual work //
+////////////////////////
+function processJob(job, done) {
 
 	var data = job.data;
-
-	// console.log("START JOB", data.url);
 
 	if (!data.source) {
 		throw new Error("'source' not defined on job: " + JSON.strinfify(job));
@@ -70,7 +77,8 @@ function waitUntilWork(job, done) {
 	var crawlerName = utils.calculated.getCrawlerName(data);
 	var crawlerResource = resourcesPerCrawlerType[crawlerName];
 	if (crawlerResource === undefined) {
-		crawlerResource = resourcesPerCrawlerType[crawlerName] = createCrawlerResource(data);
+		throw new Error("crawler not found: " + crawlerName);
+		//LATER: might want to add hot loading here.
 	}
 
 	//the entire crawl config as defined in /crawlers
@@ -87,7 +95,6 @@ function waitUntilWork(job, done) {
 
 		//x-ray instance specific to <source,type>
 		x = crawlerResource.x;
-
 
 
 	Promise.resolve()
@@ -132,8 +139,8 @@ function waitUntilWork(job, done) {
 			return _.extend({
 				id: uuid.v4(),
 				//TODO: check what attributes should always exist in msg: 
-				//- check book
-				//- check guigelines for Kafka
+				//- check EIP book
+				//- check guidelines for Kafka
 				meta: {
 					type: crawlConfig.entity.type,
 					crawl: {
@@ -178,60 +185,79 @@ function waitUntilWork(job, done) {
 }
 
 
+///////////////////////////////
+// Start <source,type> queue //
+///////////////////////////////
+function startCrawlerQueue(crawlConfig) {
 
-// Create a cachable crawler resource for each <source,type>-combo
-function createCrawlerResource(jobData) {
+	var crawlerName = utils.calculated.getCrawlerName(crawlConfig.source.name, crawlConfig.entity.type);
 
-	var crawlerResource = utils.init(jobData);
+	var outputMessageSchema;
+	try {
+		var outputSchemaName = crawlConfig.entity.type.toLowerCase();
+		var outputSchemaPath = path.resolve(__dirname + "/schemas/" + outputSchemaName);
+		outputMessageSchema = require(outputSchemaPath);
+	} catch (err) {
+		throw new Error("outputMessageSchema not found for entitytype: " + outputSchemaName);
+	}
 
 	var x = Xray();
 
 	//install own driver which does: 
 	//- proxying through crawlera
 	//- caching using S3
-	var proxyAndCacheDriver = proxyDriver(crawlerResource.crawlConfig.driver);
+	var proxyAndCacheDriver = proxyDriver(crawlConfig.driver);
 
 	x.driver(proxyAndCacheDriver);
 
-	var out = {
+	var resource = resourcesPerCrawlerType[crawlerName] = {
 		x: x,
+		crawlerName: crawlerName,
+		queueName: utils.calculated.getCrawlerQueueName(crawlConfig),
 		proxyAndCacheDriver: proxyAndCacheDriver,
-		crawlConfig: crawlerResource.crawlConfig,
-		outputMessageSchema: crawlerResource.outputMessageSchema,
+		crawlConfig: crawlConfig,
+		outputMessageSchema: outputMessageSchema,
 		stats: {
-			downloadedDetailPages: 0,
+			intervalMS: 5000, // 5 seconds
+			intervalMovingAverageMS: 5 * 60 * 1000, //5 minutes
+			total: {
+				nrDetailPages: 0,
+			}
 		},
-		job: jobData,
-		crawlResultSchema: _.extend({}, crawlerResource.crawlConfig.schema.results.schema(x), {
+		crawlResultSchema: _.extend({}, crawlConfig.schema.results.schema(x), {
 			calcPageDone: function(el, cb) {
-				out.stats.downloadedDetailPages++;
+				resource.stats.total.nrDetailPages++;
 				cb();
 			}
 		})
 	};
 
-	return out;
+	queue.process(
+		resource.queueName,
+		crawlConfig.concurrency.concurrentJobs,
+		processJob
+	);
+
+	manageCrawlerLifecycle(resource);
 }
 
-function displayStats() {
-	console.log("STATS--------------");
-	_.each(resourcesPerCrawlerType, function(resource) {
-		console.log("downladed detail pages: " + resource.stats.downloadedDetailPages +
-			" - for <" + resource.job.source + "," + resource.job.type + ">");
-	});
-}
 
 
-(function checkIfDone() {
+////////////////////
+//manage lifecyle of specific crawler: 
+//- periodicially check if done and gracefully shutdown
+//- report stats
+////////////////////
+function manageCrawlerLifecycle(resource) {
+
 	async.parallel([
 		function(cb) {
 			//check nr inactive (i.e.: queued)
-			queue.inactiveCount(utils.queues.seedUrlQueueName, cb);
+			queue.inactiveCount(resource.queueName, cb);
 		},
 		function(cb) {
 			//check nr active in this process. 
-			//TODO: this is a distrbuted check, while a local check should be enough (and better?)
-			queue.activeCount(utils.queues.seedUrlQueueName, cb);
+			queue.activeCount(resource.queueName, cb);
 		},
 		function(cb) {
 			//TODO:  no more busy seeds -> check in redis
@@ -246,28 +272,97 @@ function displayStats() {
 			return total + len;
 		}, 0);
 
-		displayStats();
+		//Show some stats
+		console.log("#####", resource.crawlerName);
+		console.log(_.extend(generateStats(resource), {
+			"QUEUE": {
+				inactiveCount: lengths[0],
+				activeCount: lengths[1]
+			}
+		}));
 
 		if (countTotal) { //busy -> check when 
-			setTimeout(checkIfDone, 5000);
+			setTimeout(function() {
+				manageCrawlerLifecycle(resource);
+			}, resource.stats.intervalMS);
 		} else {
-
-			shutdown();
+			console.log("SHUTDOWN ", resource.crawlerName);
+			resource.isDone = true;
 		}
 	});
-}());
-
-function shutdown() {
-	_.each(resourcesPerCrawlerType, function(resource) {
-		resource.proxyAndCacheDriver.redisCache.db.quit();
-	});
-	console.log("Redit shut down");
-	queue.shutdown(5000, function(err) {
-		console.log('Kue shutdown ', err || '');
-		console.log("DONE");
-		process.exit(0);
-	});
 }
+
+function generateStats(resource) {
+
+	//INIT
+	if (!resource.stats.totalPrev) {
+
+		//init totalPrev to 0 for all values
+		var prev = resource.stats.totalPrev = {},
+			movingAverages = resource.stats.movingAverages = {};
+
+		//init moving averages
+		_.each(resource.stats.total, function(v, k) {
+			prev[k] = 0;
+			movingAverages[k] = MA(resource.stats.intervalMovingAverageMS);
+		});
+	}
+
+	//calculate delta. I.e.: totals changed since last check (in resource.stats.intervalMS interval)
+	var delta = _.reduce(resource.stats.total, function(agg, v, k) {
+		agg[k] = v - resource.stats.totalPrev[k];
+		return agg;
+	}, {});
+
+	//from delta -> perSecond
+	var perSecond = _.reduce(delta, function(agg, v, k) {
+		agg[k] = v * 1000 / resource.stats.intervalMS; //multiplication first
+		return agg;
+	}, {});
+
+	//from perSecond -> exponential moving average
+	var movingAverageStats = _.reduce(perSecond, function(agg, v, k) {
+		var ma = resource.stats.movingAverages[k];
+		ma.push(Date.now(), v);
+		agg[k] = ma.movingAverage();
+		return agg;
+	}, {});
+
+	resource.stats.totalPrev = _.cloneDeep(resource.stats.total);
+	return {
+		"TOTAL": resource.stats.total,
+		// "DELTA": delta,
+		"PER_SECOND": perSecond,
+		"MA_PER_SECOND": movingAverageStats
+	};
+}
+
+
+
+///////////////////////////////////
+//checker to shutdown everything //
+///////////////////////////////////
+(function manageShutdown() {
+
+	//If all resources are set to isDone -> we're done with everything
+	//and can gracefully shutdown the entire process: 
+	//1. shutdown queue (which is shared between crawlers)
+	//2. process.exit()
+
+	var resources = _.values(resourcesPerCrawlerType),
+		resourcesDone = _.filter(resources, {
+			isDone: true
+		});
+
+	if (resources.length !== resourcesDone.length) {
+		setTimeout(manageShutdown, 1000);
+	} else {
+		queue.shutdown(5000, function(err) {
+			console.log("SHUTDOWN ALL");
+			process.exit(0);
+		});
+	}
+}());
 
 
 

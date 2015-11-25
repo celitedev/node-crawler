@@ -8,11 +8,11 @@ module.exports = {
 		name: "Eventful Events",
 		description: "Distributed Crawler for Eventful.com Events"
 	},
-	entity: {
-		type: "Event"
-	},
 	source: {
 		name: "Eventful"
+	},
+	entity: {
+		type: "Event"
 	},
 	driver: {
 		// caching: true, //always true / not configurable: see #9 for more info
@@ -22,6 +22,17 @@ module.exports = {
 		headers: { //Default Headers for all requests
 			"Accept-Encoding": 'gzip, deflate'
 		}
+	},
+	concurrency: {
+		//x concurrent kue jobs
+		//
+		//NOTE: depending on the type of crawl this can be a master page, which 
+		//within that job will set off concurrent detail-page fetches. 
+		//In that case total concurrency is higher than specified here. 
+		//
+		//#6: distribute concurrency per <source,type> or <source>
+		//for mrre controlled throttling.
+		concurrentJobs: 10,
 	},
 	schema: {
 		version: "0.1", //version of this schema
@@ -33,6 +44,7 @@ module.exports = {
 			// - urlSeed: function to build seed urls to visit. 
 			type: "urlToNextPage",
 			config: {
+				disable: true, //for testing. 
 				seedUrl: "http://newyorkcity.eventful.com/events/categories",
 				nextUrl: function(el) {
 					return el.find(".next > a").attr("href");

@@ -52,8 +52,6 @@ function driver(opts) {
       });
   };
 
-  fn.redisCache = redisCache;
-
   return fn;
 
 }
