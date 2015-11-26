@@ -36,7 +36,9 @@ to big (crippling concurrency).
 			typeSchemaVersion: outputMessageSchema.version, //specific version of the target message schema. 
 		},
 	},
-	source: {
+	//identifiers are generic and always avail. 
+	//They're used for various tasks such as lookup, pruning, et.c
+	identifiers: {
 		id, //if known. Otherwise url
 		url
 	},
@@ -49,29 +51,30 @@ to big (crippling concurrency).
 Example
 
 ````javascript
-{ id: 'c2561987-a688-4dba-be74-b093f4a8f1a0',
+{ id: 'ec2e3fdf-ffe6-4d44-beb4-ff92cba76277',
   meta: 
    { source: 'Eventful',
      type: 'Event',
      crawl: 
       { batchId: '1',
-        jobId: '1d5d0bd4-573f-4a8d-bc6c-56aa14e4adef',
-        dateTime: '2015-11-26T19:01:34.378Z',
+        jobId: '9eb83801-e756-4c58-b6a6-822f83b9878d',
+        dateTime: '2015-11-26T19:12:05.209Z',
         crawlConfig: '0.1',
         typeSchema: '0.1' } },
-  source: 
-   { id: 'http://newyorkcity.eventful.com/events/aladdin-musical-new-york-/E0-001-061203646-1@2015112714',
-     url: 'http://newyorkcity.eventful.com/events/aladdin-musical-new-york-/E0-001-061203646-1@2015112714' },
+  identifiers: 
+   { id: 'http://newyorkcity.eventful.com/events/rihanna-travis-scott-/E0-001-089143485-7',
+     url: 'http://newyorkcity.eventful.com/events/rihanna-travis-scott-/E0-001-089143485-7' },
   payload: 
-   { name: 'Aladdin The Musical New York',
-     startDate: '2015-11-27T14:00:00',
+   { name: 'Rihanna & Travis Scott',
+     startDate: '2016-04-02T19:30:00',
      place: 
-      { name: 'New Amsterdam Theatre',
-        url: 'http://newyorkcity.eventful.com/venues/new-amsterdam-theatre-/V0-001-000112293-7',
-        streetAddress: '214 West 42nd Street',
-        addressLocality: 'New York',
-        addressRegion: 'New York',
-        postalCode: '10036' },
-     performers: {} } }
+      { name: 'Prudential Center',
+        url: 'http://newyorkcity.eventful.com/venues/prudential-center-/V0-001-000989370-3',
+        streetAddress: '25 Lafayette Street',
+        addressLocality: 'Newark',
+        addressRegion: 'New Jersey',
+        postalCode: '07102' },
+     performers: { name: 'Rihanna', url: 'http://concerts.eventful.com/Rihanna' } } }
+
 ````
 

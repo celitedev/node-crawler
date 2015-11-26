@@ -200,7 +200,7 @@ function processJob(job, done) {
 						typeSchema: outputMessageSchema.version, //specific version of the target message/type schema. 
 					},
 				},
-				source: {
+				identifiers: {
 					id: sourceId,
 					url: sourceUrl
 				},
@@ -214,7 +214,7 @@ function processJob(job, done) {
 			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
 			//The fact that a sourceId is required allows is to select based on this. 
 			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
-			return result.source.id;
+			return result.identifiers.id;
 		})
 		.then(function validateMessages(results) {
 			//TODO: #25: validate messages against JSON schema of particular schema
@@ -222,6 +222,7 @@ function processJob(job, done) {
 		})
 		.then(function(results) {
 			_.each(results, function(result) {
+				console.log(result);
 				//push them to other queue
 			});
 		})
