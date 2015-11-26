@@ -31,6 +31,7 @@
     "valid-url": "^1.0.9",
     "x-ray": "git+https://github.com/Kwhen/x-ray.git#bugfix/nested-crawling",
     "x-ray-phantom": "^1.0.1",
-    "yargs": "^3.30.0"
+    "yargs": "^3.30.0",
+    "z-schema": "^3.16.0"
   }
 }
