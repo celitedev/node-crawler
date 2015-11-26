@@ -17,6 +17,7 @@ var utils = require("./utils");
 var proxyDriver = require("./drivers/proxyDriver");
 
 
+var argv = require('yargs').argv;
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
@@ -54,6 +55,12 @@ console.log("Remembered to install proper DNS caching on the box such as nscd?".
 //  - specific custom headers per <source, type>
 var resourcesPerCrawlerType = {};
 
+if (argv.source && argv.type) {
+	var specificCrawler = utils.calculated.getCrawlerName(argv.source, argv.type);
+	console.log(("consuming jobs for specific crawler: " + specificCrawler).yellow);
+} else {
+	console.log(("consuming jobs for all crawlers").yellow);
+}
 ////////////////////////////
 //initialize all crawlers //
 ////////////////////////////
@@ -61,7 +68,11 @@ var normalizedPath = path.join(__dirname, "crawlers");
 fs.readdirSync(normalizedPath).forEach(function(file) {
 	var stat = fs.statSync(path.join(normalizedPath, file));
 	if (stat.isFile()) {
-		startCrawlerQueue(require("./crawlers/" + file));
+		if ((specificCrawler && file === specificCrawler + ".js") || !specificCrawler) {
+			startCrawlerQueue(require("./crawlers/" + file));
+		} else {
+			console.log(("skipping jobs for crawler: " + file.substring(0, file.lastIndexOf("."))).yellow);
+		}
 	}
 });
 
