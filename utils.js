@@ -53,7 +53,7 @@ var utils = module.exports = {
 				type: crawlConfig.entity.type,
 				url: url,
 				created: new Date().toISOString(),
-				title: utils.calculated.getSeedUrlTitle(crawlConfig.source.name, crawlConfig.entity.type, crawlConfig.schema.seed.config.seedUrl)
+				title: utils.calculated.getSeedUrlTitle(crawlConfig.source.name, crawlConfig.entity.type, url)
 			})
 			.ttl(crawlConfig.job.ttl)
 			//fail means retry: return to queue to be picked up later. Allows us to mimic 'at-least-once'-semantics

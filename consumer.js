@@ -111,19 +111,20 @@ function processJob(job, done) {
 
 					//pagination
 					paginate: function distributedPaginate(el, cb) {
-						if (crawlSchema.seed.type !== "urlToNextPage") {
-							//no pagination
+
+						var paginateConfig = crawlSchema.seed;
+
+						//if no nextUrlFN function -> skip
+						if (!paginateConfig.nextUrlFN) {
 							return cb();
 						}
-
-						var paginateConfig = crawlSchema.seed.config;
 
 						//disable pagination (used for testing)
 						if (paginateConfig.disable) {
 							return cb();
 						}
 
-						var nextUrl = paginateConfig.nextUrl(el);
+						var nextUrl = paginateConfig.nextUrlFN(el);
 						debug("url", data.url);
 						debug("nexturl", nextUrl);
 
