@@ -7,17 +7,24 @@ var fs = require("fs");
 
 var kue = require('kue');
 var colors = require('colors');
-var debug = require('debug')('kwhen-crawler');
 var validUrl = require('valid-url');
 
 var Promise = require("bluebird");
 var async = require('async');
+var ZSchema = require("z-schema");
+
+var debug = require('debug')('kwhen-crawler');
+var argv = require('yargs').argv;
 
 var utils = require("./utils");
 var proxyDriver = require("./drivers/proxyDriver");
 
+var abstractTypeSchema = require("./schemas/abstract");
 
-var argv = require('yargs').argv;
+var jsonValidator = new ZSchema({
+	breakOnFirstError: false
+});
+
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
@@ -48,6 +55,7 @@ fs.readdirSync(normalizedPath).forEach(function(file) {
 		}
 	}
 });
+
 
 
 ////////////////////////
@@ -210,6 +218,16 @@ function processJob(job, done) {
 				},
 				payload: _.extend({}, result, detail)
 			});
+		})
+		.then(function validateGenericEnvelopeSchema(results) {
+			_.each(results, function(result) {
+				var valid = jsonValidator.validate(result, abstractTypeSchema.schema);
+				if (!valid) {
+					var errors = jsonValidator.getLastErrors();
+					console.log("validation errors on generic/evelope schema", errors);
+				}
+			});
+			return results;
 		})
 		.then(function validateSpecificTypeSchema(results) {
 			//TODO: #25: validate messages against JSON schema of particular schema
