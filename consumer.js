@@ -4,16 +4,21 @@ var uuid = require("uuid");
 var argv = require('yargs').argv;
 var path = require("path");
 var fs = require("fs");
-var proxyDriver = require("./drivers/proxyDriver");
+
 var kue = require('kue');
 var colors = require('colors');
-
-var utils = require("./utils");
+var debug = require('debug')('kwhen-crawler');
+var validUrl = require('valid-url');
 
 var Promise = require("bluebird");
 var async = require('async');
 
 var MA = require('moving-average');
+
+var utils = require("./utils");
+var proxyDriver = require("./drivers/proxyDriver");
+
+
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
@@ -118,9 +123,56 @@ function processJob(job, done) {
 							return cb();
 						}
 
+						var nextUrl = paginateConfig.nextUrl(el);
+						debug("url", data.url);
+						debug("nexturl", nextUrl);
+
+						//sometimes the next url just isn't there anymore. 
+						//That's an easy and strong signal to stop bothering
+						if (!validUrl.isUri(nextUrl)) {
+							return cb();
+						}
+
+						//check if nextUrl is the same as currentUrl. 
+						//If so -> quit
+						if (nextUrl === data.url) {
+							return cb();
+						}
+
+						//... otherwise there might be more domain specific ways in which to pick up signal that we're done
+						var stopCriteriaFound = false;
+
+						stopArr = paginateConfig.stop || [];
+						stopArr = _.isArray(paginateConfig.stop) ? paginateConfig.stop : [paginateConfig.stop];
+
+						_.each(stopArr, function(stop) {
+							if (_.isString(stop)) {
+								stop = {
+									name: stop
+								};
+							}
+							switch (stop.name) {
+								case "zeroResults":
+									//no results found -> stopCriteriaFound = true
+									var filterFN = stop.selectorPostFilter || function(results) {
+										return true;
+									};
+									if (!_.filter(el.find(crawlSchema.results.selector), filterFN)) {
+										stopCriteriaFound = true;
+									}
+									break;
+
+								default:
+									console.log("stop-criteria not supported (and ignored)", stop.name);
+							}
+						});
+
+						if (stopCriteriaFound) {
+							return cb();
+						}
+
 						//upload next url to queue
-						//TODO: execute stop criterium
-						utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, paginateConfig.nextUrl(el), cb);
+						utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, nextUrl, cb);
 					},
 
 					//results crawling
@@ -173,12 +225,9 @@ function processJob(job, done) {
 			}, result, detail);
 		})
 		.filter(function(result) {
-			// return _.filter(results, function(result) {
-			// 	//This is a general filter that removes all ill-selected results, e.g.: headers and footers
-			// 	//The fact that a sourceId is required allows is to select based on this. 
-			// 	//It's extremely unlikely that ill-selected results have an id (as fetched by the schema) 
-			// 	return result.meta.source.id;
-			// });
+			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
+			//The fact that a sourceId is required allows is to select based on this. 
+			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
 			return result.meta.source.id;
 		})
 		.then(function(results) {
