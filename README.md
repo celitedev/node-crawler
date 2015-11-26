@@ -33,7 +33,7 @@ to big (crippling concurrency).
 			jobId:
 			createdAt: //dt
 			crawlVersion:  //specific version for this schema, i.e.: Eventful Events v1.0
-			typeSchemaVersion: outputMessageSchema.version, //specific version of the target message schema. 
+			typeVersion: outputMessageSchema.version, //specific version of the target message schema. 
 		},
 	},
 	//identifiers are generic and always avail. 
@@ -58,9 +58,9 @@ Example
      crawl: 
       { batchId: '1',
         jobId: '9eb83801-e756-4c58-b6a6-822f83b9878d',
-        dateTime: '2015-11-26T19:12:05.209Z',
-        crawlConfig: '0.1',
-        typeSchema: '0.1' } },
+        createdAt: '2015-11-26T19:12:05.209Z',
+        crawlVersion: '0.1',
+        typeVersion: '0.1' } },
   identifiers: 
    { id: 'http://newyorkcity.eventful.com/events/rihanna-travis-scott-/E0-001-089143485-7',
      url: 'http://newyorkcity.eventful.com/events/rihanna-travis-scott-/E0-001-089143485-7' },

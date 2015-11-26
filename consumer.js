@@ -195,9 +195,9 @@ function processJob(job, done) {
 					crawl: {
 						batchId: data.batchId, //the large batch.
 						jobId: data.jobId, //the specific mini job within this batch. 
-						dateTime: new Date().toISOString(),
-						crawlConfig: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
-						typeSchema: outputMessageSchema.version, //specific version of the target message/type schema. 
+						createdAt: new Date().toISOString(),
+						crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
+						typeVersion: outputMessageSchema.version, //specific version of the target message/type schema. 
 					},
 				},
 				identifiers: {
