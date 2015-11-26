@@ -58,8 +58,7 @@ module.exports = {
 			type: "urlToNextPage",
 			config: {
 				disable: false, //for testing. 
-				seedUrl: "http://newyorkcity.eventful.com/events/categories?page_number=2433",
-				// seedUrl: "http://newyorkcity.eventful.com/events/categories",
+				seedUrl: "http://newyorkcity.eventful.com/events/categories",
 				nextUrl: function(el) {
 					return el.find(".next > a").attr("href");
 				},
