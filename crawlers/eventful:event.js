@@ -14,16 +14,8 @@ module.exports = {
 	entity: {
 		type: "Event"
 	},
-	driver: {
-		// caching: true, //always true / not configurable: see #9 for more info
-		retry: 3,
-		timeoutMS: 20000,
-		proxy: "socks://localhost:5566", //local proxy, e.g.: TOR
-		headers: { //Default Headers for all requests
-			"Accept-Encoding": 'gzip, deflate'
-		}
-	},
-	concurrency: {
+
+	job: {
 		//x concurrent kue jobs
 		//
 		//NOTE: depending on the type of crawl this can be a master page, which 
@@ -31,8 +23,29 @@ module.exports = {
 		//In that case total concurrency is higher than specified here. 
 		//
 		//#6: distribute concurrency per <source,type> or <source>
-		//for mrre controlled throttling.
+		//for more controlled throttling.
 		concurrentJobs: 10,
+		retries: 5,
+
+		// fail job if not complete in 100 seconds. This is used because a consumer can fail / crash
+		// In that case the job would get stuck indefinitely in 'active' state. 
+		// With this solution, the job is placed back on the queue, and retried (according to 'retries')
+		// 
+		ttl: 100 * 1000,
+	},
+	driver: {
+
+		//timeout on individual request. 
+		//Result: fail job and put back in queue as oer config.job.retries
+		timeoutMS: 40000,
+
+		//local proxy, e.g.: TOR
+		proxy: "socks://localhost:5566",
+
+		//Default Headers for all requests
+		headers: {
+			"Accept-Encoding": 'gzip, deflate'
+		}
 	},
 	schema: {
 		version: "0.1", //version of this schema
@@ -44,27 +57,39 @@ module.exports = {
 			// - urlSeed: function to build seed urls to visit. 
 			type: "urlToNextPage",
 			config: {
-				disable: true, //for testing. 
-				seedUrl: "http://newyorkcity.eventful.com/events/categories",
+				disable: false, //for testing. 
+				seedUrl: "http://newyorkcity.eventful.com/events/categories?page_number=2433",
+				// seedUrl: "http://newyorkcity.eventful.com/events/categories",
 				nextUrl: function(el) {
 					return el.find(".next > a").attr("href");
 				},
-				//can contain strings (names for templates functions) or custom function. 
-				//Function signature: function(el, cb)
+
+
+				// STOP CRITERIA
+				// When processing one page after another, we need a way to check if we're done.
+				// A couple of standard checks are always performed to this end: 
 				//
-				//templated functions: 
+				// - check if nextUrl is the same as currentUrl. This is often employed by sites and is 
+				//  used as a sure sign we're done
+				// - nextUrl is not an url (i.e if nexturl() finds a 'href' that isn't there anymore)
 				//
-				//- urlAlreadyProcessed: looks into db to see if next url already in list of 
-				//alreadyProcessed OR queue
+				// Besides that a crawler may implement specific stop criteria based on domain knowledge:
+				// - Templated functions (referenced by string or object with attrib name = name of template function)
+				// - custom function. Signature : function(el, cb) TO BE IMPLEMENTED
 				//
-				//- zeroResults: processes page and stops if no elements to results to process on this page
-				//anymore. This is a good solid check for sites that allows browsing forward indefinitely
-				//without displaying results
+				// Available Templated functions: 
+				// - zeroResults: uses `results.selector` + optional `selectorPostFilter` to check for 0 results. 
 				//
-				//- resultsAlreadyProcessed:  processes page and stops if results found were already processed. 
-				//This is a good solud check for sites that display the same set of results after the final page
-				//with *real* (unique) results was found.
-				stop: "zeroResults"
+				// Below is a working example. 
+				// It's superfloous for this crawler through, since general checks desribed above are enough.
+				stop: [{
+					name: "zeroResults", //zeroResults
+					selectorPostFilter: function(result) {
+						//as described above this is 
+						return result.attribs.itemscope !== undefined;
+					}
+				}]
+
 			}
 		},
 		check: {
@@ -90,7 +115,10 @@ module.exports = {
 			"Accept-Encoding": 'gzip, deflate'
 		},
 		results: {
+			//WEIRD: selector: ".search-results > li[itemscope]" produces 9 instead of 10 results
+			//We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
 			selector: ".search-results > li", //selector for results
+
 			schema: function(x) { //schema for each individual result
 				return {
 					sourceUrl: "a.tn-frame@href",
