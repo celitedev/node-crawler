@@ -49,29 +49,29 @@ to big (crippling concurrency).
 Example
 
 ````javascript
-{ id: 'cb3e3f55-6e07-4d4a-bf70-89799916b217',
+{ id: 'c2561987-a688-4dba-be74-b093f4a8f1a0',
   meta: 
    { source: 'Eventful',
      type: 'Event',
      crawl: 
-      { batchId: undefined,
-        jobId: undefined,
-        dateTime: '2015-11-26T18:57:49.684Z',
+      { batchId: '1',
+        jobId: '1d5d0bd4-573f-4a8d-bc6c-56aa14e4adef',
+        dateTime: '2015-11-26T19:01:34.378Z',
         crawlConfig: '0.1',
         typeSchema: '0.1' } },
   source: 
-   { id: 'http://newyorkcity.eventful.com/events/foals-/E0-001-088106866-4',
-     url: 'http://newyorkcity.eventful.com/events/foals-/E0-001-088106866-4' },
+   { id: 'http://newyorkcity.eventful.com/events/aladdin-musical-new-york-/E0-001-061203646-1@2015112714',
+     url: 'http://newyorkcity.eventful.com/events/aladdin-musical-new-york-/E0-001-061203646-1@2015112714' },
   payload: 
-   { name: 'Foals',
-     startDate: '2015-12-18T20:00:00',
+   { name: 'Aladdin The Musical New York',
+     startDate: '2015-11-27T14:00:00',
      place: 
-      { name: 'Terminal 5',
-        url: 'http://newyorkcity.eventful.com/venues/terminal-5-/V0-001-000529171-2',
-        streetAddress: '610 West 56th Street',
+      { name: 'New Amsterdam Theatre',
+        url: 'http://newyorkcity.eventful.com/venues/new-amsterdam-theatre-/V0-001-000112293-7',
+        streetAddress: '214 West 42nd Street',
         addressLocality: 'New York',
         addressRegion: 'New York',
-        postalCode: '10019' },
-     performers: { name: 'Foals', url: 'http://concerts.eventful.com/Foals' } } }
+        postalCode: '10036' },
+     performers: {} } }
 ````
 
