@@ -57,8 +57,16 @@ module.exports = {
 			// - urlSeed: function to build seed urls to visit. 
 			type: "urlToNextPage",
 			config: {
-				disable: false, //for testing. 
-				seedUrl: "http://newyorkcity.eventful.com/events/categories",
+				disable: false, //for testing. Disabled nextUrl() call
+
+				//may be a string an array or string or a function producing any of those
+				seedUrl: function() {
+					var urls = [];
+					for (var i = 1; i < 20; i++) {
+						urls.push("http://newyorkcity.eventful.com/events/categories?page_number=" + i);
+					}
+					return urls;
+				},
 				nextUrl: function(el) {
 					return el.find(".next > a").attr("href");
 				},
