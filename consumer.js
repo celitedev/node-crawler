@@ -242,6 +242,7 @@ function startCrawlerQueue(crawlConfig) {
 			intervalMovingAverageMS: 5 * 60 * 1000, //5 minutes
 			total: {
 				nrDetailPages: 0,
+				unzippedInBytes: 0
 			}
 		},
 		crawlResultSchema: _.extend({}, crawlConfig.schema.results.schema(x), {
@@ -251,6 +252,8 @@ function startCrawlerQueue(crawlConfig) {
 			}
 		})
 	};
+
+	proxyAndCacheDriver.setTotalStats(resource.stats.total);
 
 	//start queue for this crawl
 	queue.process(
@@ -354,13 +357,13 @@ function generateStats(resource) {
 
 		"PER_SECOND": perSecond,
 
-		//exponential moving average / second
-		"MAE_PER_SECOND": _.reduce(perSecond, function(agg, v, k) {
-			var ma = resource.stats.movingAverages[k];
-			ma.push(Date.now(), v);
-			agg[k] = parseFloat((ma.movingAverage()).toFixed(2));
-			return agg;
-		}, {}),
+		// //exponential moving average / second
+		// "MAE_PER_SECOND": _.reduce(perSecond, function(agg, v, k) {
+		// 	var ma = resource.stats.movingAverages[k];
+		// 	ma.push(Date.now(), v);
+		// 	agg[k] = parseFloat((ma.movingAverage()).toFixed(2));
+		// 	return agg;
+		// }, {}),
 
 		//Total average / second
 		"AVG_PER_SECOND": _.reduce(resource.stats.total, function(agg, v, k) {
