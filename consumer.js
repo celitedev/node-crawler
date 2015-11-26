@@ -13,8 +13,6 @@ var validUrl = require('valid-url');
 var Promise = require("bluebird");
 var async = require('async');
 
-var MA = require('moving-average');
-
 var utils = require("./utils");
 var proxyDriver = require("./drivers/proxyDriver");
 
@@ -289,7 +287,6 @@ function startCrawlerQueue(crawlConfig) {
 		outputMessageSchema: outputMessageSchema,
 		stats: {
 			intervalMS: 5000, // 5 seconds
-			intervalMovingAverageMS: 5 * 60 * 1000, //5 minutes
 			total: {
 				nrDetailPages: 0,
 				unzippedInBytes: 0
@@ -372,13 +369,10 @@ function generateStats(resource) {
 	if (!resource.stats.totalPrev) {
 
 		//init totalPrev to 0 for all values
-		var prev = resource.stats.totalPrev = {},
-			movingAverages = resource.stats.movingAverages = {};
+		var prev = resource.stats.totalPrev = {};
 
-		//init moving averages
 		_.each(resource.stats.total, function(v, k) {
 			prev[k] = 0;
-			movingAverages[k] = MA(resource.stats.intervalMovingAverageMS);
 		});
 	}
 
@@ -403,17 +397,7 @@ function generateStats(resource) {
 
 		"TOTAL": resource.stats.total,
 
-		// "DELTA": delta,
-
 		"PER_SECOND": perSecond,
-
-		// //exponential moving average / second
-		// "MAE_PER_SECOND": _.reduce(perSecond, function(agg, v, k) {
-		// 	var ma = resource.stats.movingAverages[k];
-		// 	ma.push(Date.now(), v);
-		// 	agg[k] = parseFloat((ma.movingAverage()).toFixed(2));
-		// 	return agg;
-		// }, {}),
 
 		//Total average / second
 		"AVG_PER_SECOND": _.reduce(resource.stats.total, function(agg, v, k) {
