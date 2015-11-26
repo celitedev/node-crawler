@@ -35,7 +35,7 @@ var batchid = "1";
 
 
 //create urls that need to be seeded
-var urlsOrFN = crawlConfig.schema.seed.config.seedUrl,
+var urlsOrFN = crawlConfig.schema.seed.seedUrls,
 	urls = _.isFunction(urlsOrFN) ? urlsOrFN() : urlsOrFN;
 
 urls = _.isArray(urls) ? urls : [urls];

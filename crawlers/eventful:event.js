@@ -52,52 +52,45 @@ module.exports = {
 		type: "masterDetail", //signifies overall type of scroll. For now: only 'masterDetail'
 		requiresJS: false, //If true, use PhantomJS
 		seed: {
-			// type of seed. Options:
-			// - urlToNextPage: selector to navigate to next page. Needs to include stopCriteria
-			// - urlSeed: function to build seed urls to visit. 
-			type: "urlToNextPage",
-			config: {
-				disable: false, //for testing. Disabled nextUrl() call
+			disable: false, //for testing. Disabled nextUrl() call
 
-				//may be a string an array or string or a function producing any of those
-				seedUrl: function() {
-					var urls = [];
-					for (var i = 1; i < 20; i++) {
-						urls.push("http://newyorkcity.eventful.com/events/categories?page_number=" + i);
-					}
-					return urls;
-				},
-				nextUrl: function(el) {
-					return el.find(".next > a").attr("href");
-				},
+			//may be a string an array or string or a function producing any of those
+			seedUrls: function() {
+				var urls = [];
+				for (var i = 1; i < 20; i++) {
+					urls.push("http://newyorkcity.eventful.com/events/categories?page_number=" + i);
+				}
+				return urls;
+			},
+			nextUrlFN: function(el) {
+				return el.find(".next > a").attr("href");
+			},
 
 
-				// STOP CRITERIA
-				// When processing one page after another, we need a way to check if we're done.
-				// A couple of standard checks are always performed to this end: 
-				//
-				// - check if nextUrl is the same as currentUrl. This is often employed by sites and is 
-				//  used as a sure sign we're done
-				// - nextUrl is not an url (i.e if nexturl() finds a 'href' that isn't there anymore)
-				//
-				// Besides that a crawler may implement specific stop criteria based on domain knowledge:
-				// - Templated functions (referenced by string or object with attrib name = name of template function)
-				// - custom function. Signature : function(el, cb) TO BE IMPLEMENTED
-				//
-				// Available Templated functions: 
-				// - zeroResults: uses `results.selector` + optional `selectorPostFilter` to check for 0 results. 
-				//
-				// Below is a working example. 
-				// It's superfloous for this crawler through, since general checks desribed above are enough.
-				stop: [{
-					name: "zeroResults", //zeroResults
-					selectorPostFilter: function(result) {
-						//as described above this is 
-						return result.attribs.itemscope !== undefined;
-					}
-				}]
-
-			}
+			// STOP CRITERIA when processing nextUrlFN
+			// When processing one page after another using nextUrlFN, we need a way to check if we're done.
+			// A couple of standard checks are always performed to this end: 
+			//
+			// - check if nextUrl is the same as currentUrl. This is often employed by sites and is 
+			//  used as a sure sign we're done
+			// - nextUrl is not an url (i.e if nexturl() finds a 'href' that isn't there anymore)
+			//
+			// Besides that a crawler may implement specific stop criteria based on domain knowledge:
+			// - Templated functions (referenced by string or object with attrib name = name of template function)
+			// - custom function. Signature : function(el, cb) TO BE IMPLEMENTED
+			//
+			// Available Templated functions: 
+			// - zeroResults: uses `results.selector` + optional `selectorPostFilter` to check for 0 results. 
+			//
+			// Below is a working example. 
+			// It's superfloous for this crawler through, since general checks desribed above are enough.
+			stop: [{
+				name: "zeroResults", //zeroResults
+				selectorPostFilter: function(result) {
+					//as described above this is 
+					return result.attribs.itemscope !== undefined;
+				}
+			}]
 		},
 		check: {
 
