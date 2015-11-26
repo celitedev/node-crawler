@@ -4,20 +4,28 @@ var uuid = require("uuid");
 var argv = require('yargs').argv;
 var path = require("path");
 var fs = require("fs");
-var proxyDriver = require("./drivers/proxyDriver");
-var kue = require('kue');
 
-var utils = require("./utils");
+var kue = require('kue');
+var colors = require('colors');
+var debug = require('debug')('kwhen-crawler');
+var validUrl = require('valid-url');
 
 var Promise = require("bluebird");
 var async = require('async');
 
 var MA = require('moving-average');
 
+var utils = require("./utils");
+var proxyDriver = require("./drivers/proxyDriver");
+
+
+
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
 });
 
+//DNS caching such as http://manpages.ubuntu.com/manpages/natty/man8/nscd.8.html
+console.log("Remembered to install proper DNS caching on the box such as nscd?".green);
 
 /////////////////////////////////////////////////////////////////////////////////
 //TODO                                                                         //
@@ -96,21 +104,78 @@ function processJob(job, done) {
 		//x-ray instance specific to <source,type>
 		x = crawlerResource.x;
 
-
 	Promise.resolve()
 		.then(function() {
 			return new Promise(function(resolve, reject) {
 				x(data.url, "html", {
+
+					//pagination
 					paginate: function distributedPaginate(el, cb) {
 						if (crawlSchema.seed.type !== "urlToNextPage") {
 							//no pagination
 							return cb();
 						}
 
+						var paginateConfig = crawlSchema.seed.config;
+
+						//disable pagination (used for testing)
+						if (paginateConfig.disable) {
+							return cb();
+						}
+
+						var nextUrl = paginateConfig.nextUrl(el);
+						debug("url", data.url);
+						debug("nexturl", nextUrl);
+
+						//sometimes the next url just isn't there anymore. 
+						//That's an easy and strong signal to stop bothering
+						if (!validUrl.isUri(nextUrl)) {
+							return cb();
+						}
+
+						//check if nextUrl is the same as currentUrl. 
+						//If so -> quit
+						if (nextUrl === data.url) {
+							return cb();
+						}
+
+						//... otherwise there might be more domain specific ways in which to pick up signal that we're done
+						var stopCriteriaFound = false;
+
+						stopArr = paginateConfig.stop || [];
+						stopArr = _.isArray(paginateConfig.stop) ? paginateConfig.stop : [paginateConfig.stop];
+
+						_.each(stopArr, function(stop) {
+							if (_.isString(stop)) {
+								stop = {
+									name: stop
+								};
+							}
+							switch (stop.name) {
+								case "zeroResults":
+									//no results found -> stopCriteriaFound = true
+									var filterFN = stop.selectorPostFilter || function(results) {
+										return true;
+									};
+									if (!_.filter(el.find(crawlSchema.results.selector), filterFN)) {
+										stopCriteriaFound = true;
+									}
+									break;
+
+								default:
+									console.log("stop-criteria not supported (and ignored)", stop.name);
+							}
+						});
+
+						if (stopCriteriaFound) {
+							return cb();
+						}
+
 						//upload next url to queue
-						//TODO: execute stop criterium
-						utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, crawlSchema.seed.config.nextUrl(el), cb);
+						utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, nextUrl, cb);
 					},
+
+					//results crawling
 					results: x(crawlSchema.results.selector, [crawlResultSchema])
 				})(function(err, obj) {
 					if (err) {
@@ -160,30 +225,34 @@ function processJob(job, done) {
 			}, result, detail);
 		})
 		.filter(function(result) {
-			// return _.filter(results, function(result) {
-			// 	//This is a general filter that removes all ill-selected results, e.g.: headers and footers
-			// 	//The fact that a sourceId is required allows is to select based on this. 
-			// 	//It's extremely unlikely that ill-selected results have an id (as fetched by the schema) 
-			// 	return result.meta.source.id;
-			// });
+			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
+			//The fact that a sourceId is required allows is to select based on this. 
+			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
 			return result.meta.source.id;
 		})
 		.then(function(results) {
 			_.each(results, function(result) {
-				// console.log(result);
+				//push them to other queue
 			});
 		})
+		.then(done)
 		.catch(function(err) {
-			//Error: move job back to queue
+
+			// if (err.code === "ENOTFOUND") {
+			// 	throw err; //CHECK THIS
+			// }
+
+			// if (err.code === "ECONNABORTED") {
+			// 	//likely timeout -> move back to queue
+
+			// }
+
 			console.log("ERR", err);
 			done(new Error("job error: orig: " + err.message));
-		})
-		.then(done)
-		.finally(function() {
-			// console.log("END JOB");
-		});
-}
 
+		});
+
+}
 
 ///////////////////////////////
 // Start <source,type> queue //
@@ -222,6 +291,7 @@ function startCrawlerQueue(crawlConfig) {
 			intervalMovingAverageMS: 5 * 60 * 1000, //5 minutes
 			total: {
 				nrDetailPages: 0,
+				unzippedInBytes: 0
 			}
 		},
 		crawlResultSchema: _.extend({}, crawlConfig.schema.results.schema(x), {
@@ -232,9 +302,12 @@ function startCrawlerQueue(crawlConfig) {
 		})
 	};
 
+	proxyAndCacheDriver.setTotalStats(resource.stats.total);
+
+	//start queue for this crawl
 	queue.process(
 		resource.queueName,
-		crawlConfig.concurrency.concurrentJobs,
+		crawlConfig.job.concurrentJobs,
 		processJob
 	);
 
@@ -308,6 +381,8 @@ function generateStats(resource) {
 		});
 	}
 
+	resource.stats.totalMS = resource.stats.totalMS + resource.stats.intervalMS || 0;
+
 	//calculate delta. I.e.: totals changed since last check (in resource.stats.intervalMS interval)
 	var delta = _.reduce(resource.stats.total, function(agg, v, k) {
 		agg[k] = v - resource.stats.totalPrev[k];
@@ -320,20 +395,30 @@ function generateStats(resource) {
 		return agg;
 	}, {});
 
-	//from perSecond -> exponential moving average
-	var movingAverageStats = _.reduce(perSecond, function(agg, v, k) {
-		var ma = resource.stats.movingAverages[k];
-		ma.push(Date.now(), v);
-		agg[k] = ma.movingAverage();
-		return agg;
-	}, {});
+
 
 	resource.stats.totalPrev = _.cloneDeep(resource.stats.total);
 	return {
+
 		"TOTAL": resource.stats.total,
+
 		// "DELTA": delta,
+
 		"PER_SECOND": perSecond,
-		"MA_PER_SECOND": movingAverageStats
+
+		// //exponential moving average / second
+		// "MAE_PER_SECOND": _.reduce(perSecond, function(agg, v, k) {
+		// 	var ma = resource.stats.movingAverages[k];
+		// 	ma.push(Date.now(), v);
+		// 	agg[k] = parseFloat((ma.movingAverage()).toFixed(2));
+		// 	return agg;
+		// }, {}),
+
+		//Total average / second
+		"AVG_PER_SECOND": _.reduce(resource.stats.total, function(agg, v, k) {
+			agg[k] = parseFloat((resource.stats.totalMS ? v * 1000 / resource.stats.totalMS : 0).toFixed(2));
+			return agg;
+		}, {})
 	};
 }
 

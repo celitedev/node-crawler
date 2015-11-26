@@ -24,6 +24,7 @@ function driver(opts) {
 
   //TODO: passing options is for certificate and cookies only 
   var agent = superagent.agent();
+  var stats;
 
   var fn = function http_driver(ctx, fn) {
 
@@ -33,23 +34,33 @@ function driver(opts) {
       .timeout(opts.timeoutMS || 20000) //have a timeout. Seems by default superagent doesn't set one, which can lead to hands
       .proxy(opts.proxy) //TOR
       .end(function(err, res) {
-        if (err && !err.status) {
+
+        //This includes request errors (4xx and 5xx) as well as node errors, which is what we want. 
+        //Result: Job fails in entirety and retry later. 
+        //This is preferred since we're not able to do partial retries (we don't want to)
+        //
+        //See https://github.com/lapwinglabs/x-ray-crawler/pull/1 for the opposite viewpoint
+        //which we need share for our particular usecase.
+        if (err) { //WAS: (err && !err.status) 
           return fn(err);
         }
-
-        //TODO: #14
-        //Driver continues when err with status code
 
         ctx.status = res.status;
         ctx.set(res.headers);
 
         ctx.body = 'application/json' == ctx.type ? res.body : res.text;
 
+        stats.unzippedInBytes += ctx.body.length;
+
         // update the URL if there were redirects
         ctx.url = res.redirects.length ? res.redirects.pop() : ctx.url;
 
         return fn(null, ctx);
       });
+  };
+
+  fn.setTotalStats = function(statsObj) {
+    stats = statsObj;
   };
 
   return fn;
