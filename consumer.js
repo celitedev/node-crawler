@@ -187,8 +187,6 @@ function processJob(job, done) {
 				sourceUrl = result.sourceUrl;
 
 			delete result.detail;
-			delete result.sourceId;
-			delete result.sourceUrl;
 
 			return _.extend({
 				id: uuid.v4(),
