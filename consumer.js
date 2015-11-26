@@ -222,7 +222,6 @@ function processJob(job, done) {
 		})
 		.then(function(results) {
 			_.each(results, function(result) {
-				console.log(result);
 				//push them to other queue
 			});
 		})
