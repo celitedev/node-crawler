@@ -168,11 +168,17 @@ function processJob(job, done) {
 				});
 			});
 		})
-		.then(function(obj) {
+		.then(function trimWhiteSpaceRecursively(obj) {
 			return iterTrim(obj);
 		})
-		.then(function(obj) {
+		.then(function returnResultsAttrib(obj) {
 			return obj.results;
+		})
+		.filter(function genericPrunerToCheckForSourceId(result) {
+			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
+			//The fact that a sourceId is required allows is to select based on this. 
+			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
+			return result.sourceId;
 		})
 		.map(function transformToGenericOutput(result) {
 
@@ -207,20 +213,11 @@ function processJob(job, done) {
 				payload: _.extend({}, result, detail)
 			});
 		})
-		.filter(function(result) {
-
-			//TODO: move up
-			//
-			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
-			//The fact that a sourceId is required allows is to select based on this. 
-			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
-			return result.identifiers.id;
-		})
-		.then(function validateMessages(results) {
+		.then(function validateSpecificTypeSchema(results) {
 			//TODO: #25: validate messages against JSON schema of particular schema
 			return results;
 		})
-		.then(function(results) {
+		.then(function postMessagesToQueue(results) {
 			_.each(results, function(result) {
 				//push them to other queue
 			});
