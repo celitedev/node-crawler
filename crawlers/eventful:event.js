@@ -14,7 +14,32 @@ module.exports = {
 	entity: {
 		type: "Event"
 	},
+	//General logic/behavior for this crawler 
+	semantics: {
 
+		//prune LIST URL if already processed 
+		//options: 
+		//- false: never prune
+		//- true: prune if url already processed
+		//- batch: prune if url already processed for this batch
+		pruneList: "batch",
+
+		//prune ENTITY URL if already processed 
+		//options: 
+		//- false: never prune
+		//- true: prune if url already processed
+		//- batch: prune if url already processed for this batch
+		pruneEntity: true,
+
+		//How to check entity is updated since last processed
+		// - string (templated functions) 
+		// - custom function. Signature: function(el, cb)
+		//
+		//template options: 
+		//- hash: hash of detail contents
+		//- headers: based on cache headers
+		dirtyCheckEntity: "hash",
+	},
 	job: {
 		//x concurrent kue jobs
 		//
@@ -27,10 +52,9 @@ module.exports = {
 		concurrentJobs: 10,
 		retries: 5,
 
-		// fail job if not complete in 100 seconds. This is used because a consumer can fail / crash
+		// fail job if not complete in 100 seconds. This is used because a consumer/box can fail/crash
 		// In that case the job would get stuck indefinitely in 'active' state. 
-		// With this solution, the job is placed back on the queue, and retried (according to 'retries')
-		// 
+		// With this solution, the job is placed back on the queue, and retried according to 'retries'-policy
 		ttl: 100 * 1000,
 	},
 	driver: {
@@ -91,25 +115,6 @@ module.exports = {
 					return result.attribs.itemscope !== undefined;
 				}
 			}]
-		},
-		check: {
-
-			//how to check entity is new
-			//string (templated functions) or custom function
-			//Function signature: function(el, cb)
-			//
-			//options: 
-			//- sourceId: check if 'sourceId' exists
-			isNew: "sourceId",
-
-			//how to check entity is updated since last processed
-			//string (templated functions) or custom function
-			//Function signature: function(el, cb)
-			//
-			//options: 
-			//- hash: hash of detail contents
-			//- headers: bsaed on cache headers
-			isUpdated: "hash",
 		},
 		headers: { //Default Headers for all requests
 			"Accept-Encoding": 'gzip, deflate'
