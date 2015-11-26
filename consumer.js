@@ -26,33 +26,6 @@ var queue = kue.createQueue({
 //DNS caching such as http://manpages.ubuntu.com/manpages/natty/man8/nscd.8.html
 console.log("Remembered to install proper DNS caching on the box such as nscd?".green);
 
-/////////////////////////////////////////////////////////////////////////////////
-//TODO                                                                         //
-// Seed queue or continue with job                                             //
-// i.e.: there should only be 1 seeder process and multiple listening boxes    //
-//                                                                             //
-// Moreover, we should check:                                                  //
-// - master url already done in OR(queue, completed) for *this* batch -> skip
-//   - next batch we want to recheck master pages for new entities
-// - detail url already done in OR(queue, completed) for *every* batch -> skip
-//   - LATER: we may want to do rechecks of new data for existing entities. This
-//   is likely a completely separate flow though.
-//                                                                             //
-/////////////////////////////////////////////////////////////////////////////////
-
-//Set of master urls done
-// //Key: <source, entityType, batch> -> [<url>]
-// var setDoneMaster;
-
-// //Set of detail urls done
-// //Key: <source, entityType, batch> -> [<url>]
-// var setDoneDetail;
-
-
-//Each <source, type> has a cached version of a couple of things: 
-//- xRay (bc of specific proxyAndCacheDriver)
-//- proxyAndCacheDriver, bc of
-//  - specific custom headers per <source, type>
 var resourcesPerCrawlerType = {};
 
 if (argv.source && argv.type) {
@@ -182,7 +155,7 @@ function processJob(job, done) {
 						}
 
 						//upload next url to queue
-						utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, nextUrl, cb);
+						utils.addCrawlJob(queue, data.batchId, crawlConfig, nextUrl, cb);
 					},
 
 					//results crawling
@@ -198,10 +171,10 @@ function processJob(job, done) {
 		.then(function(obj) {
 			return iterTrim(obj);
 		})
-		.then(function(obj) { //TODO: why did we have this nested again? 
+		.then(function(obj) {
 			return obj.results;
 		})
-		.map(function(result) {
+		.map(function transformToGenericOutput(result) {
 
 			var detail = result.detail,
 				sourceId = result.sourceId,
@@ -217,28 +190,35 @@ function processJob(job, done) {
 				//- check EIP book
 				//- check guidelines for Kafka
 				meta: {
+					source: crawlConfig.source.name,
 					type: crawlConfig.entity.type,
 					crawl: {
-						crawlJob: 123, //the large job. TODO: based on crawling manager
-						taskId: 132903712, //the specific mini job/batch within this crawlJob. TODO: based on crawling manager
+						batchId: data.batchId, //the large batch.
+						jobId: data.jobId, //the specific mini job within this batch. 
 						dateTime: new Date().toISOString(),
 						crawlConfig: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
-						msgSchema: outputMessageSchema.version, //specific version of the target message schema. 
+						typeSchema: outputMessageSchema.version, //specific version of the target message/type schema. 
 					},
-					source: {
-						name: crawlConfig.source.name,
-						id: sourceId,
-						url: sourceUrl
-					}
 				},
-
-			}, result, detail);
+				source: {
+					id: sourceId,
+					url: sourceUrl
+				},
+				payload: _.extend({}, result, detail)
+			});
 		})
 		.filter(function(result) {
+
+			//TODO: move up
+			//
 			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
 			//The fact that a sourceId is required allows is to select based on this. 
 			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
-			return result.meta.source.id;
+			return result.source.id;
+		})
+		.then(function validateMessages(results) {
+			//TODO: #25: validate messages against JSON schema of particular schema
+			return results;
 		})
 		.then(function(results) {
 			_.each(results, function(result) {
@@ -342,7 +322,7 @@ function manageCrawlerLifecycle(resource) {
 			queue.activeCount(resource.queueName, cb);
 		},
 		function(cb) {
-			//TODO:  no more busy seeds -> check in redis
+			//TODO:  no more busy seeds: relates to #23
 			cb(undefined, 0);
 		}
 	], function(err, lengths) {

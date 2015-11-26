@@ -47,8 +47,8 @@ var utils = module.exports = {
 		var crawlerQueueName = utils.calculated.getCrawlerQueueName(crawlConfig);
 
 		return queue.create(crawlerQueueName, {
-				crawlJobId: batchId,
-				taskid: uuid.v4(), //id of this specific mini batch
+				batchId: batchId,
+				jobId: uuid.v4(), //id of this specific mini batch
 				source: crawlConfig.source.name,
 				type: crawlConfig.entity.type,
 				url: url,
