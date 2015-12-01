@@ -202,10 +202,8 @@ function processJob(job, done) {
 				//- check EIP book
 				//- check guidelines for Kafka
 				meta: {
-					source: crawlConfig.source.name,
-					type: crawlConfig.entity.type,
 					crawl: {
-						batchId: data.batchId, //the large batch.
+						batchId: parseInt(data.batchId), //the large batch.
 						jobId: data.jobId, //the specific mini job within this batch. 
 						createdAt: new Date().toISOString(),
 						crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
@@ -214,17 +212,20 @@ function processJob(job, done) {
 				},
 				identifiers: {
 					id: sourceId,
-					url: sourceUrl
+					url: sourceUrl,
+					source: crawlConfig.source.name,
+					type: crawlConfig.entity.type,
 				},
 				payload: _.extend({}, result, detail)
 			});
 		})
 		.then(function validateGenericEnvelopeSchema(results) {
+
 			_.each(results, function(result) {
 				var valid = jsonValidator.validate(result, abstractTypeSchema.schema);
 				if (!valid) {
 					var errors = jsonValidator.getLastErrors();
-					console.log("validation errors on generic/evelope schema", errors);
+					console.log("TODO: throw eerrors bc coding error: validation errors on generic/evelope schema", errors);
 				}
 			});
 			return results;
