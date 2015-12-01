@@ -289,6 +289,14 @@ function processJob(job, done) {
 
 			// }
 
+			//Non-200 http codes are treated as errors. 
+			//These error-objects are huge so we extract only the needed info here
+			if (err.status) {
+				var errTmp = new Error(err.message);
+				errTmp.status = err.status;
+				err = errTmp;
+			}
+
 			console.log("ERR", err);
 			done(new Error("job error: orig: " + err.message));
 
