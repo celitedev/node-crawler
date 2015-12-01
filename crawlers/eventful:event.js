@@ -12,7 +12,8 @@ module.exports = {
 		name: "Eventful"
 	},
 	entity: {
-		type: "Event"
+		type: "Event",
+		schema: "source_event", //the actual schema to use
 	},
 	//General logic/behavior for this crawler 
 	semantics: {
@@ -130,19 +131,15 @@ module.exports = {
 					sourceId: "a.tn-frame@href",
 					detail: x("a.tn-frame@href", {
 						name: "[itemprop=name] > span",
-						startDate: "[itemprop=startDate]@content",
-						place: x("[itemprop=location]", {
+						dtstart: "[itemprop=startDate]@content",
+						placeRefs: x("[itemprop=location]", [{
 							name: "[itemprop=name]",
-							url: "[itemprop=name] > a@href",
-							streetAddress: "[itemprop=streetAddress]",
-							addressLocality: "[itemprop=addressLocality]",
-							addressRegion: "[itemprop=addressRegion]",
-							postalCode: "[itemprop=postalCode]"
-						}),
-						performers: x("[itemprop=performer]", {
+							url: "[itemprop=name] > a@href"
+						}]),
+						performerRefs: x("[itemprop=performer]", [{
 							name: "[itemprop=name]",
 							url: "> a@href"
-						}),
+						}]),
 					})
 				};
 			}

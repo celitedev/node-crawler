@@ -15,16 +15,22 @@ var ZSchema = require("z-schema");
 
 var debug = require('debug')('kwhen-crawler');
 var argv = require('yargs').argv;
+var moment = require("moment");
 
 var utils = require("./utils");
 var proxyDriver = require("./drivers/proxyDriver");
 
 var abstractTypeSchema = require("./schemas/abstract");
 
+//overwrite date-time format
+ZSchema.registerFormat("date-time", function(dateTimeString) {
+	var m = moment(dateTimeString);
+	return m.isValid();
+});
+
 var jsonValidator = new ZSchema({
 	breakOnFirstError: false
 });
-
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
@@ -195,6 +201,8 @@ function processJob(job, done) {
 				sourceUrl = result.sourceUrl;
 
 			delete result.detail;
+			delete result.sourceId;
+			delete result.sourceUrl;
 
 			return _.extend({
 				id: uuid.v4(),
@@ -216,31 +224,61 @@ function processJob(job, done) {
 					source: crawlConfig.source.name,
 					type: crawlConfig.entity.type,
 				},
-				payload: _.extend({}, result, detail)
+				payload: _.extend({
+					id: sourceId,
+					url: sourceUrl
+				}, result, detail)
 			});
 		})
 		.then(function validateGenericEnvelopeSchema(results) {
 
+			var errorArr = [];
 			_.each(results, function(result) {
 				var valid = jsonValidator.validate(result, abstractTypeSchema.schema);
 				if (!valid) {
-					var errors = jsonValidator.getLastErrors();
-					console.log("TODO: throw eerrors bc coding error: validation errors on generic/evelope schema", errors);
+					errorArr.push(jsonValidator.getLastErrors());
 				}
 			});
+			if (errorArr.length) {
+				console.log(errorArr);
+				var err = new Error("errors in generic part of results. These need fixing. Halting process");
+				err.halt = true;
+				throw err;
+			}
 			return results;
 		})
 		.then(function validateSpecificTypeSchema(results) {
-			//TODO: #25: validate messages against JSON schema of particular schema
+			var errorArr = [];
+			_.each(results, function(result) {
+				var valid = jsonValidator.validate(result.payload, outputMessageSchema.schema);
+				if (!valid) {
+					errorArr.push(jsonValidator.getLastErrors());
+				}
+			});
+			if (errorArr.length) {
+				//TODO:
+				//1. better way of handling? What if 1 instance has 1 missing attrib? Should we keep failing entire batch? 
+				//2. If suddenly nr of entities erroring spike, we might have a change in source html format. Alert based on this.
+				console.log(errorArr);
+				var err = new Error("errors in validation. Retrying...");
+				throw err;
+			}
+
 			return results;
 		})
 		.then(function postMessagesToQueue(results) {
 			_.each(results, function(result) {
+				// console.log(result.payload);
 				//push them to other queue
 			});
 		})
 		.then(done)
-		.catch(function(err) {
+		.catch(function catchall(err) {
+
+			if (err.halt) {
+				//errors that require immediate halting are thrown
+				throw err;
+			}
 
 			// if (err.code === "ENOTFOUND") {
 			// 	throw err; //CHECK THIS
@@ -254,6 +292,11 @@ function processJob(job, done) {
 			console.log("ERR", err);
 			done(new Error("job error: orig: " + err.message));
 
+		})
+		.catch(function severe(err) {
+			//TODO: we might do some cleanup here?
+			console.log("SEVERE ERR", err);
+			process.exit();
 		});
 
 }
@@ -267,7 +310,7 @@ function startCrawlerQueue(crawlConfig) {
 
 	var outputMessageSchema;
 	try {
-		var outputSchemaName = crawlConfig.entity.type.toLowerCase();
+		var outputSchemaName = crawlConfig.entity.schema.toLowerCase();
 		var outputSchemaPath = path.resolve(__dirname + "/schemas/" + outputSchemaName);
 		outputMessageSchema = require(outputSchemaPath);
 	} catch (err) {
