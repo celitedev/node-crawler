@@ -16,17 +16,25 @@ var ZSchema = require("z-schema");
 var debug = require('debug')('kwhen-crawler');
 var argv = require('yargs').argv;
 var moment = require("moment");
+var Ajv = require('ajv');
 
 var utils = require("./utils");
 var proxyDriver = require("./drivers/proxyDriver");
 
-var abstractTypeSchema = require("./schemas/abstract");
+///////////////
+//validation //
+///////////////
+var ajv = Ajv({
+	allErrors: true
+});
 
-//overwrite date-time format
-ZSchema.registerFormat("date-time", function(dateTimeString) {
+ajv.addFormat("date-time", function(dateTimeString) {
 	var m = moment(dateTimeString);
 	return m.isValid();
 });
+
+var abstractTypeSchema = require("./schemas/abstract");
+var validateAbstractSchema = ajv.compile(abstractTypeSchema.schema);
 
 var jsonValidator = new ZSchema({
 	breakOnFirstError: false
@@ -234,25 +242,27 @@ function processJob(job, done) {
 
 			var errorArr = [];
 			_.each(results, function(result) {
-				var valid = jsonValidator.validate(result, abstractTypeSchema.schema);
+				var valid = validateAbstractSchema(result);
 				if (!valid) {
-					errorArr.push(jsonValidator.getLastErrors());
+					errorArr.push(validateAbstractSchema.errors);
 				}
 			});
+
 			if (errorArr.length) {
 				console.log(errorArr);
 				var err = new Error("errors in generic part of results. These need fixing. Halting process");
 				err.halt = true;
 				throw err;
 			}
+
 			return results;
 		})
 		.then(function validateSpecificTypeSchema(results) {
 			var errorArr = [];
 			_.each(results, function(result) {
-				var valid = jsonValidator.validate(result.payload, outputMessageSchema.schema);
+				var valid = ajv.validate(outputMessageSchema.schema, result.payload);
 				if (!valid) {
-					errorArr.push(jsonValidator.getLastErrors());
+					errorArr.push(ajv.errors);
 				}
 			});
 			if (errorArr.length) {
