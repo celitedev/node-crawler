@@ -69,7 +69,8 @@ module.exports = {
 							type: "string"
 						}
 					},
-					required: ["url"]
+					required: ["url"],
+					additionalProperties: false
 				}
 			},
 			"performerRefs": {
@@ -89,7 +90,8 @@ module.exports = {
 							type: "string"
 						}
 					},
-					required: ["url"]
+					required: ["url"],
+					additionalProperties: false
 				}
 			}
 		},
@@ -101,6 +103,7 @@ module.exports = {
 			"dtstart",
 			"placeRefs",
 			"performerRefs"
-		]
+		],
+		additionalProperties: false
 	}
 };
