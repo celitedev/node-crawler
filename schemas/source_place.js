@@ -48,6 +48,9 @@ module.exports = {
 			neighborhood: {
 				type: "string"
 			},
+			crossStreets: {
+				type: "string"
+			},
 			city: {
 				type: "string"
 			},
@@ -55,6 +58,18 @@ module.exports = {
 				type: "string"
 			},
 			country: {
+				type: "string"
+			},
+			tel: {
+				type: "string"
+			},
+			fax: {
+				type: "string"
+			},
+			email: {
+				type: "string"
+			},
+			website: {
 				type: "string"
 			},
 			images: {
