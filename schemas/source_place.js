@@ -83,7 +83,7 @@ module.exports = {
 			"id",
 			"url",
 			"name",
-			"description"
+			// "description"
 		],
 		additionalProperties: false
 	}
