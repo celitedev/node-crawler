@@ -242,6 +242,9 @@ function processJob(job, done) {
 
 			var errorArr = [];
 			_.each(results, function(result) {
+
+				debug("DEBUG RESULT", result);
+
 				var valid = validateAbstractSchema(result);
 				if (!valid) {
 					errorArr.push(validateAbstractSchema.errors);

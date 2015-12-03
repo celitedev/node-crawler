@@ -45,6 +45,9 @@ module.exports = {
 			zipCode: {
 				type: "string"
 			},
+			neighborhood: {
+				type: "string"
+			},
 			city: {
 				type: "string"
 			},
@@ -53,13 +56,35 @@ module.exports = {
 			},
 			country: {
 				type: "string"
-			}
+			},
+			images: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						url: {
+							type: "string"
+						},
+						alt: {
+							description: "the alternative description",
+							type: "string",
+						},
+						cc: {
+							description: "contribution / licence info",
+							type: "string"
+						},
+					},
+					additionalProperties: false,
+					required: ["url"]
+				}
+			},
 		},
 		"required": [
 			"id",
 			"url",
 			"name",
 			"description"
-		]
+		],
+		additionalProperties: false
 	}
 };
