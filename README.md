@@ -17,7 +17,8 @@ to big (crippling concurrency).
 - seeding of urls is controllable per crawler
 - crawling is done with configurable speed, concurrency, proxies. WIP: controlling concurrency in distributed environment. Follow #12 for more info
 - crawlers default to non-javascript (fast) but allow client-side javascript processing where needed on a per crawler basis. 
-
+- sensible algorithms for detecting endless loops (something sites try to do to deter crawlers) as well as options for custom functions per source
+- output is validated (Json Schema) giving more quality assurance when writing new crawlers.
 
 
 ## Output format
