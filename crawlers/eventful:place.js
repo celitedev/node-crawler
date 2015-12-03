@@ -169,7 +169,14 @@ module.exports = {
 						}]),
 					})
 				};
-			}
+			},
+
+			//transformers allow function(entire obj) || strings or array of those
+			//returning undefined removes them
+			transformers: {
+				"detail.latitude": "float",
+				"detail.longitude": "float"
+			},
 		}
 	}
 };
