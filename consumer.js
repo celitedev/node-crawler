@@ -202,6 +202,49 @@ function processJob(job, done) {
 			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
 			return result.sourceId;
 		})
+		.then(function transformFields(results) {
+
+			var functionLib = {
+				"float": function(val) {
+					if (val === undefined) return undefined;
+					try {
+						val = parseFloat(val);
+					} catch (err) {
+						//swallow: if json mapping is correct we'll catch this next
+					}
+					return val;
+				}
+			};
+
+			//transform results using declarative `transformers`
+			if (!crawlConfig.schema.results.transformers) {
+				return results;
+			}
+			return _.map(results, function(result) {
+				_.each(crawlConfig.schema.results.transformers, function(pipeline, path) {
+
+					var needle = path.lastIndexOf("."),
+						parent = ~needle ? _.property(path.substring(0, needle))(result) : result,
+						childKey = ~needle ? path.substring(needle + 1) : path;
+
+					pipeline = _.isArray(pipeline) ? pipeline : [pipeline];
+
+					//transform pipeline of single field
+					parent[childKey] = _.reduce(pipeline, function(val, stage) {
+						if (_.isString(stage)) {
+							if (!functionLib[stage]) {
+								throw "canned transformer not available: '" + stage + "'. You should choose from '" + _.keys(functionLib).join(",") + "'";
+							}
+							return functionLib[stage](val);
+						} else {
+							return stage(result);
+						}
+					}, parent[childKey]);
+
+				});
+				return result;
+			});
+		})
 		.map(function transformToGenericOutput(result) {
 
 			var detail = result.detail,
