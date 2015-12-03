@@ -40,6 +40,24 @@ module.exports = {
 		//- hash: hash of detail contents
 		//- headers: based on cache headers
 		dirtyCheckEntity: "hash",
+
+
+		//Examples: 
+		//
+		//pruneList = batch + pruntEntity = true -> 
+		//Each batch run prunes lists pages when done within the same batch. 
+		//However, the next batch run lists aren't pruned to stay up-to-date with changed contents (new entities?)
+		//of these list pages. 
+		//Regardless, due to pruneEntity=true, the crawler will not recheck entities if they're already processed. 
+		//This is the default (and fastest) mode, based on the rationale that entities do not change often if at all. 
+		//I.e.: a Place-page on Eventful will rarely update it's contents. 
+		//
+		//Prunelist = batch + pruneEntity = batch -> 
+		//recheck already processed entities for each new batch.
+		//
+		//A good setting may be: 
+		//- EACH HOUR: Run pruneList = batch + pruntEntity = true 
+		//- EACH DAY: Run pruneList = batch + pruntEntity = batch 
 	},
 	job: {
 		//x concurrent kue jobs
@@ -112,7 +130,7 @@ module.exports = {
 			stop: [{
 				name: "zeroResults", //zeroResults
 				selectorPostFilter: function(result) {
-					//as described above this is 
+					//as described above this is s
 					return result.attribs.itemscope !== undefined;
 				}
 			}]
