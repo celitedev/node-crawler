@@ -149,7 +149,13 @@ module.exports = {
 					sourceId: "a.tn-frame@href",
 					detail: x("a.tn-frame@href", {
 						name: "[itemprop=name] > span",
+						//descriptionShort
+						description: "[itemprop=description]",
 						dtstart: "[itemprop=startDate]@content",
+						//dtend
+						//duration
+						//rdate
+						//rrule
 						placeRefs: x("[itemprop=location]", [{
 							name: "[itemprop=name]",
 							url: "[itemprop=name] > a@href"
@@ -160,7 +166,16 @@ module.exports = {
 						}]),
 					})
 				};
-			}
+			},
+			transformers: {
+				"detail.description": function(obj) {
+					var desc = obj.detail.description;
+					if (desc === "There is no description for this event.") {
+						return undefined;
+					}
+					return desc;
+				},
+			},
 		}
 	}
 };
