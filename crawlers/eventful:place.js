@@ -162,7 +162,7 @@ module.exports = {
 						city: "[itemprop=addressLocality]",
 						region: "[itemprop=addressRegion]",
 						// country: 
-						images: x(".image-viewer > li", [{
+						images: x(".image-viewer li", [{
 							url: "a@href",
 							alt: "@title",
 							// cc
