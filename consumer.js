@@ -286,7 +286,7 @@ function processJob(job, done) {
 			var errorArr = [];
 			_.each(results, function(result) {
 
-				debug("DEBUG RESULT", result);
+				debug("DEBUG RESULT PAYLOAD", result.payload);
 
 				var valid = validateAbstractSchema(result);
 				if (!valid) {
