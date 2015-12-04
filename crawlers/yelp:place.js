@@ -180,8 +180,10 @@ module.exports = {
 				};
 			},
 
-			//transformers allow function(entire obj) || strings or array of those
+			//Transformers allow function(entire obj) || strings or array of those
 			//returning undefined removes them
+			//
+			//REMEMBER: obj._htmlDetail is always there for you should you need access to raw power.
 			transformers: {
 
 				//fetch based on urlencoded json-stringified data-attrib
