@@ -123,40 +123,58 @@ module.exports = {
 					sourceUrl: ".biz-name@href",
 					sourceId: ".biz-name@href",
 					detail: x(".biz-name@href", {
+
 						name: ".biz-page-title",
-						// descriptionShort  //TODO
-						// description: ".section-block.description", //TODO
-						// latitude: "[itemprop=latitude]@content", //requires #30 
-						// longitude: "[itemprop=longitude]@content",//requires #30 
+
+						// descriptionShort  //nope?
+						// description: //nope? //"meta[property='og:description']@content", //NOT CORRECT. No General description it seems
+
+						latitude: ".lightbox-map@data-map-state",
+						longitude: ".lightbox-map@data-map-state",
+
 						streetAddress: "[itemprop=streetAddress]",
 						// streetAddressSup: nope
+
 						zipCode: "[itemprop=postalCode]",
 						neighborhood: ".neighborhood-str-list",
 						crossStreets: ".cross-streets",
 						city: "[itemprop=addressLocality]",
 						region: "[itemprop=addressRegion]",
 						// country: nope
+
 						tel: "[itemprop=telephone]",
 						//fax: nope
 						//email: nope
 						website: ".biz-website > a@href",
 
-						//TODO: on different page so do nested crawl
-						// images: x(".image-viewer li", [{
-						// 	url: "a@href",
-						// 	alt: "@title",
+						//Works, but bit costly
+						//TODO: in laer crawl possibly. Probably should 
+						//fetch nice images from place website instead: nicer and no copyright issues.
+						// images: x(".showcase-footer-links a@href", ".photo-box-grid > li", [{
+						// 	url: "> img@src",
+						// 	alt: "> img@alt",
 						// 	// cc
 						// }]),
 
-						//TODO: MODEL IN 'SOURCE_PLACE'
-						//openinghours
-						//pricerange
-						//category (restaurant) (hmm. Yelp does multi-label classification?)
-						//tags (category specific)
-						//reviews_nr
-						//reviews_avg
-						//more factual (generic + category specific). E.g.: wifi, delivery, etc. 
-						//directions, incl public transport. How does Yelp do this?
+						openinghours: x(".hours-table tr", [{
+							dayOfWeek: "> th",
+							range: "> td",
+						}]),
+
+						pricerange: ".price-range",
+
+						//A category is nothing but a top-tier tag. That's the same system we wanted to opt-into.
+						//This means there may be multiple top categories per entity
+						categories: x(".mapbox-container > [itemtype='http://data-vocabulary.org/Breadcrumb'] > a > span", ["@text"]),
+
+						tags: x(".category-str-list", ["a"]),
+						reviews_nr: "[itemprop=reviewCount]",
+						reviews_avg: "[itemprop=ratingValue]@content",
+
+						facts: x(".short-def-list dl", [{
+							name: "> dt",
+							val: "> dd"
+						}]),
 
 					})
 				};
@@ -165,6 +183,32 @@ module.exports = {
 			//transformers allow function(entire obj) || strings or array of those
 			//returning undefined removes them
 			transformers: {
+
+				//fetch based on urlencoded json-stringified data-attrib
+				"detail.latitude": [
+					function(obj) {
+						try {
+							return JSON.parse(decodeURIComponent(obj.detail.latitude)).center.latitude;
+						} catch (e) {
+							//skip: caught by json schema validator
+						}
+					},
+					"float"
+				],
+
+				//fetch based on urlencoded json-stringified data-attrib
+				"detail.longitude": [
+					function(obj) {
+						try {
+							return JSON.parse(decodeURIComponent(obj.detail.longitude)).center.longitude;
+						} catch (e) {
+							//skip: caught by json schema validator
+						}
+					},
+					"float"
+				],
+
+				//parse the url from a redirect
 				"detail.website": function(obj) {
 					var url = obj.detail.website;
 					if (!url) {
@@ -174,6 +218,24 @@ module.exports = {
 					var urlObj = URL.parse(absUrl, true);
 					return urlObj.query.url;
 				},
+
+				//from thumb to complete
+				// "detail.images": function(obj) {
+				// 	return _.map(obj.detail.images, function(v) {
+				// 		var url = v.url.substring(0, v.url.lastIndexOf("/")) + "/o.jpg";
+				// 		return {
+				// 			url: url,
+				// 			alt: v.alt
+				// 		};
+				// 	});
+				// },
+
+				//make categories unique
+				"detail.categories": function(obj) {
+					return _.uniq(obj.detail.categories);
+				},
+				"detail.reviews_nr": "int",
+				"detail.reviews_avg": "float"
 			},
 		}
 	}
