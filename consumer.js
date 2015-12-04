@@ -249,6 +249,16 @@ function processJob(job, done) {
 				return result;
 			});
 		})
+		.map(function removePrivateVariables(result) {
+			//Private vars such as `_htmlDetail` are removed. 
+			//These can be used in transformers, etc.
+			return _.reduce(result, function(agg, v, k) {
+				if (k.indexOf("_") !== 0) { //don't remove
+					agg[k] = v;
+				}
+				return agg;
+			}, {});
+		})
 		.map(function transformToGenericOutput(result) {
 
 			var detail = result.detail,
@@ -409,6 +419,10 @@ function startCrawlerQueue(crawlConfig) {
 			}
 		},
 		crawlResultSchema: _.extend({}, crawlConfig.schema.results.schema(x), {
+			//add _htmlDetail for transormers to use. See #30
+			_htmlDetail: function(el, cb) {
+				cb(undefined, el.html());
+			},
 			calcPageDone: function(el, cb) {
 				resource.stats.total.nrDetailPages++;
 				cb();
