@@ -22,6 +22,10 @@ module.exports = {
 				"type": "string",
 				"description": "name of instance as known by source"
 			},
+			"logo": {
+				"type": "string",
+				"description": "logo of the instance"
+			},
 			"descriptionShort": {
 				"type": "string",
 			},
