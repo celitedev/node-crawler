@@ -93,6 +93,67 @@ module.exports = {
 					required: ["url"]
 				}
 			},
+
+			openinghours: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						dayOfWeek: {
+							type: "string"
+						},
+						range: {
+							type: "string",
+						},
+					},
+					additionalProperties: false,
+					required: ["dayOfWeek", "range"]
+				}
+			},
+
+			pricerange: {
+				type: "string"
+			},
+
+			categories: {
+				type: "array",
+				items: {
+					type: "string"
+				}
+			},
+
+			tags: {
+				type: "array",
+				items: {
+					type: "string"
+				}
+			},
+
+			reviews_nr: {
+				type: "number"
+			},
+			reviews_avg: {
+				type: "number"
+			},
+
+			facts: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						name: {
+							type: "string"
+						},
+						val: {
+							type: "string",
+						},
+					},
+					additionalProperties: false,
+					required: ["name", "val"]
+				}
+			},
+
+
 		},
 		"required": [
 			"id",
@@ -100,6 +161,6 @@ module.exports = {
 			"name",
 			// "description"
 		],
-		additionalProperties: false
+		// additionalProperties: false
 	}
 };
