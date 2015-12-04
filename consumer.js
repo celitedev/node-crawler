@@ -11,7 +11,6 @@ var validUrl = require('valid-url');
 
 var Promise = require("bluebird");
 var async = require('async');
-var ZSchema = require("z-schema");
 
 var debug = require('debug')('kwhen-crawler');
 var argv = require('yargs').argv;
@@ -35,10 +34,6 @@ ajv.addFormat("date-time", function(dateTimeString) {
 
 var abstractTypeSchema = require("./schemas/abstract");
 var validateAbstractSchema = ajv.compile(abstractTypeSchema.schema);
-
-var jsonValidator = new ZSchema({
-	breakOnFirstError: false
-});
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
@@ -148,7 +143,7 @@ function processJob(job, done) {
 						var stopCriteriaFound = false;
 
 						stopArr = paginateConfig.stop || [];
-						stopArr = _.isArray(paginateConfig.stop) ? paginateConfig.stop : [paginateConfig.stop];
+						stopArr = _.isArray(stopArr) ? stopArr : [stopArr];
 
 						_.each(stopArr, function(stop) {
 							if (_.isString(stop)) {
