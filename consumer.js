@@ -208,6 +208,15 @@ function processJob(job, done) {
 						//swallow: if json mapping is correct we'll catch this next
 					}
 					return val;
+				},
+				"int": function(val) {
+					if (val === undefined) return undefined;
+					try {
+						val = parseInt(val);
+					} catch (err) {
+						//swallow: if json mapping is correct we'll catch this next
+					}
+					return val;
 				}
 			};
 
