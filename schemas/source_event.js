@@ -93,6 +93,27 @@ module.exports = {
 					required: ["url"],
 					additionalProperties: false
 				}
+			},
+			"objectRefs": {
+				description: "array of event-object references within source.",
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						url: {
+							"format": "uri",
+							type: "string"
+						},
+						id: {
+							type: "string"
+						},
+						name: {
+							type: "string"
+						}
+					},
+					required: ["url"],
+					additionalProperties: false
+				}
 			}
 		},
 		"required": [
@@ -102,7 +123,8 @@ module.exports = {
 			// "description",
 			"dtstart",
 			"placeRefs",
-			"performerRefs"
+			// "performerRefs"
+			// "objectRefs"
 		],
 		additionalProperties: false
 	}
