@@ -62,18 +62,19 @@ module.exports = {
 				items: {
 					type: "object",
 					properties: {
-						url: {
-							"format": "uri",
+						id: {
+							description: "key that uniquely identifies entity. May be an url",
 							type: "string"
 						},
-						id: {
+						url: {
+							"format": "uri",
 							type: "string"
 						},
 						name: {
 							type: "string"
 						}
 					},
-					required: ["url"],
+					required: ["id"],
 					additionalProperties: false
 				}
 			},
@@ -83,18 +84,19 @@ module.exports = {
 				items: {
 					type: "object",
 					properties: {
-						url: {
-							"format": "uri",
+						id: {
+							description: "key that uniquely identifies entity. May be an url",
 							type: "string"
 						},
-						id: {
+						url: {
+							"format": "uri",
 							type: "string"
 						},
 						name: {
 							type: "string"
 						}
 					},
-					required: ["url"],
+					required: ["id"],
 					additionalProperties: false
 				}
 			},
@@ -104,25 +106,26 @@ module.exports = {
 				items: {
 					type: "object",
 					properties: {
-						url: {
-							"format": "uri",
+						id: {
+							description: "key that uniquely identifies entity. May be an url",
 							type: "string"
 						},
-						id: {
+						url: {
+							"format": "uri",
 							type: "string"
 						},
 						name: {
 							type: "string"
 						}
 					},
-					required: ["url"],
+					required: ["id"],
 					additionalProperties: false
 				}
 			}
 		},
 		"required": [
 			"id",
-			// "url", //not required for event. See #32
+			// "url", //not required. See #41
 			"name",
 			// "description",
 			"dtstart",
