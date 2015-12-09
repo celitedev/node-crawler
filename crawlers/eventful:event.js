@@ -157,12 +157,15 @@ module.exports = {
 						//rdate
 						//rrule
 						placeRefs: x("[itemprop=location]", [{
-							name: "[itemprop=name]",
-							url: "[itemprop=name] > a@href"
+							id: "[itemprop=name] > a@href",
+							url: "[itemprop=name] > a@href",
+							name: "[itemprop=name]"
+
 						}]),
 						performerRefs: x("[itemprop=performer]", [{
-							name: "[itemprop=name]",
-							url: "> a@href"
+							id: "> a@href",
+							url: "> a@href",
+							name: "[itemprop=name]"
 						}]),
 					})
 				};

@@ -161,9 +161,10 @@ module.exports = {
 		},
 		"required": [
 			"id",
-			"url",
+			// "url", //not required. See #41
 			"name",
-			// "description"
+			"city",
+			"country"
 		],
 		// additionalProperties: false
 	}
