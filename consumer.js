@@ -539,7 +539,7 @@ function manageCrawlerLifecycle(resource) {
 		}, 0);
 
 
-		if (argv.showStats) {
+		function showStats() {
 			//Show some stats
 			console.log("#####", resource.crawlerName);
 			console.log(_.extend(generateStats(resource), {
@@ -550,11 +550,16 @@ function manageCrawlerLifecycle(resource) {
 			}));
 		}
 
+		if (argv.showStats) {
+			showStats();
+		}
+
 		if (countTotal) { //busy -> check when 
 			setTimeout(function() {
 				manageCrawlerLifecycle(resource);
 			}, resource.stats.intervalMS);
 		} else {
+			showStats(); //always show stats on shutdown
 			console.log("SHUTDOWN ", resource.crawlerName);
 			resource.isDone = true;
 		}
