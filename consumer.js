@@ -538,14 +538,17 @@ function manageCrawlerLifecycle(resource) {
 			return total + len;
 		}, 0);
 
-		//Show some stats
-		console.log("#####", resource.crawlerName);
-		console.log(_.extend(generateStats(resource), {
-			"QUEUE": {
-				inactiveCount: lengths[0],
-				activeCount: lengths[1]
-			}
-		}));
+
+		if (argv.showStats) {
+			//Show some stats
+			console.log("#####", resource.crawlerName);
+			console.log(_.extend(generateStats(resource), {
+				"QUEUE": {
+					inactiveCount: lengths[0],
+					activeCount: lengths[1]
+				}
+			}));
+		}
 
 		if (countTotal) { //busy -> check when 
 			setTimeout(function() {
