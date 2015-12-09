@@ -441,6 +441,11 @@ function processJob(job, done) {
 
 }
 
+
+function deleteJob(job, done) {
+	done();
+}
+
 ///////////////////////////////
 // Start <source,type> queue //
 ///////////////////////////////
@@ -498,12 +503,22 @@ function startCrawlerQueue(crawlConfig) {
 
 	proxyAndCacheDriver.setTotalStats(resource.stats.total);
 
+	console.log("ASDASD", argv);
 	//start queue for this crawl
-	queue.process(
-		resource.queueName,
-		crawlConfig.job.concurrentJobs,
-		processJob
-	);
+	if (argv.delete) {
+		console.log(("OK YOU WANTED IT: deleting jobs!").yellow);
+		queue.process(
+			resource.queueName,
+			crawlConfig.job.concurrentJobs,
+			deleteJob
+		);
+	} else {
+		queue.process(
+			resource.queueName,
+			crawlConfig.job.concurrentJobs,
+			processJob
+		);
+	}
 
 	manageCrawlerLifecycle(resource);
 }
