@@ -180,17 +180,17 @@ module.exports = {
 				};
 			},
 
-			//Transformers allow function(entire obj) || strings or array of those
+			//mappings allow function(entire obj) || strings or array of those
 			//returning undefined removes them
 			//
 			//REMEMBER: obj._htmlDetail is always there for you should you need access to raw power.
-			transformers: {
+			mapping: {
 
 				//fetch based on urlencoded json-stringified data-attrib
 				"detail.latitude": [
-					function(obj) {
+					function(latitude, obj) {
 						try {
-							return JSON.parse(decodeURIComponent(obj.detail.latitude)).center.latitude;
+							return JSON.parse(decodeURIComponent(latitude)).center.latitude;
 						} catch (e) {
 							//skip: caught by json schema validator
 						}
@@ -200,9 +200,9 @@ module.exports = {
 
 				//fetch based on urlencoded json-stringified data-attrib
 				"detail.longitude": [
-					function(obj) {
+					function(longitude, obj) {
 						try {
-							return JSON.parse(decodeURIComponent(obj.detail.longitude)).center.longitude;
+							return JSON.parse(decodeURIComponent(longitude)).center.longitude;
 						} catch (e) {
 							//skip: caught by json schema validator
 						}
@@ -211,8 +211,7 @@ module.exports = {
 				],
 
 				//parse the url from a redirect
-				"detail.website": function(obj) {
-					var url = obj.detail.website;
+				"detail.website": function(url, obj) {
 					if (!url) {
 						return undefined;
 					}
@@ -233,8 +232,8 @@ module.exports = {
 				// },
 
 				//make categories unique
-				"detail.categories": function(obj) {
-					return _.uniq(obj.detail.categories);
+				"detail.categories": function(categories, obj) {
+					return _.uniq(categories);
 				},
 				"detail.reviews_nr": "int",
 				"detail.reviews_avg": "float"

@@ -62,7 +62,7 @@ module.exports = {
 					url: {
 						"format": "uri",
 						type: "string",
-						description: "url of entity instance as known by source"
+						description: "OPTIONAL: url of entity instance as known by source"
 					},
 					source: {
 						//TODO: enum
@@ -75,7 +75,7 @@ module.exports = {
 						description: "name of type mapped. Independent of source"
 					}
 				},
-				"required": ["id", "url", "source", "type"]
+				"required": ["id", "source", "type"]
 			},
 			payload: {
 				description: "actual payload of message. " +
