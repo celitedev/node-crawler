@@ -5,15 +5,15 @@ var _ = require("lodash");
 //type: events
 module.exports = {
 	_meta: {
-		name: "Eventful Events",
-		description: "Distributed Crawler for Eventful.com Events"
+		name: "Fandango Places",
+		description: "Distributed Crawler for Fandango.com Places"
 	},
 	source: {
-		name: "Eventful"
+		name: "fandango"
 	},
 	entity: {
-		type: "Event",
-		schema: "source_event", //the actual schema to use
+		type: "Place",
+		schema: "source_place", //the actual schema to use
 	},
 	//General logic/behavior for this crawler 
 	semantics: {
@@ -97,85 +97,33 @@ module.exports = {
 		seed: {
 			disable: false, //for testing. Disabled nextUrl() call
 
-			//may be a string an array or string or a function producing any of those
-			seedUrls: function() {
-				var urls = [];
-				for (var i = 1; i < 20; i++) {
-					urls.push("http://newyorkcity.eventful.com/events/categories?page_number=" + i);
-				}
-				return urls;
-			},
+			seedUrls: [
+				"http://www.fandango.com/manhattan_+ny_movietimes?pn=1"
+			],
+
 			nextUrlFN: function(el) {
-				return el.find(".next > a").attr("href");
-			},
-
-
-			// STOP CRITERIA when processing nextUrlFN
-			// When processing one page after another using nextUrlFN, we need a way to check if we're done.
-			// A couple of standard checks are always performed to this end: 
-			//
-			// - check if nextUrl is the same as currentUrl. This is often employed by sites and is 
-			//  used as a sure sign we're done
-			// - nextUrl is not an url (i.e if nexturl() finds a 'href' that isn't there anymore)
-			//
-			// Besides that a crawler may implement specific stop criteria based on domain knowledge:
-			// - Templated functions (referenced by string or object with attrib name = name of template function)
-			// - custom function. Signature : function(el, cb) TO BE IMPLEMENTED
-			//
-			// Available Templated functions: 
-			// - zeroResults: uses `results.selector` + optional `selectorPostFilter` to check for 0 results. 
-			//
-			// Below is a working example. 
-			// It's superfloous for this crawler through, since general checks desribed above are enough.
-			stop: [{
-				name: "zeroResults", //zeroResults
-				selectorPostFilter: function(result) {
-					//as described above this is s
-					return result.attribs.itemscope !== undefined;
-				}
-			}]
+				return el.find("#GlobalBody_paginationControl_NextLink").attr("href");
+			}
 		},
 		headers: { //Default Headers for all requests
 			"Accept-Encoding": 'gzip, deflate'
 		},
 		results: {
-			//WEIRD: selector: ".search-results > li[itemscope]" produces 9 instead of 10 results
-			//We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
-			selector: ".search-results > li", //selector for results
+			selector: "[itemtype='http://schema.org/MovieTheater']", //selector for results
 
 			schema: function(x) { //schema for each individual result
 				return {
-					sourceUrl: "a.tn-frame@href",
-					sourceId: "a.tn-frame@href",
-					detail: x("a.tn-frame@href", {
-						name: "[itemprop=name] > span",
-						//descriptionShort
-						description: "[itemprop=description]",
-						dtstart: "[itemprop=startDate]@content",
-						//dtend
-						//duration
-						//rdate
-						//rrule
-						placeRefs: x("[itemprop=location]", [{
-							name: "[itemprop=name]",
-							url: "[itemprop=name] > a@href"
-						}]),
-						performerRefs: x("[itemprop=performer]", [{
-							name: "[itemprop=name]",
-							url: "> a@href"
-						}]),
-					})
+					sourceUrl: "[itemprop=url]@content",
+					sourceId: "[itemprop=url]@content",
+					name: "[itemprop=name]@content",
+					logo: "[itemprop=logo]@content",
+					streetAddress: "[itemprop=streetAddress]@content",
+					zipCode: "[itemprop=postalCode]@content",
+					city: "[itemprop=addressLocality]@content",
+					region: "[itemprop=addressRegion]@content",
+					country: "[itemprop=addressCountry]@content",
 				};
-			},
-
-			mapping: {
-				"detail.description": function(desc, obj) {
-					if (desc === "There is no description for this event.") {
-						return undefined;
-					}
-					return desc;
-				},
-			},
+			}
 		}
 	}
 };

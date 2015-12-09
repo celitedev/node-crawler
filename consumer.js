@@ -7,55 +7,72 @@ var fs = require("fs");
 
 var kue = require('kue');
 var colors = require('colors');
-var debug = require('debug')('kwhen-crawler');
 var validUrl = require('valid-url');
 
 var Promise = require("bluebird");
 var async = require('async');
 
-var MA = require('moving-average');
+var debug = require('debug')('kwhen-crawler');
+var argv = require('yargs').argv;
+var moment = require("moment");
+var Ajv = require('ajv');
 
 var utils = require("./utils");
 var proxyDriver = require("./drivers/proxyDriver");
 
+///////////////
+//validation //
+///////////////
+var ajv = Ajv({
+	allErrors: true
+});
 
+ajv.addFormat("date-time", function(dateTimeString) {
+	var m = moment(dateTimeString);
+	return m.isValid();
+});
+
+var abstractTypeSchema = require("./schemas/abstract");
+var validateAbstractSchema = ajv.compile(abstractTypeSchema.schema);
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
 });
 
+
+var functionLib = {
+	"float": function(val) {
+		if (val === undefined) return undefined;
+		try {
+			val = parseFloat(val);
+		} catch (err) {
+			//swallow: if json mapping is correct we'll catch this next
+		}
+		return val;
+	},
+	"int": function(val) {
+		if (val === undefined) return undefined;
+		try {
+			val = parseInt(val);
+		} catch (err) {
+			//swallow: if json mapping is correct we'll catch this next
+		}
+		return val;
+	}
+};
+
+
 //DNS caching such as http://manpages.ubuntu.com/manpages/natty/man8/nscd.8.html
 console.log("Remembered to install proper DNS caching on the box such as nscd?".green);
 
-/////////////////////////////////////////////////////////////////////////////////
-//TODO                                                                         //
-// Seed queue or continue with job                                             //
-// i.e.: there should only be 1 seeder process and multiple listening boxes    //
-//                                                                             //
-// Moreover, we should check:                                                  //
-// - master url already done in OR(queue, completed) for *this* batch -> skip
-//   - next batch we want to recheck master pages for new entities
-// - detail url already done in OR(queue, completed) for *every* batch -> skip
-//   - LATER: we may want to do rechecks of new data for existing entities. This
-//   is likely a completely separate flow though.
-//                                                                             //
-/////////////////////////////////////////////////////////////////////////////////
-
-//Set of master urls done
-// //Key: <source, entityType, batch> -> [<url>]
-// var setDoneMaster;
-
-// //Set of detail urls done
-// //Key: <source, entityType, batch> -> [<url>]
-// var setDoneDetail;
-
-
-//Each <source, type> has a cached version of a couple of things: 
-//- xRay (bc of specific proxyAndCacheDriver)
-//- proxyAndCacheDriver, bc of
-//  - specific custom headers per <source, type>
 var resourcesPerCrawlerType = {};
 
+if (argv.source && argv.type) {
+	var specificCrawler = utils.calculated.getCrawlerName(argv.source, argv.type);
+	console.log(("consuming jobs for specific crawler: " + specificCrawler).yellow);
+} else {
+	console.log(("consuming jobs for all crawlers").yellow);
+}
 ////////////////////////////
 //initialize all crawlers //
 ////////////////////////////
@@ -63,9 +80,14 @@ var normalizedPath = path.join(__dirname, "crawlers");
 fs.readdirSync(normalizedPath).forEach(function(file) {
 	var stat = fs.statSync(path.join(normalizedPath, file));
 	if (stat.isFile()) {
-		startCrawlerQueue(require("./crawlers/" + file));
+		if ((specificCrawler && file === specificCrawler + ".js") || !specificCrawler) {
+			startCrawlerQueue(require("./crawlers/" + file));
+		} else {
+			console.log(("skipping jobs for crawler: " + file.substring(0, file.lastIndexOf("."))).yellow);
+		}
 	}
 });
+
 
 
 ////////////////////////
@@ -104,6 +126,38 @@ function processJob(job, done) {
 		//x-ray instance specific to <source,type>
 		x = crawlerResource.x;
 
+	function doFieldMappings(mappingName) {
+		return function(results) {
+
+			//transform results using declarative `mappings`
+			if (!crawlConfig.schema.results[mappingName]) {
+				return results;
+			}
+			return _.map(results, function(result) {
+
+				_.each(crawlConfig.schema.results[mappingName], function(pipeline, path) {
+
+					var needle = path.lastIndexOf("."),
+						parent = ~needle ? _.property(path.substring(0, needle))(result) : result,
+						childKey = ~needle ? path.substring(needle + 1) : path;
+
+					pipeline = _.isArray(pipeline) ? pipeline : [pipeline];
+
+					//transform pipeline of single field
+					parent[childKey] = _.reduce(pipeline, function(val, stage) {
+						var stageFn = _.isString(stage) ? functionLib[stage] : stage;
+						if (!stageFn) {
+							throw "canned transformer not available: '" + stage + "'. You should choose from '" + _.keys(functionLib).join(",") + "'";
+						}
+						return stageFn(val, result);
+					}, parent[childKey]);
+
+				});
+				return result;
+			});
+		};
+	}
+
 	Promise.resolve()
 		.then(function() {
 			return new Promise(function(resolve, reject) {
@@ -111,19 +165,20 @@ function processJob(job, done) {
 
 					//pagination
 					paginate: function distributedPaginate(el, cb) {
-						if (crawlSchema.seed.type !== "urlToNextPage") {
-							//no pagination
+
+						var paginateConfig = crawlSchema.seed;
+
+						//if no nextUrlFN function -> skip
+						if (!paginateConfig.nextUrlFN) {
 							return cb();
 						}
-
-						var paginateConfig = crawlSchema.seed.config;
 
 						//disable pagination (used for testing)
 						if (paginateConfig.disable) {
 							return cb();
 						}
 
-						var nextUrl = paginateConfig.nextUrl(el);
+						var nextUrl = paginateConfig.nextUrlFN(el);
 						debug("url", data.url);
 						debug("nexturl", nextUrl);
 
@@ -143,7 +198,7 @@ function processJob(job, done) {
 						var stopCriteriaFound = false;
 
 						stopArr = paginateConfig.stop || [];
-						stopArr = _.isArray(paginateConfig.stop) ? paginateConfig.stop : [paginateConfig.stop];
+						stopArr = _.isArray(stopArr) ? stopArr : [stopArr];
 
 						_.each(stopArr, function(stop) {
 							if (_.isString(stop)) {
@@ -172,7 +227,7 @@ function processJob(job, done) {
 						}
 
 						//upload next url to queue
-						utils.addCrawlJob(queue, data.crawlJobId, crawlConfig, nextUrl, cb);
+						utils.addCrawlJob(queue, data.batchId, crawlConfig, nextUrl, cb);
 					},
 
 					//results crawling
@@ -185,58 +240,176 @@ function processJob(job, done) {
 				});
 			});
 		})
-		.then(function(obj) {
+		.then(function trimWhiteSpaceRecursively(obj) {
 			return iterTrim(obj);
 		})
-		.then(function(obj) { //TODO: why did we have this nested again? 
+		.then(function returnResultsAttrib(obj) {
 			return obj.results;
 		})
-		.map(function(result) {
+		.then(doFieldMappings("mapping"))
+		.then(function callCustomReducer(results) {
+			if (!crawlConfig.schema.results.reducer) {
+				return results;
+			}
 
-			var detail = result.detail,
-				sourceId = result.sourceId,
-				sourceUrl = result.sourceUrl;
-
-			delete result.detail;
-			delete result.sourceId;
-			delete result.sourceUrl;
-
-			return _.extend({
-				id: uuid.v4(),
-				//TODO: check what attributes should always exist in msg: 
-				//- check EIP book
-				//- check guidelines for Kafka
-				meta: {
-					type: crawlConfig.entity.type,
-					crawl: {
-						crawlJob: 123, //the large job. TODO: based on crawling manager
-						taskId: 132903712, //the specific mini job/batch within this crawlJob. TODO: based on crawling manager
-						dateTime: new Date().toISOString(),
-						crawlConfig: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
-						msgSchema: outputMessageSchema.version, //specific version of the target message schema. 
-					},
-					source: {
-						name: crawlConfig.source.name,
-						id: sourceId,
-						url: sourceUrl
-					}
-				},
-
-			}, result, detail);
+			return _.compact(_.reduce(results, function(arr, result) {
+				var out = crawlConfig.schema.results.reducer(result);
+				return arr.concat(_.isArray(out) ? out : [out]);
+			}, []));
 		})
-		.filter(function(result) {
+		.then(doFieldMappings("postMapping"))
+		.then(function customPruner(results) {
+			if (!crawlConfig.schema.results.pruner) {
+				return results;
+			}
+			return _.reduce(results, function(arr, result) {
+				var out = crawlConfig.schema.results.pruner(result);
+				out = _.isArray(out) ? out : [out];
+				_.each(out, function(o) {
+					if (o !== undefined) {
+						arr.push(o);
+					} else {
+						crawlerResource.stats.total.nrItemsPruned++;
+					}
+				});
+				return arr;
+			}, []);
+		})
+		.filter(function genericPrunerToCheckForSourceId(result) {
 			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
 			//The fact that a sourceId is required allows is to select based on this. 
 			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
-			return result.meta.source.id;
+			//
+			//Moreover, it will remove results that are falsey. This can happen if we: 
+			//- explicitly remove results by returning undefined in a `reducer`
+
+			var doPrune = !(result && result.sourceId);
+			if (doPrune) {
+				crawlerResource.stats.total.nrItemsPruned++;
+			}
+			return !doPrune; //return true when we should NOT prune
 		})
-		.then(function(results) {
+		.map(function removePrivateVariables(result) {
+			//Private vars such as `_htmlDetail` are removed. 
+			//These can be used in transformers, etc.
+			return _.reduce(result, function(agg, v, k) {
+				if (k.indexOf("_") !== 0) { //don't remove
+					agg[k] = v;
+				}
+				return agg;
+			}, {});
+		})
+		.then(function transformToGenericOutput(out) {
+			return _.reduce(out, function(agg, results) {
+
+				//results may be an array as well. If not make it an array for uniform handling
+				results = _.isArray(results) ? results : [results];
+				_.each(results, function(result) {
+
+					var detail = result.detail,
+						sourceId = result.sourceId,
+						sourceUrl = result.sourceUrl;
+
+					delete result.detail;
+					delete result.sourceId;
+					delete result.sourceUrl;
+
+					var doc = _.extend({
+						id: uuid.v4(),
+						//TODO: check what attributes should always exist in msg: 
+						//- check EIP book
+						//- check guidelines for Kafka
+						meta: {
+							crawl: {
+								batchId: parseInt(data.batchId), //the large batch.
+								jobId: data.jobId, //the specific mini job within this batch. 
+								createdAt: new Date().toISOString(),
+								crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
+								typeVersion: outputMessageSchema.version, //specific version of the target message/type schema. 
+							},
+						},
+						identifiers: {
+							id: sourceId,
+							url: sourceUrl,
+							source: crawlConfig.source.name,
+							type: crawlConfig.entity.type,
+						},
+						payload: _.extend({
+							id: sourceId,
+							url: sourceUrl
+						}, result, detail)
+					});
+
+					agg.push(doc);
+
+				});
+
+				return agg;
+
+			}, []);
+		})
+		.then(function validateGenericEnvelopeSchema(results) {
+
+			var errorArr = [];
 			_.each(results, function(result) {
+
+				debug("DEBUG RESULT PAYLOAD", result.payload);
+
+				var valid = validateAbstractSchema(result);
+				if (!valid) {
+					errorArr.push(validateAbstractSchema.errors);
+				}
+			});
+
+			if (errorArr.length) {
+				console.log(errorArr);
+				var err = new Error("errors in generic part of results. These need fixing. Halting process");
+				err.halt = true;
+				throw err;
+			}
+
+			return results;
+		})
+		.then(function validateSpecificTypeSchema(results) {
+			var errorArr = [];
+			_.each(results, function(result) {
+				var valid = ajv.validate(outputMessageSchema.schema, result.payload);
+				if (!valid) {
+					crawlerResource.stats.total.nrItemsFailedToValidate++;
+					errorArr.push(ajv.errors);
+				}
+			});
+			if (errorArr.length) {
+				//TODO:
+				//1. better way of handling? What if 1 instance has 1 missing attrib? Should we keep failing entire batch? 
+				//2. If suddenly nr of entities erroring spike, we might have a change in source html format. Alert based on this.
+				console.log(errorArr);
+				var err = new Error("errors in validation. Retrying...");
+				err.isValidationError = true;
+				throw err;
+			}
+
+			return results;
+		})
+		.then(function postMessagesToQueue(results) {
+			crawlerResource.stats.total.nrItemsComplete += results.length;
+
+			_.each(results, function(result) {
+				// console.log(result.payload);
 				//push them to other queue
 			});
 		})
 		.then(done)
-		.catch(function(err) {
+		.catch(function catchall(err) {
+
+			if (err.halt) {
+				//errors that require immediate halting are thrown
+				throw err;
+			}
+
+			if (!err.isValidationError) {
+				crawlerResource.stats.total.nrErrorsNonValidation++;
+			}
 
 			// if (err.code === "ENOTFOUND") {
 			// 	throw err; //CHECK THIS
@@ -247,9 +420,22 @@ function processJob(job, done) {
 
 			// }
 
+			//Non-200 http codes are treated as errors. 
+			//These error-objects are huge so we extract only the needed info here
+			if (err.status) {
+				var errTmp = new Error(err.message);
+				errTmp.status = err.status;
+				err = errTmp;
+			}
+
 			console.log("ERR", err);
 			done(new Error("job error: orig: " + err.message));
 
+		})
+		.catch(function severe(err) {
+			//TODO: we might do some cleanup here?
+			console.log("SEVERE ERR", err);
+			process.exit();
 		});
 
 }
@@ -263,7 +449,7 @@ function startCrawlerQueue(crawlConfig) {
 
 	var outputMessageSchema;
 	try {
-		var outputSchemaName = crawlConfig.entity.type.toLowerCase();
+		var outputSchemaName = crawlConfig.entity.schema.toLowerCase();
 		var outputSchemaPath = path.resolve(__dirname + "/schemas/" + outputSchemaName);
 		outputMessageSchema = require(outputSchemaPath);
 	} catch (err) {
@@ -288,13 +474,20 @@ function startCrawlerQueue(crawlConfig) {
 		outputMessageSchema: outputMessageSchema,
 		stats: {
 			intervalMS: 5000, // 5 seconds
-			intervalMovingAverageMS: 5 * 60 * 1000, //5 minutes
 			total: {
 				nrDetailPages: 0,
+				nrItemsComplete: 0,
+				nrItemsPruned: 0,
+				nrItemsFailedToValidate: 0,
+				nrErrorsNonValidation: 0, //TODO: can we get more granular?
 				unzippedInBytes: 0
 			}
 		},
 		crawlResultSchema: _.extend({}, crawlConfig.schema.results.schema(x), {
+			//add _htmlDetail for transormers to use. See #30
+			_htmlDetail: function(el, cb) {
+				cb(undefined, el.html());
+			},
 			calcPageDone: function(el, cb) {
 				resource.stats.total.nrDetailPages++;
 				cb();
@@ -333,7 +526,7 @@ function manageCrawlerLifecycle(resource) {
 			queue.activeCount(resource.queueName, cb);
 		},
 		function(cb) {
-			//TODO:  no more busy seeds -> check in redis
+			//TODO:  no more busy seeds: relates to #23
 			cb(undefined, 0);
 		}
 	], function(err, lengths) {
@@ -371,13 +564,10 @@ function generateStats(resource) {
 	if (!resource.stats.totalPrev) {
 
 		//init totalPrev to 0 for all values
-		var prev = resource.stats.totalPrev = {},
-			movingAverages = resource.stats.movingAverages = {};
+		var prev = resource.stats.totalPrev = {};
 
-		//init moving averages
 		_.each(resource.stats.total, function(v, k) {
 			prev[k] = 0;
-			movingAverages[k] = MA(resource.stats.intervalMovingAverageMS);
 		});
 	}
 
@@ -402,17 +592,7 @@ function generateStats(resource) {
 
 		"TOTAL": resource.stats.total,
 
-		// "DELTA": delta,
-
 		"PER_SECOND": perSecond,
-
-		// //exponential moving average / second
-		// "MAE_PER_SECOND": _.reduce(perSecond, function(agg, v, k) {
-		// 	var ma = resource.stats.movingAverages[k];
-		// 	ma.push(Date.now(), v);
-		// 	agg[k] = parseFloat((ma.movingAverage()).toFixed(2));
-		// 	return agg;
-		// }, {}),
 
 		//Total average / second
 		"AVG_PER_SECOND": _.reduce(resource.stats.total, function(agg, v, k) {

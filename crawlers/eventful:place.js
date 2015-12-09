@@ -5,15 +5,15 @@ var _ = require("lodash");
 //type: events
 module.exports = {
 	_meta: {
-		name: "Eventful Events",
-		description: "Distributed Crawler for Eventful.com Events"
+		name: "Eventful Plaves",
+		description: "Distributed Crawler for Eventful.com Places"
 	},
 	source: {
 		name: "Eventful"
 	},
 	entity: {
-		type: "Event",
-		schema: "source_event", //the actual schema to use
+		type: "Place",
+		schema: "source_place", //the actual schema to use
 	},
 	//General logic/behavior for this crawler 
 	semantics: {
@@ -98,13 +98,15 @@ module.exports = {
 			disable: false, //for testing. Disabled nextUrl() call
 
 			//may be a string an array or string or a function producing any of those
-			seedUrls: function() {
-				var urls = [];
-				for (var i = 1; i < 20; i++) {
-					urls.push("http://newyorkcity.eventful.com/events/categories?page_number=" + i);
-				}
-				return urls;
-			},
+			// seedUrls: function() {
+			// 	var urls = [];
+			// 	for (var i = 1; i < 20; i++) {
+			// 		urls.push("http://newyorkcity.eventful.com/venues?page_number=" + i);
+			// 	}
+			// 	return urls;
+			// },
+			seedUrls: "http://newyorkcity.eventful.com/venues?page_number=1",
+
 			nextUrlFN: function(el) {
 				return el.find(".next > a").attr("href");
 			},
@@ -149,32 +151,31 @@ module.exports = {
 					sourceId: "a.tn-frame@href",
 					detail: x("a.tn-frame@href", {
 						name: "[itemprop=name] > span",
-						//descriptionShort
-						description: "[itemprop=description]",
-						dtstart: "[itemprop=startDate]@content",
-						//dtend
-						//duration
-						//rdate
-						//rrule
-						placeRefs: x("[itemprop=location]", [{
-							name: "[itemprop=name]",
-							url: "[itemprop=name] > a@href"
-						}]),
-						performerRefs: x("[itemprop=performer]", [{
-							name: "[itemprop=name]",
-							url: "> a@href"
+						// descriptionShort
+						description: ".section-block.description",
+						latitude: "[itemprop=latitude]@content",
+						longitude: "[itemprop=longitude]@content",
+						streetAddress: "[itemprop=streetAddress]",
+						// streetAddressSup: 
+						zipCode: "[itemprop=postalCode]",
+						neighborhood: ".neighborhood > span",
+						city: "[itemprop=addressLocality]",
+						region: "[itemprop=addressRegion]",
+						// country: 
+						images: x(".image-viewer li", [{
+							url: "a@href",
+							alt: "@title",
+							// cc
 						}]),
 					})
 				};
 			},
 
+			//mapping allow function(entire obj) || strings or array of those
+			//returning undefined removes them
 			mapping: {
-				"detail.description": function(desc, obj) {
-					if (desc === "There is no description for this event.") {
-						return undefined;
-					}
-					return desc;
-				},
+				"detail.latitude": "float",
+				"detail.longitude": "float"
 			},
 		}
 	}

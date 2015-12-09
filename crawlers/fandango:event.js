@@ -5,11 +5,11 @@ var _ = require("lodash");
 //type: events
 module.exports = {
 	_meta: {
-		name: "Eventful Events",
-		description: "Distributed Crawler for Eventful.com Events"
+		name: "Fandango Events",
+		description: "Distributed Crawler for Fandango.com Events (Movie showtimes)"
 	},
 	source: {
-		name: "Eventful"
+		name: "fandango"
 	},
 	entity: {
 		type: "Event",
@@ -97,85 +97,107 @@ module.exports = {
 		seed: {
 			disable: false, //for testing. Disabled nextUrl() call
 
-			//may be a string an array or string or a function producing any of those
-			seedUrls: function() {
-				var urls = [];
-				for (var i = 1; i < 20; i++) {
-					urls.push("http://newyorkcity.eventful.com/events/categories?page_number=" + i);
-				}
-				return urls;
-			},
+			//TODO: Seed" list of neightborhoods * dates
+			seedUrls: [
+				"http://www.fandango.com/manhattan_+ny_movietimes?pn=1"
+			],
+
 			nextUrlFN: function(el) {
-				return el.find(".next > a").attr("href");
-			},
-
-
-			// STOP CRITERIA when processing nextUrlFN
-			// When processing one page after another using nextUrlFN, we need a way to check if we're done.
-			// A couple of standard checks are always performed to this end: 
-			//
-			// - check if nextUrl is the same as currentUrl. This is often employed by sites and is 
-			//  used as a sure sign we're done
-			// - nextUrl is not an url (i.e if nexturl() finds a 'href' that isn't there anymore)
-			//
-			// Besides that a crawler may implement specific stop criteria based on domain knowledge:
-			// - Templated functions (referenced by string or object with attrib name = name of template function)
-			// - custom function. Signature : function(el, cb) TO BE IMPLEMENTED
-			//
-			// Available Templated functions: 
-			// - zeroResults: uses `results.selector` + optional `selectorPostFilter` to check for 0 results. 
-			//
-			// Below is a working example. 
-			// It's superfloous for this crawler through, since general checks desribed above are enough.
-			stop: [{
-				name: "zeroResults", //zeroResults
-				selectorPostFilter: function(result) {
-					//as described above this is s
-					return result.attribs.itemscope !== undefined;
-				}
-			}]
-		},
-		headers: { //Default Headers for all requests
-			"Accept-Encoding": 'gzip, deflate'
+				return el.find("#GlobalBody_paginationControl_NextLink").attr("href");
+			}
 		},
 		results: {
-			//WEIRD: selector: ".search-results > li[itemscope]" produces 9 instead of 10 results
-			//We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
-			selector: ".search-results > li", //selector for results
+			selector: ".showtimes-theater", //selector for results
 
 			schema: function(x) { //schema for each individual result
+
 				return {
-					sourceUrl: "a.tn-frame@href",
-					sourceId: "a.tn-frame@href",
-					detail: x("a.tn-frame@href", {
-						name: "[itemprop=name] > span",
-						//descriptionShort
-						description: "[itemprop=description]",
-						dtstart: "[itemprop=startDate]@content",
-						//dtend
-						//duration
-						//rdate
-						//rrule
-						placeRefs: x("[itemprop=location]", [{
-							name: "[itemprop=name]",
-							url: "[itemprop=name] > a@href"
+
+					//movietheater
+					placeRefs: x(".showtimes-theater-title", [{
+						name: "@text",
+						url: "@href"
+					}]),
+
+					//multiple movies per movietheater
+					movieContainer: x(".showtimes-movie-container", [{
+
+						movieShowingContainer: x(".showtimes-times > a", [{
+							sourceId: "time@datetime",
+							sourceUrl: "@href",
+							name: "time@datetime",
+							//descriptionShort: nope
+							// description: nope
+							dtstart: "time@datetime",
+							//dtend: nope
+							//duration: nope
+							//rdate: nope
+							//rrule: nope
 						}]),
-						performerRefs: x("[itemprop=performer]", [{
-							name: "[itemprop=name]",
-							url: "> a@href"
-						}]),
-					})
+
+						//moie
+						objectRefs: x(".showtimes-movie-title", [{
+							name: "@text",
+							url: "@href"
+						}])
+					}]),
+
+					//performerRefs: nope
 				};
 			},
 
-			mapping: {
-				"detail.description": function(desc, obj) {
-					if (desc === "There is no description for this event.") {
+			//Reducer is called after all fieldMappings are called, 
+			//and just before postsMappings are called. 
+			//
+			//You can use this to do a complete custom mapping. 
+			//Also going from 1 to several items is supported. This therefore implements #31.
+			reducer: function(doc) {
+
+				var showings = [];
+
+				_.each(doc.movieContainer, function(movieContainer) {
+					_.each(movieContainer.movieShowingContainer, function(movieShowingContainer) {
+
+						//Create compound name/id
+						//
+						//TODO: we should probably adhere to some schema for constructing things such as 'movieshowing names' 
+						//in a uniform wau. 
+						//
+						var time = movieShowingContainer.name,
+							placeName = doc.placeRefs[0].name,
+							movieName = movieContainer.objectRefs[0].name;
+
+						var id = (placeName + " -- " + movieName + " -- " + time);
+						name = id;
+
+						// if(movieShowingContainer.sourceUrl.lastIndexOf("#")
+
+						showings.push(_.extend(movieShowingContainer, {
+							sourceId: id, //should have an id. Otherwise it's auto-pruned
+							name: name,
+							idCompound: true,
+							objectRefs: movieContainer.objectRefs,
+							placeRefs: doc.placeRefs
+						}));
+					});
+				});
+
+				return showings;
+			},
+
+			postMapping: {
+				"sourceUrl": function(sourceUrl) {
+					if (sourceUrl.lastIndexOf("#") === sourceUrl.length - 1) {
 						return undefined;
 					}
-					return desc;
+					return sourceUrl;
 				},
 			},
+
+			//no pruning: just for show
+			pruner: function(doc) {
+				return doc;
+			}
 		}
 	}
 };
