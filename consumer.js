@@ -503,7 +503,6 @@ function startCrawlerQueue(crawlConfig) {
 
 	proxyAndCacheDriver.setTotalStats(resource.stats.total);
 
-	console.log("ASDASD", argv);
 	//start queue for this crawl
 	if (argv.delete) {
 		console.log(("OK YOU WANTED IT: deleting jobs!").yellow);
