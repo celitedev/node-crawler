@@ -115,8 +115,9 @@ module.exports = {
 
 					//movietheater
 					placeRefs: x(".showtimes-theater-title", [{
-						name: "@text",
-						url: "@href"
+						id: "@href",
+						url: "@href",
+						name: "@text"
 					}]),
 
 					//multiple movies per movietheater
@@ -137,8 +138,9 @@ module.exports = {
 
 						//moie
 						objectRefs: x(".showtimes-movie-title", [{
-							name: "@text",
-							url: "@href"
+							id: "@href",
+							url: "@href",
+							name: "@text"
 						}])
 					}]),
 
@@ -187,6 +189,7 @@ module.exports = {
 
 			postMapping: {
 				"sourceUrl": function(sourceUrl) {
+					//only keep urls if they actually point somewhere
 					if (sourceUrl.lastIndexOf("#") === sourceUrl.length - 1) {
 						return undefined;
 					}
