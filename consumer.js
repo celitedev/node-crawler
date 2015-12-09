@@ -538,27 +538,37 @@ function manageCrawlerLifecycle(resource) {
 			return total + len;
 		}, 0);
 
-		//Show some stats
-		console.log("#####", resource.crawlerName);
-		console.log(_.extend(generateStats(resource), {
-			"QUEUE": {
-				inactiveCount: lengths[0],
-				activeCount: lengths[1]
-			}
-		}));
+
+		function showStats(limitToFields) {
+			//Show some stats
+			console.log("#####", resource.crawlerName);
+			console.log(_.extend(generateStats(resource, limitToFields), {
+				"QUEUE": {
+					inactiveCount: lengths[0],
+					activeCount: lengths[1]
+				}
+			}));
+		}
+
+		if (argv.showStats) {
+			showStats();
+		} else {
+			showStats(["nrItemsComplete"]);
+		}
 
 		if (countTotal) { //busy -> check when 
 			setTimeout(function() {
 				manageCrawlerLifecycle(resource);
 			}, resource.stats.intervalMS);
 		} else {
+			showStats(); //always show stats on shutdown
 			console.log("SHUTDOWN ", resource.crawlerName);
 			resource.isDone = true;
 		}
 	});
 }
 
-function generateStats(resource) {
+function generateStats(resource, limitToFields) {
 
 	//INIT
 	if (!resource.stats.totalPrev) {
@@ -588,7 +598,7 @@ function generateStats(resource) {
 
 
 	resource.stats.totalPrev = _.cloneDeep(resource.stats.total);
-	return {
+	var out = {
 
 		"TOTAL": resource.stats.total,
 
@@ -597,6 +607,29 @@ function generateStats(resource) {
 		//Total average / second
 		"AVG_PER_SECOND": _.reduce(resource.stats.total, function(agg, v, k) {
 			agg[k] = parseFloat((resource.stats.totalMS ? v * 1000 / resource.stats.totalMS : 0).toFixed(2));
+			return agg;
+		}, {})
+	};
+	if (!limitToFields) {
+		return out;
+	}
+	return {
+		TOTAL: _.reduce(out.TOTAL, function(agg, v, k) {
+			if (~limitToFields.indexOf(k)) {
+				agg[k] = v;
+			}
+			return agg;
+		}, {}),
+		PER_SECOND: _.reduce(out.PER_SECOND, function(agg, v, k) {
+			if (~limitToFields.indexOf(k)) {
+				agg[k] = v;
+			}
+			return agg;
+		}, {}),
+		AVG_PER_SECOND: _.reduce(out.AVG_PER_SECOND, function(agg, v, k) {
+			if (~limitToFields.indexOf(k)) {
+				agg[k] = v;
+			}
 			return agg;
 		}, {})
 	};
