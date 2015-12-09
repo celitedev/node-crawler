@@ -39,6 +39,29 @@ var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
 });
 
+
+var functionLib = {
+	"float": function(val) {
+		if (val === undefined) return undefined;
+		try {
+			val = parseFloat(val);
+		} catch (err) {
+			//swallow: if json mapping is correct we'll catch this next
+		}
+		return val;
+	},
+	"int": function(val) {
+		if (val === undefined) return undefined;
+		try {
+			val = parseInt(val);
+		} catch (err) {
+			//swallow: if json mapping is correct we'll catch this next
+		}
+		return val;
+	}
+};
+
+
 //DNS caching such as http://manpages.ubuntu.com/manpages/natty/man8/nscd.8.html
 console.log("Remembered to install proper DNS caching on the box such as nscd?".green);
 
@@ -102,6 +125,38 @@ function processJob(job, done) {
 
 		//x-ray instance specific to <source,type>
 		x = crawlerResource.x;
+
+	function doFieldMappings(mappingName) {
+		return function(results) {
+
+			//transform results using declarative `mappings`
+			if (!crawlConfig.schema.results[mappingName]) {
+				return results;
+			}
+			return _.map(results, function(result) {
+
+				_.each(crawlConfig.schema.results[mappingName], function(pipeline, path) {
+
+					var needle = path.lastIndexOf("."),
+						parent = ~needle ? _.property(path.substring(0, needle))(result) : result,
+						childKey = ~needle ? path.substring(needle + 1) : path;
+
+					pipeline = _.isArray(pipeline) ? pipeline : [pipeline];
+
+					//transform pipeline of single field
+					parent[childKey] = _.reduce(pipeline, function(val, stage) {
+						var stageFn = _.isString(stage) ? functionLib[stage] : stage;
+						if (!stageFn) {
+							throw "canned transformer not available: '" + stage + "'. You should choose from '" + _.keys(functionLib).join(",") + "'";
+						}
+						return stageFn(val, result);
+					}, parent[childKey]);
+
+				});
+				return result;
+			});
+		};
+	}
 
 	Promise.resolve()
 		.then(function() {
@@ -191,63 +246,48 @@ function processJob(job, done) {
 		.then(function returnResultsAttrib(obj) {
 			return obj.results;
 		})
+		.then(doFieldMappings("mapping"))
+		.then(function callCustomReducer(results) {
+			if (!crawlConfig.schema.results.reducer) {
+				return results;
+			}
+
+			return _.compact(_.reduce(results, function(arr, result) {
+				var out = crawlConfig.schema.results.reducer(result);
+				return arr.concat(_.isArray(out) ? out : [out]);
+			}, []));
+		})
+		.then(doFieldMappings("postMapping"))
+		.then(function customPruner(results) {
+			if (!crawlConfig.schema.results.pruner) {
+				return results;
+			}
+			return _.reduce(results, function(arr, result) {
+				var out = crawlConfig.schema.results.pruner(result);
+				out = _.isArray(out) ? out : [out];
+				_.each(out, function(o) {
+					if (o !== undefined) {
+						arr.push(o);
+					} else {
+						crawlerResource.stats.total.nrItemsPruned++;
+					}
+				});
+				return arr;
+			}, []);
+		})
 		.filter(function genericPrunerToCheckForSourceId(result) {
 			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
 			//The fact that a sourceId is required allows is to select based on this. 
 			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
-			return result.sourceId;
-		})
-		.then(function transformFields(results) {
+			//
+			//Moreover, it will remove results that are falsey. This can happen if we: 
+			//- explicitly remove results by returning undefined in a `reducer`
 
-			var functionLib = {
-				"float": function(val) {
-					if (val === undefined) return undefined;
-					try {
-						val = parseFloat(val);
-					} catch (err) {
-						//swallow: if json mapping is correct we'll catch this next
-					}
-					return val;
-				},
-				"int": function(val) {
-					if (val === undefined) return undefined;
-					try {
-						val = parseInt(val);
-					} catch (err) {
-						//swallow: if json mapping is correct we'll catch this next
-					}
-					return val;
-				}
-			};
-
-			//transform results using declarative `transformers`
-			if (!crawlConfig.schema.results.transformers) {
-				return results;
+			var doPrune = !(result && result.sourceId);
+			if (doPrune) {
+				crawlerResource.stats.total.nrItemsPruned++;
 			}
-			return _.map(results, function(result) {
-				_.each(crawlConfig.schema.results.transformers, function(pipeline, path) {
-
-					var needle = path.lastIndexOf("."),
-						parent = ~needle ? _.property(path.substring(0, needle))(result) : result,
-						childKey = ~needle ? path.substring(needle + 1) : path;
-
-					pipeline = _.isArray(pipeline) ? pipeline : [pipeline];
-
-					//transform pipeline of single field
-					parent[childKey] = _.reduce(pipeline, function(val, stage) {
-						if (_.isString(stage)) {
-							if (!functionLib[stage]) {
-								throw "canned transformer not available: '" + stage + "'. You should choose from '" + _.keys(functionLib).join(",") + "'";
-							}
-							return functionLib[stage](val);
-						} else {
-							return stage(result);
-						}
-					}, parent[childKey]);
-
-				});
-				return result;
-			});
+			return !doPrune; //return true when we should NOT prune
 		})
 		.map(function removePrivateVariables(result) {
 			//Private vars such as `_htmlDetail` are removed. 
@@ -259,41 +299,54 @@ function processJob(job, done) {
 				return agg;
 			}, {});
 		})
-		.map(function transformToGenericOutput(result) {
+		.then(function transformToGenericOutput(out) {
+			return _.reduce(out, function(agg, results) {
 
-			var detail = result.detail,
-				sourceId = result.sourceId,
-				sourceUrl = result.sourceUrl;
+				//results may be an array as well. If not make it an array for uniform handling
+				results = _.isArray(results) ? results : [results];
+				_.each(results, function(result) {
 
-			delete result.detail;
-			delete result.sourceId;
-			delete result.sourceUrl;
+					var detail = result.detail,
+						sourceId = result.sourceId,
+						sourceUrl = result.sourceUrl;
 
-			return _.extend({
-				id: uuid.v4(),
-				//TODO: check what attributes should always exist in msg: 
-				//- check EIP book
-				//- check guidelines for Kafka
-				meta: {
-					crawl: {
-						batchId: parseInt(data.batchId), //the large batch.
-						jobId: data.jobId, //the specific mini job within this batch. 
-						createdAt: new Date().toISOString(),
-						crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
-						typeVersion: outputMessageSchema.version, //specific version of the target message/type schema. 
-					},
-				},
-				identifiers: {
-					id: sourceId,
-					url: sourceUrl,
-					source: crawlConfig.source.name,
-					type: crawlConfig.entity.type,
-				},
-				payload: _.extend({
-					id: sourceId,
-					url: sourceUrl
-				}, result, detail)
-			});
+					delete result.detail;
+					delete result.sourceId;
+					delete result.sourceUrl;
+
+					var doc = _.extend({
+						id: uuid.v4(),
+						//TODO: check what attributes should always exist in msg: 
+						//- check EIP book
+						//- check guidelines for Kafka
+						meta: {
+							crawl: {
+								batchId: parseInt(data.batchId), //the large batch.
+								jobId: data.jobId, //the specific mini job within this batch. 
+								createdAt: new Date().toISOString(),
+								crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
+								typeVersion: outputMessageSchema.version, //specific version of the target message/type schema. 
+							},
+						},
+						identifiers: {
+							id: sourceId,
+							url: sourceUrl,
+							source: crawlConfig.source.name,
+							type: crawlConfig.entity.type,
+						},
+						payload: _.extend({
+							id: sourceId,
+							url: sourceUrl
+						}, result, detail)
+					});
+
+					agg.push(doc);
+
+				});
+
+				return agg;
+
+			}, []);
 		})
 		.then(function validateGenericEnvelopeSchema(results) {
 
@@ -322,6 +375,7 @@ function processJob(job, done) {
 			_.each(results, function(result) {
 				var valid = ajv.validate(outputMessageSchema.schema, result.payload);
 				if (!valid) {
+					crawlerResource.stats.total.nrItemsFailedToValidate++;
 					errorArr.push(ajv.errors);
 				}
 			});
@@ -331,12 +385,15 @@ function processJob(job, done) {
 				//2. If suddenly nr of entities erroring spike, we might have a change in source html format. Alert based on this.
 				console.log(errorArr);
 				var err = new Error("errors in validation. Retrying...");
+				err.isValidationError = true;
 				throw err;
 			}
 
 			return results;
 		})
 		.then(function postMessagesToQueue(results) {
+			crawlerResource.stats.total.nrItemsComplete += results.length;
+
 			_.each(results, function(result) {
 				// console.log(result.payload);
 				//push them to other queue
@@ -348,6 +405,10 @@ function processJob(job, done) {
 			if (err.halt) {
 				//errors that require immediate halting are thrown
 				throw err;
+			}
+
+			if (!err.isValidationError) {
+				crawlerResource.stats.total.nrErrorsNonValidation++;
 			}
 
 			// if (err.code === "ENOTFOUND") {
@@ -415,6 +476,10 @@ function startCrawlerQueue(crawlConfig) {
 			intervalMS: 5000, // 5 seconds
 			total: {
 				nrDetailPages: 0,
+				nrItemsComplete: 0,
+				nrItemsPruned: 0,
+				nrItemsFailedToValidate: 0,
+				nrErrorsNonValidation: 0, //TODO: can we get more granular?
 				unzippedInBytes: 0
 			}
 		},

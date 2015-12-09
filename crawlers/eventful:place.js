@@ -171,9 +171,9 @@ module.exports = {
 				};
 			},
 
-			//transformers allow function(entire obj) || strings or array of those
+			//mapping allow function(entire obj) || strings or array of those
 			//returning undefined removes them
-			transformers: {
+			mapping: {
 				"detail.latitude": "float",
 				"detail.longitude": "float"
 			},

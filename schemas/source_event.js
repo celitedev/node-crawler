@@ -13,6 +13,10 @@ module.exports = {
 				type: "string",
 				description: "id of instance as known by source"
 			},
+			idCompound: {
+				type: "boolean",
+				description: "indicates if id was created manually/ compounded based on several attribs"
+			},
 			url: {
 				"format": "uri",
 				type: "string",
@@ -118,7 +122,7 @@ module.exports = {
 		},
 		"required": [
 			"id",
-			"url",
+			// "url", //not required for event. See #32
 			"name",
 			// "description",
 			"dtstart",
