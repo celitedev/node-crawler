@@ -13,6 +13,7 @@ var Promise = require("bluebird");
 var async = require('async');
 
 var debug = require('debug')('kwhen-crawler');
+var debugUrls = require('debug')('kwhen-crawler-urls');
 var argv = require('yargs').argv;
 var moment = require("moment");
 var Ajv = require('ajv');
@@ -179,8 +180,8 @@ function processJob(job, done) {
 						}
 
 						var nextUrl = paginateConfig.nextUrlFN(el);
-						debug("url", data.url);
-						debug("nexturl", nextUrl);
+						debugUrls("url", data.url);
+						debugUrls("nexturl", nextUrl);
 
 						//sometimes the next url just isn't there anymore. 
 						//That's an easy and strong signal to stop bothering

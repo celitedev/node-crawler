@@ -54,7 +54,7 @@ urls = _.isArray(urls) ? urls : [urls];
 //
 var promises = _.map(urls, function(url) {
 	return new Promise(function(resolve, reject) {
-		utils.addCrawlJob(queue, batchid, crawlConfig, urls[0], function(err) {
+		utils.addCrawlJob(queue, batchid, crawlConfig, url, function(err) {
 			if (err) {
 				return reject(err);
 			}
