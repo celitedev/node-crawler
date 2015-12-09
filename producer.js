@@ -7,7 +7,7 @@ var argv = require('yargs').argv;
 var path = require("path");
 
 var kue = require('kue');
-
+var Promise = require("bluebird");
 var utils = require("./utils");
 
 
@@ -33,24 +33,40 @@ var queue = kue.createQueue({
 
 var batchid = "1";
 
-utils.addCrawlJob(queue, batchid, crawlConfig, crawlConfig.schema.seed.config.seedUrl, function(err) {
-	if (err) {
-		throw err;
-	}
 
-	//TODO:
-	//Running will ALWAYS run with increased batchId. 
-	//
-	//However, there's a check that if currentBatchId was added less than x time ago it will shortcircuit by default. 
-	//forceNewBatch=true overwrites this failsafe.
-	//
-	//A default safe solution is important, because depending on config this may mean that 
-	//in-process + queued jobs of current batchId are discarded. 
-	//
-	//deleteOldJobs=true | false(default) can be added to remove old jobs from the queue. I.e.: of batchid < newly created batchId
-	//
-	queue.shutdown(5000, function(err) {
-		console.log('Kue shutdown: ', err || '');
-		console.log("done seeding (source, type, batchid)", crawlConfig.source.name, crawlConfig.entity.type, batchid);
+//create urls that need to be seeded
+var urlsOrFN = crawlConfig.schema.seed.seedUrls,
+	urls = _.isFunction(urlsOrFN) ? urlsOrFN() : urlsOrFN;
+
+urls = _.isArray(urls) ? urls : [urls];
+
+
+//TODO:
+//Running will ALWAYS run with increased batchId. 
+//
+//However, there's a check that if currentBatchId was added less than x time ago it will shortcircuit by default. 
+//forceNewBatch=true overwrites this failsafe.
+//
+//A default safe solution is important, because depending on config this may mean that 
+//in-process + queued jobs of current batchId are discarded. 
+//
+//deleteOldJobs=true | false(default) can be added to remove old jobs from the queue. I.e.: of batchid < newly created batchId
+//
+var promises = _.map(urls, function(url) {
+	return new Promise(function(resolve, reject) {
+		utils.addCrawlJob(queue, batchid, crawlConfig, urls[0], function(err) {
+			if (err) {
+				return reject(err);
+			}
+			resolve();
+		});
 	});
 });
+
+Promise.all(promises)
+	.finally(function() {
+		queue.shutdown(5000, function(err) {
+			console.log('Kue shutdown: ', err || '');
+			console.log("done seeding (source, type, batchid)", crawlConfig.source.name, crawlConfig.entity.type, batchid);
+		});
+	});

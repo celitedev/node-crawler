@@ -2,7 +2,7 @@ var uuid = require("uuid");
 var path = require("path");
 var _ = require("lodash");
 
-module.exports = {
+var utils = module.exports = {
 	URL_SEED_PREFIX: "url_seed",
 	URL_DONE_MASTER_PREFIX: "url_done_master",
 	URL_DONE_DETAIL_PREFIX: "url_done_detail",
@@ -12,7 +12,7 @@ module.exports = {
 		config.source = config.source.toLowerCase();
 		config.type = config.type.toLowerCase();
 
-		var crawlerName = this.calculated.getCrawlerName(config.source, config.type);
+		var crawlerName = utils.calculated.getCrawlerName(config.source, config.type);
 
 		try {
 			var crawlerSchemaPath = path.resolve(__dirname + "/crawlers/" + crawlerName);
@@ -44,16 +44,16 @@ module.exports = {
 
 	addCrawlJob: function(queue, batchId, crawlConfig, url, cb) {
 
-		var crawlerQueueName = this.calculated.getCrawlerQueueName(crawlConfig);
+		var crawlerQueueName = utils.calculated.getCrawlerQueueName(crawlConfig);
 
 		return queue.create(crawlerQueueName, {
-				crawlJobId: batchId,
-				taskid: uuid.v4(), //id of this specific mini batch
+				batchId: batchId,
+				jobId: uuid.v4(), //id of this specific mini batch
 				source: crawlConfig.source.name,
 				type: crawlConfig.entity.type,
 				url: url,
 				created: new Date().toISOString(),
-				title: this.calculated.getSeedUrlTitle(crawlConfig.source.name, crawlConfig.entity.type, crawlConfig.schema.seed.config.seedUrl)
+				title: utils.calculated.getSeedUrlTitle(crawlConfig.source.name, crawlConfig.entity.type, url)
 			})
 			.ttl(crawlConfig.job.ttl)
 			//fail means retry: return to queue to be picked up later. Allows us to mimic 'at-least-once'-semantics
@@ -91,7 +91,7 @@ module.exports = {
 
 
 		getCrawlerQueueName: function(crawlConfig) {
-			var crawlerName = this.getCrawlerName(crawlConfig.source.name, crawlConfig.entity.type);
+			var crawlerName = utils.calculated.getCrawlerName(crawlConfig.source.name, crawlConfig.entity.type);
 			return "crawl-" + crawlerName;
 		}
 	}
