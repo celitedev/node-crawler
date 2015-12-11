@@ -1,5 +1,6 @@
-//frmo https://github.com/indexzero/node-schema-org/issues/4
+//frmo http://schema.link.fish/downloads/all.json
 //except for datatypes which are filled in by OUTDATED  http://schema.rdfs.org/all.json
+//Also see:  https://github.com/indexzero/node-schema-org/issues/4
 module.exports = {
   "datatypes": {
     "Boolean": {
