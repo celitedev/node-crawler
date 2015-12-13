@@ -1,9 +1,3 @@
-///////////////////////////////////////
-//TODO: 
-//1. json schema on below schemas //
-///////////////////////////////////////
-
-
 //Goal here is to model LOGICAL entity schemas that follow schema.org as closely as possible. 
 //More specifically, 
 //- a entity schema always inherits from exactly 1 schema.org schema

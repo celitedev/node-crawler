@@ -14,7 +14,7 @@ if (!type) {
 	throw new Error("type not found for:" + typeName);
 }
 
-// console.log(type);
+console.log(type);
 
 // var schema = _.extend({}, type, {
 // 	propertySchemas: _.map(type.properties, function(propName) {
