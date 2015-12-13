@@ -44,7 +44,9 @@ var _ = require("lodash");
 
 var schemaOrgDef = require("./all");
 
-var properties = {};
+var properties = {
+	bla: {}
+};
 
 var types = {
 	Thing: {
