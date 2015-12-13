@@ -42,64 +42,54 @@
 
 var _ = require("lodash");
 
-var schemaOrgDef = require("./all");
-
-var properties = {
-	bla: {}
-};
-
-var types = {
-	Thing: {
-
-		// overwrites: "Thing",
-
-		//limit to the following Schema.org properties that the direct supertyped defines
-		properties: {
-			"name": {},
-			"url": {},
-			"description": {
-				//isMulti : false -> default
-			},
-			"alternateName": {
-				"isMulti": true,
-				// "minItems": 1,
-				// "maxItems": 2,
-				ranges: ['Text'] //just for example. We test that if ranges is defined, is specifies a subtype of ranges supported on overwrite-type.
-			},
-			"image": {
-				"isMulti": true
-			},
-			"sameAs": { //might be use to provide references from canonical to specific sources.
-				"isMulti": true
-			},
-		},
-		// //explicitly remove support for properties defined by ancestor types. 
-		// //I.e.: a comment doesn't support a Image or something.
-		// remove_ancestor_properties: {
-		// 	//property names to remove by ancestors. format: `<name>: {}`
-		// },
-		// //properties added by Kwhen
-		// added_properties: {
-
-		// }
-	},
-	Place: {
-		supertypes: ['Thing'] // if needed you can 
-	}
-};
-
+var schemaOrgDef = require("./schemaOrg");
+var properties = require("./kwhen").properties;
+var types = require("./kwhen").types;
 
 //extend (default) our property def with schema.org property definitions.
-var noOrigProps = [];
+var noOrigProps = [],
+	typesNotSupported = [];
+
 _.each(properties, function(p, k) {
 	var propOverwrite = schemaOrgDef.properties[k];
-	if (!propOverwrite && p.isNew) {
+	if (!propOverwrite && !p.isNew) {
 		noOrigProps.push(k);
+		return;
 	}
-	_.defaults(p, pOverwrite);
+
+	//////////////////////////////////////////////////////
+	//check sub.ranges is proper subset of sup.ranges// //
+	//////////////////////////////////////////////////////
+	if (p.ranges) {
+
+		var unsupportedRanges = [];
+		_.each(p.ranges, function(r) {
+			if (propOverwrite.ranges.indexOf(r) === -1) {
+				unsupportedRanges.push(r);
+			}
+		});
+		if (unsupportedRanges.length) {
+			throw new Error("CONFIG ERR: range is not a proper subset of prop.range of overwritten type (propName, unsupportedRanges, supported): " +
+				k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
+		}
+	}
+
+	_.defaults(p, propOverwrite);
+
+	//check all types defined in `property.ranges` are supported
+	_.each(p.ranges, function(type) {
+		if (schemaOrgDef.datatypes[type]) {
+			return;
+		}
+		typesNotSupported.push(type);
+	});
+
 });
 if (noOrigProps.length) {
-	throw new Error("Following properties weren't defined in schema.org definition: " + noOrigProps.join(","));
+	throw new Error("Following properties defined in our own definition, weren't defined in schema.org definition: " + noOrigProps.join(","));
+}
+if (_.size(typesNotSupported)) {
+	throw new Error("Following types are not defined, although properties referencing to them are: " + typesNotSupported.join(","));
 }
 
 
@@ -118,9 +108,8 @@ _.each(types, function(t, k) {
 	//inherit some defaults
 	_.defaults(t, {
 		id: overwrites.id,
-		properties: [],
 		overwrites: k,
-		//TODO: check self specified 'supertypes' is a proper subset of overwrites.supertypes
+		properties: [],
 		supertypes: _.clone(overwrites.supertypes),
 	});
 
@@ -128,54 +117,43 @@ _.each(types, function(t, k) {
 	/////////////////////////////////////////////
 	//do some checks + extension of properties //
 	/////////////////////////////////////////////
-	var undefinedProps = [];
-	_.each(types[k].properties, function(propObj, propK) {
+	var undefinedProps = [],
+		undefinedPropsOwn = [];
+
+
+	_.each(t.properties, function(propObj, propK) {
 
 		//set defaults
 		//- isMulti = false
 		propObj.isMulti = propObj.isMulti || false;
 
-		/////////////////////////////////////////////////////////////////////////
-		// check if all properties are indeed defined by 'overwrites' type.  //
-		/////////////////////////////////////////////////////////////////////////
+		//check if properties defined exist in our own properties definition 
+		//Remember: we already linked up/extened our own definition with schema.org property definitions
+		if (!properties[propK]) {
+			undefinedPropsOwn.push(propK);
+			return;
+		}
+
+		//check if all defined `properties` on types are indeed defined by 'overwrites' type.
 		if (overwrites.specific_properties.indexOf(propK) === -1) {
 			undefinedProps.push(propK);
 			return;
 		}
 
-		///////////////////////////////////////////////
-		//check propery ref exists in overwrite Type //
-		///////////////////////////////////////////////
-		var propOverwrite = schemaOrgDef.properties[propK];
-		if (!propOverwrite) {
-			//property should exist (since a schema.org definition references it). Yet it doesn't exist -> fail hard
-			throw new Error("ERROR in all.js. Couldn't find property: " + propK);
-		}
-
-		//////////////////////////////////////////////////////
-		//check sub.ranges is proper subset of sup.ranges// //
-		//////////////////////////////////////////////////////
-		if (propObj.ranges) {
-
-			var unsupportedRanges = [];
-			_.each(propObj.ranges, function(r) {
-				if (propOverwrite.ranges.indexOf(r) === -1) {
-					unsupportedRanges.push(r);
-				}
-			});
-			if (unsupportedRanges.length) {
-				throw new Error("CONFIG ERR: range is not a proper subset of prop.range of overwritten type ( overwrite type, propName, unsupportedRanges, supported): " +
-					t.overwrites + ", " + propK + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
-			}
-		}
-
-		_.defaults(propObj, propOverwrite);
+		_.defaults(propObj, properties[propK]);
 	});
+
+
+	if (undefinedPropsOwn.length) {
+		throw new Error("CONFIG ERR: some properties not defined on our own properties definition (type, undefinedProps): " + k +
+			", (" + undefinedPropsOwn.join(",") + ")");
+	}
 
 	if (undefinedProps.length) {
 		throw new Error("CONFIG ERR: some properties not defined on the 'overwrite' type (type, overwrite type, undefinedProps): " + k + ", " +
 			t.overwrites + ", (" + undefinedProps.join(",") + ")");
 	}
+
 
 	types[k].specific_properties = types[k].properties;
 	delete types[k].properties;
