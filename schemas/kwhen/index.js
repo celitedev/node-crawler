@@ -6,7 +6,12 @@ var properties = {
 	description: {},
 	alternateName: {},
 	image: {
-		ranges: ["URL"] //ImageObject not supported for now
+		ranges: ["URL"], //ImageObject not supported for now
+		validation: {
+			URL: { //validation per range-object
+
+			}
+		}
 	},
 	sameAs: {},
 	url: {},
