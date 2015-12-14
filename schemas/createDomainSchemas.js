@@ -1,3 +1,7 @@
+//In the end we need to end up with 
+
+
+
 //Goal here is to model LOGICAL entity schemas that follow schema.org as closely as possible. 
 //More specifically, 
 //- a entity schema always inherits from exactly 1 schema.org schema
@@ -36,9 +40,9 @@
 
 var _ = require("lodash");
 
-var schemaOrgDef = require("./schemaOrg");
-var properties = require("./kwhen").properties;
-var types = require("./kwhen").types;
+var schemaOrgDef = require("./domain/schemaOrgDef");
+var properties = require("./domain").properties;
+var types = require("./domain").types;
 
 //extend (default) our property def with schema.org property definitions.
 var noOrigProps = [],
@@ -73,6 +77,9 @@ _.each(properties, function(p, k) {
 	//check all types defined in `property.ranges` are supported
 	_.each(p.ranges, function(type) {
 		if (schemaOrgDef.datatypes[type]) {
+			return;
+		}
+		if (types[type]) {
 			return;
 		}
 		typesNotSupported.push(type);
