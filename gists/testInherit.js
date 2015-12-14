@@ -1,4 +1,4 @@
-var generatedSchemas = require("../schemas/generate.js");
+var generatedSchemas = require("../schemas/createDomainSchemas.js");
 var argv = require('yargs').argv;
 var _ = require("lodash");
 
