@@ -119,7 +119,8 @@ _.each(types, function(t, k) {
 	//do some checks + extension of properties //
 	/////////////////////////////////////////////
 	var undefinedProps = [],
-		undefinedPropsOwn = [];
+		undefinedPropsOwn = [],
+		propsWithUnsupportedIsMulti = [];
 
 
 	_.each(t.properties, function(propObj, propK) {
@@ -141,7 +142,12 @@ _.each(types, function(t, k) {
 			return;
 		}
 
-		_.defaults(propObj, properties[propK]);
+		var prop = properties[propK];
+		if (propObj.isMulti && !prop.isMulti) {
+			propsWithUnsupportedIsMulti.push(propK);
+		}
+
+		_.defaults(propObj, prop);
 	});
 
 
@@ -153,6 +159,11 @@ _.each(types, function(t, k) {
 	if (undefinedProps.length) {
 		throw new Error("CONFIG ERR: some properties not defined on the 'overwrite' type (type, overwrite type, undefinedProps): " + k + ", " +
 			t.overwrites + ", (" + undefinedProps.join(",") + ")");
+	}
+
+	if (propsWithUnsupportedIsMulti.length) {
+		throw new Error("CONFIG ERR: some properties defined as isMulti on type, but not defined as isMulti on property they reference (type, wrongProps): " + k +
+			", (" + propsWithUnsupportedIsMulti.join(",") + ")");
 	}
 
 
@@ -167,6 +178,24 @@ _.each(types, function addSuperTypeProperties(t, k) {
 	t.properties = _.cloneDeep(t.specific_properties);
 	addSupertypeProps(t, k, t.properties);
 });
+
+
+//https://github.com/Kwhen/crawltest/issues/52
+var transientPropWithoutCopyOfDirective = [];
+_.each(types, function(t, k) {
+	_.each(t.properties, function(p, propK) {
+		if (p.transient && !p.copyOf) {
+			transientPropWithoutCopyOfDirective.push({
+				type: k,
+				prop: propK
+			});
+		}
+	});
+});
+if (transientPropWithoutCopyOfDirective.length) {
+	throw new Error("defined prop with transient=true for which no copyOf directive was set: " + JSON.stringify(transientPropWithoutCopyOfDirective));
+}
+
 
 function addSupertypeProps(walkType, passTypeName, passProps) {
 	_.each(walkType.supertypes, function(supertypeName) {

@@ -1,5 +1,4 @@
 module.exports = {
-	supertypes: ['Thing'], // must be proper subset of overwrite-type
 	properties: {
 		aggregateRating: {},
 		address: {},
@@ -8,5 +7,13 @@ module.exports = {
 		containsPlace: {
 			"isMulti": true
 		},
+		//event: we'll have events be looked up in separate index
+		faxNumber: {},
+		// geo //TODO
+		logo: {},
+		// openingHoursSpecification: {}; //TODO
+		//photo: //TODO ? There's already an image
+		// review: {},
+		telephone: {}
 	}
 };
