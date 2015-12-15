@@ -1,5 +1,6 @@
 //A MusicRelease is a specific release of a music album.
 module.exports = {
+	disable: true,
 	properties: {
 		catalogNumber: {},
 

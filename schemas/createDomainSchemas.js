@@ -82,7 +82,10 @@ _.each(properties, function(p, k) {
 		if (types[type]) {
 			return;
 		}
-		typesNotSupported.push(type);
+		typesNotSupported.push({
+			property: k,
+			type: type
+		});
 	});
 
 });
@@ -90,7 +93,7 @@ if (noOrigProps.length) {
 	throw new Error("Following properties defined in our own definition, weren't defined in schema.org definition: " + noOrigProps.join(","));
 }
 if (_.size(typesNotSupported)) {
-	throw new Error("Following types are not defined, although properties referencing to them are: " + typesNotSupported.join(","));
+	throw new Error("Following types are not defined, although properties referencing to them are: " + JSON.stringify(typesNotSupported, null, 2));
 }
 
 

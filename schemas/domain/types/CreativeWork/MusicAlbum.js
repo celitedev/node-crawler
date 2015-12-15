@@ -6,8 +6,11 @@ module.exports = {
 		},
 		// albumProductionType: MusicAlbumProductionType,
 		// albumReleaseType: MusicAlbumReleaseType , 
-		albumRelease: { //MusicRelease
-			isMulti: true
-		}
+
+
+		// Commented-out because wanted to disable 'MusicRelease' for time being
+		// albumRelease: { //MusicRelease
+		// 	isMulti: true
+		// }
 	}
 };
