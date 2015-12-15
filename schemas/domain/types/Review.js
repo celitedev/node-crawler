@@ -5,10 +5,10 @@ module.exports = {
 
 			//this property is calculated so can not be written to. Isntead it's value is copied from 
 			//another property.
-			copyOf: "about"
+			writeFrom: "about"
 		},
 		reviewBody: {
-			copyOf: "text"
+			writeFrom: "text"
 		},
 		reviewRating: {}
 	}

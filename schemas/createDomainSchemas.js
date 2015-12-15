@@ -181,10 +181,10 @@ _.each(types, function addSuperTypeProperties(t, k) {
 
 
 //https://github.com/Kwhen/crawltest/issues/52
-var transientPropWithoutCopyOfDirective = [];
+var transientPropWithoutWriteFromDirective = [];
 _.each(types, function(t, k) {
 	_.each(t.properties, function(p, propK) {
-		if (p.transient && !p.copyOf) {
+		if (p.transient && !p.writeFrom) {
 			transientPropWithoutCopyOfDirective.push({
 				type: k,
 				prop: propK
@@ -192,8 +192,8 @@ _.each(types, function(t, k) {
 		}
 	});
 });
-if (transientPropWithoutCopyOfDirective.length) {
-	throw new Error("defined prop with transient=true for which no copyOf directive was set: " + JSON.stringify(transientPropWithoutCopyOfDirective));
+if (transientPropWithoutWriteFromDirective.length) {
+	throw new Error("defined prop with transient=true for which no writeFrom directive was set: " + JSON.stringify(transientPropWithoutCopyOfDirective));
 }
 
 
