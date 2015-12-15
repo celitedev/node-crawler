@@ -8,7 +8,7 @@ module.exports = {
 		//but by Lady Gaga.
 		creditedTo: {},
 
-		// duration: Duration
+		duration: {},
 		// musicReleaseFormat: MusicReleaseFormatType 	
 		recordLabel: {},
 		releaseOf: {},

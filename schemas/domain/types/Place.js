@@ -13,7 +13,7 @@ module.exports = {
 		faxNumber: {
 			writeFrom: "address.faxNumber"
 		},
-		// geo //TODO
+		geo: {},
 		logo: {},
 		// openingHoursSpecification: {}; //TODO
 		//photo: //TODO ? There's already an image

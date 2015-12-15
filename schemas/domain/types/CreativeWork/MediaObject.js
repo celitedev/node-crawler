@@ -3,7 +3,7 @@ module.exports = {
 		bitrate: {},
 		contentSize: {},
 		contentUrl: {},
-		// duration: DURATIOn
+		duration: {},
 		uploadDate: {},
 	}
 };

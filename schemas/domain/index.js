@@ -15,7 +15,10 @@ module.exports = {
 	properties: _.defaults({}, ownProperties, propertiesSchemaOrg),
 	types: _.reduce(glob.sync(path.resolve(__dirname, "types") + "**/**/*.js"), function(types, file) {
 		var clazzName = file.substring(file.lastIndexOf("/") + 1, file.lastIndexOf("."));
-		types[clazzName] = require(file);
+		var type = require(file);
+		if (!type.disable) {
+			types[clazzName] = type;
+		}
 		return types;
 	}, {})
 };
