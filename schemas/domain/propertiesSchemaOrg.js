@@ -161,7 +161,7 @@ module.exports = {
 	///////////////////////////////////
 
 	reviewBody: {
-		//should be accompanied with a copyOf directive in all types carrying this property
+		//should be accompanied with a writeFrom directive in all types carrying this property
 		//this signals that reviewBody will not be part of the domain
 		//https://github.com/Kwhen/crawltest/issues/52
 		"transient": true
