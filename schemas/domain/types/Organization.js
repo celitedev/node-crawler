@@ -31,7 +31,9 @@ module.exports = {
 		},
 		// numberOfEmployees: {}, QuantitativeValue
 		parentOrganization: {},
-		review: {},
+		review: {
+			isMulti: true
+		},
 		subOrganization: {
 			isMulti: true
 		},

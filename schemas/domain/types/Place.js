@@ -17,7 +17,9 @@ module.exports = {
 		logo: {},
 		// openingHoursSpecification: {}; //TODO
 		//photo: //TODO ? There's already an image
-		review: {},
+		review: {
+			isMulti: true
+		},
 		telephone: {
 			writeFrom: "address.telephone"
 		}
