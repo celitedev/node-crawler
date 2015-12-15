@@ -10,12 +10,16 @@ module.exports = {
 			"isMulti": true
 		},
 		//event: we'll have events be looked up in separate index
-		faxNumber: {},
+		faxNumber: {
+			writeFrom: "address.faxNumber"
+		},
 		// geo //TODO
 		logo: {},
 		// openingHoursSpecification: {}; //TODO
 		//photo: //TODO ? There's already an image
 		review: {},
-		telephone: {}
+		telephone: {
+			writeFrom: "address.telephone"
+		}
 	}
 };
