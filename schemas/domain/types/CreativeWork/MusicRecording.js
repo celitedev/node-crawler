@@ -4,7 +4,7 @@ module.exports = {
 		byArtist: {
 			isMulti: true
 		},
-		// duration: duration
+		duration: {},
 		inAlbum: {
 			isMulti: true
 		},

@@ -1,17 +1,21 @@
+//A media season e.g. tv, radio, video game etc.
 module.exports = {
 	properties: {
 		actor: {
 			isMulti: true
 		},
-		countryOfOrigin: {},
 		director: {
 			isMulti: true
 		},
-		duration: {},
-		musicBy: {
+		endDate: {},
+		episode: {
 			isMulti: true
 		},
+		numberOfEpisodes: {},
+		partOfSeries: {},
 		productionCompany: {},
+		seasonNumber: {},
+		startDate: {},
 		trailer: {
 			isMulti: true
 		}

@@ -42,6 +42,15 @@ module.exports = {
 	reviewCount: {}, //bit weird, but can be used to list nr or reviews. Although factually not related to ratings
 
 
+	///////////////////////////////////
+	//http://schema.org/ContactPoint //
+	///////////////////////////////////
+	contactType: {},
+	email: {},
+	faxNumber: {},
+	telephone: {},
+
+
 	////////////////////////////////////
 	//http://schema.org/PostalAddress //
 	////////////////////////////////////
@@ -52,13 +61,20 @@ module.exports = {
 	postalCode: {},
 	streetAddress: {},
 
-	///////////////////////////////////
-	//http://schema.org/ContactPoint //
-	///////////////////////////////////
-	contactType: {},
-	email: {},
-	faxNumber: {},
-	telephone: {},
+
+	//////////////////////////////////////
+	//https://schema.org/GeoCoordinates //
+	//////////////////////////////////////
+	elevation: {
+		ranges: ["Number"]
+	},
+	latitude: {
+		ranges: ["Number"]
+	},
+	longitude: {
+		ranges: ["Number"]
+	},
+
 
 
 	////////////////////////////
@@ -75,11 +91,28 @@ module.exports = {
 	containsPlace: {
 		"isMulti": true
 	},
+	geo: {
+		ranges: ["GeoCoordinates"]
+	},
 	logo: {},
 	review: {
 		isMulti: true
 	},
 
+
+	//////////////////////////////////////
+	// https://schema.org/LocalBusiness //
+	//////////////////////////////////////
+
+	// 		The opening hours for a business. Opening hours can be specified as a weekly time range, starting with days, then times per day. 
+	// 		Multiple days can be listed with commas ',' separating each day. Day or time ranges are specified using a hyphen '-'.
+	// - Days are specified using the following two-letter combinations: Mo, Tu, We, Th, Fr, Sa, Su.
+	// - Times are specified using 24:00 time. For example, 3pm is specified as 15:00. 
+	// - Here is an example: <time itemprop="openingHours" datetime="Tu,Th 16:00-20:00">Tuesdays and Thursdays 4-8pm</time>. 
+	// - If a business is open 7 days a week, then it can be specified as <time itemprop="openingHours" datetime="Mo-Su">Monday through Sunday, all day</time>.
+	openingHours: {},
+	paymentAccepted: {},
+	priceRange: {},
 
 	///////////////////////////////////
 	//http://schema.org/CreativeWork //
@@ -133,6 +166,8 @@ module.exports = {
 	text: {},
 	thumbnailUrl: {},
 
+
+
 	///////////////////////////////////
 	//http://schema.org/MediaObject //
 	///////////////////////////////////
@@ -140,6 +175,7 @@ module.exports = {
 	contentSize: {},
 	contentUrl: {},
 	uploadDate: {},
+	duration: {},
 
 	//////////////////////////////////
 	//http://schema.org/ImageObject //
@@ -251,6 +287,39 @@ module.exports = {
 	recordLabel: {},
 	releaseOf: {}, //points to MusicAlbum
 
+
+	//////////////////////////////////////////
+	//https://schema.org/CreativeWorkSeries //
+	//////////////////////////////////////////
+	endDate: {},
+	startDate: {},
+
+
+	//////////////////////////////////////////
+	//https://schema.org/CreativeWorkSeason //
+	//////////////////////////////////////////
+	numberOfEpisodes: {},
+	partOfSeries: {},
+	seasonNumber: {},
+
+
+	////////////////////////////////
+	//https://schema.org/TVSeries //
+	////////////////////////////////
+	containsSeason: { //ref to CreativeWorkSeason 
+		isMulti: true
+	},
+	numberOfSeasons: {},
+	episode: {
+		isMulti: true
+	},
+
+
+	///////////////////////////////
+	//https://schema.org/Episode //
+	///////////////////////////////
+	episodeNumber: {},
+	partOfSeason: {},
 
 
 	/////////////////////////////

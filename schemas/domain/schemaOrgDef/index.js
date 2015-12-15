@@ -21676,7 +21676,7 @@ module.exports = {
         "RadioSeason",
         "TVSeason"
       ],
-      "supertypes": [],
+      "supertypes": ["CreativeWork"],
       "url": "http://schema.org/CreativeWorkSeason"
     },
     "CreativeWorkSeries": {
@@ -21784,7 +21784,7 @@ module.exports = {
         "TVSeries",
         "VideoGameSeries"
       ],
-      "supertypes": [],
+      "supertypes": ["CreativeWork"],
       "url": "http://schema.org/CreativeWorkSeries"
     },
     "CreditCard": {
@@ -25893,7 +25893,7 @@ module.exports = {
         "RadioEpisode",
         "TVEpisode"
       ],
-      "supertypes": [],
+      "supertypes": ["CreativeWork"],
       "url": "http://schema.org/Episode"
     },
     "Event": {
