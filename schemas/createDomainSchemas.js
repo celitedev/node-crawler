@@ -175,7 +175,9 @@ _.each(types, function(t, k) {
 
 
 //type directives to inherit
-var typeDirectivesToCopyFromSuper = ["isValueObject"];
+var typeDirectivesToInherit = [
+	"isValueObject"
+];
 
 //add `properties` which consists of all `specific_properties` of current type + all suptypes
 //TODO: minus `remove_ancestor_properties`
@@ -211,7 +213,7 @@ function addSupertypeStuff(walkType, passTypeName, passProps) {
 			throw new Error("supertype not defined in Kwhen config (Supertype, refDirect, refTrans) " + supertypeName + ", " + passTypeName);
 		}
 		// console.log("super", supertypeName);
-		_.defaults(walkType, _.pick(supertype, typeDirectivesToCopyFromSuper));
+		_.defaults(walkType, _.pick(supertype, typeDirectivesToInherit));
 		_.extend(passProps, supertype.specific_properties);
 		addSupertypeStuff(supertype, passTypeName, passProps);
 	});
