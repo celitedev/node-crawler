@@ -87,6 +87,11 @@ Defines schemas:
 * per datasource 
 * for entire polyglot facade. 
 
+
+Responsibilities: 
+
+- define if contained entities are linked by embedding or reference (type = @id). This needs 
+
 **TBD**
 
 
