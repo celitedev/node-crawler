@@ -184,6 +184,75 @@ module.exports = {
 		isMulti: true
 	},
 
+
+	////////////////////////////
+	//https://schema.org/Book //
+	////////////////////////////
+	illustrator: {
+		isMulti: true
+	},
+	isbn: {},
+	numberOfPages: {},
+
+
+	////////////////////////////////////////
+	//https://schema.org/MusicComposition //
+	////////////////////////////////////////
+	composer: {
+		isMulti: true
+	},
+	iswcCode: {},
+	lyricist: {
+		isMulti: true
+	},
+	recordedAs: {
+		isMulti: true
+	},
+
+
+	/////////////////////////////////////
+	//https://schema.org/MusicRecording //
+	/////////////////////////////////////
+	byArtist: {
+		isMulti: true
+	},
+	inAlbum: {
+		isMulti: true
+	},
+	inPlaylist: {
+		isMulti: true
+	},
+	isrcCode: {},
+	recordingOf: {},
+
+
+	/////////////////////////////////////
+	//https://schema.org/MusicPlaylist //
+	/////////////////////////////////////
+	numTracks: {},
+	track: {
+		ranges: ["MusicRecording"],
+		isMulti: true
+	},
+
+
+	/////////////////////////////////////
+	//https://schema.org/MusicAlbum //
+	/////////////////////////////////////
+	albumRelease: {
+		isMulti: true //refers to 1-n MusicRelease
+	},
+
+	/////////////////////////////////////
+	//https://schema.org/MusicRelease //
+	/////////////////////////////////////
+	catalogNumber: {},
+	creditedTo: {},
+	recordLabel: {},
+	releaseOf: {}, //points to MusicAlbum
+
+
+
 	/////////////////////////////
 	//http://schema.org/Person //
 	/////////////////////////////

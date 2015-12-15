@@ -37441,7 +37441,7 @@ module.exports = {
         "translationOfWork",
         "workTranslation"
       ],
-      "supertypes": [],
+      "supertypes": ["CreativeWork"],
       "url": "http://schema.org/MusicComposition"
     },
     "MusicEvent": {
@@ -37664,7 +37664,7 @@ module.exports = {
         "MusicAlbum",
         "MusicRelease"
       ],
-      "supertypes": [],
+      "supertypes": ["CreativeWork"],
       "url": "http://schema.org/MusicPlaylist"
     },
     "MusicRecording": {
@@ -37778,7 +37778,7 @@ module.exports = {
         "translationOfWork",
         "workTranslation"
       ],
-      "supertypes": [],
+      "supertypes": ["CreativeWork"],
       "url": "http://schema.org/MusicRecording"
     },
     "MusicRelease": {
