@@ -382,4 +382,23 @@ module.exports = {
 		isMulti: true
 	},
 
+	//////////////////////////////////////////
+	//https://schema.org/SportsOrganization //
+	//////////////////////////////////////////
+	sport: {
+		isMulti: true
+	},
+
+
+	///////////////////////////////////
+	// https://schema.org/SportsTeam //
+	///////////////////////////////////
+	athlete: {
+		isMulti: true
+	},
+	coach: {
+		isMulti: true
+	}
+
+
 };
