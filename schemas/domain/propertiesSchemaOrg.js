@@ -13,7 +13,8 @@ module.exports = {
 	},
 	image: {
 		"isMulti": true,
-		// ranges: ["URL"], //ImageObject not supported for now
+
+		//TODO
 		validation: {
 			URL: { //validation per range-object
 
@@ -29,7 +30,7 @@ module.exports = {
 	/////////////////////////////
 	//http://schema.org/Rating //
 	/////////////////////////////
-	bestRating: {},
+	bestRating: {}, //The highest value allowed in this rating system. If bestRating is omitted, 5 is assumed.
 	ratingValue: {},
 	worstRating: {},
 
@@ -38,7 +39,7 @@ module.exports = {
 	//////////////////////////////////////
 	itemReviewed: {},
 	ratingCount: {},
-	reviewCount: {},
+	reviewCount: {}, //bit weird, but can be used to list nr or reviews. Although factually not related to ratings
 
 
 	////////////////////////////////////
@@ -64,16 +65,20 @@ module.exports = {
 	//http://schema.org/Place //
 	////////////////////////////
 	aggregateRating: {}, //also avail in CreativeWork
-	address: {},
+	address: {
+		ranges: ["PostalAddress"] //require PostalAddress instead of Text: format nicely where we can
+	},
 	branchCode: {},
-	containedInPlace: {},
+	containedInPlace: { //we probably store entire place hierarchy
+		isMulti: true
+	},
 	containsPlace: {
 		"isMulti": true
 	},
-	logo: {
-		// ranges: ["URL"] //ImageObject not supported for now
+	logo: {},
+	review: {
+		isMulti: true
 	},
-	// review: {}
 
 
 	///////////////////////////////////
@@ -81,8 +86,12 @@ module.exports = {
 	///////////////////////////////////
 	about: {},
 	alternativeHeadline: {},
-	citation: {},
-	comment: {},
+	citation: {
+		isMulti: true
+	},
+	comment: {
+		isMulti: true
+	},
 	commentCount: {},
 	contentRating: {},
 	copyrightYear: {},
@@ -97,10 +106,16 @@ module.exports = {
 	// 		return domainModel.author;
 	// 	}
 	// },
-	genre: {},
-	hasPart: {},
+	genre: {
+		isMulti: true
+	},
+	hasPart: {
+		isMulti: true
+	},
 	headline: {},
-	isPartOf: {},
+	isPartOf: {
+		isMulti: true //episode -> season -> series
+	},
 	keywords: {
 		"isMulti": true,
 
@@ -128,9 +143,18 @@ module.exports = {
 	caption: {},
 
 	//////////////////////////////////
+	//http://schema.org/VideoObject //
+	///////////////////////////////////
+	videoFrameSize: {},
+	videoQuality: {},
+
+	//////////////////////////////////
 	//http://schema.org/Movie //
 	///////////////////////////////////
-
+	countryOfOrigin: {},
+	trailer: {
+		isMulti: true
+	},
 
 	//////////////////////////////////
 	//http://schema.org/Review //
@@ -139,6 +163,7 @@ module.exports = {
 	reviewBody: {
 		//should be accompanied with a copyOf directive in all types carrying this property
 		//this signals that reviewBody will not be part of the domain
+		//https://github.com/Kwhen/crawltest/issues/52
 		"transient": true
 	},
 	//rating GIVEN in review. AggregateRating is rating of the review
