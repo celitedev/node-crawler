@@ -3,7 +3,9 @@ module.exports = {
 		aggregateRating: {},
 		address: {},
 		branchCode: {},
-		containedInPlace: {},
+		containedInPlace: {
+			"isMulti": true // TBD: not sure want entire hierarchy displayed?
+		},
 		containsPlace: {
 			"isMulti": true
 		},
@@ -13,7 +15,7 @@ module.exports = {
 		logo: {},
 		// openingHoursSpecification: {}; //TODO
 		//photo: //TODO ? There's already an image
-		// review: {},
+		review: {},
 		telephone: {}
 	}
 };
