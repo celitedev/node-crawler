@@ -1,6 +1,6 @@
 module.exports = {
 	properties: {
-		caption: {}, //TODO: copyTo directive
+		caption: {},
 		videoFrameSize: {},
 		videoQuality: {}
 	}

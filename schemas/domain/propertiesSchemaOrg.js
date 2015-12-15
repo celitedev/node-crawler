@@ -86,6 +86,12 @@ module.exports = {
 	///////////////////////////////////
 	about: {},
 	alternativeHeadline: {},
+	author: {
+		isMulti: true
+	},
+	character: {
+		isMulti: true
+	},
 	citation: {
 		isMulti: true
 	},
@@ -95,17 +101,9 @@ module.exports = {
 	commentCount: {},
 	contentRating: {},
 	copyrightYear: {},
-	// creator: {
-
-	// 	//This is the same as the Author property for CreativeWork.
-
-	// 	//exclude from internal model
-	// 	//Just exists for compatibility with schema.org
-	// 	excludeFromModel: true,
-	// 	toSchemaOrg: function(notDefined, domainModel) {
-	// 		return domainModel.author;
-	// 	}
-	// },
+	encoding: {
+		isMulti: true
+	},
 	genre: {
 		isMulti: true
 	},
@@ -126,6 +124,12 @@ module.exports = {
 		}
 	},
 	license: {},
+	producer: {
+		isMulti: true
+	},
+	publisher: {
+		isMulti: true
+	},
 	text: {},
 	thumbnailUrl: {},
 
@@ -148,18 +152,10 @@ module.exports = {
 	videoFrameSize: {},
 	videoQuality: {},
 
-	//////////////////////////////////
-	//http://schema.org/Movie //
-	///////////////////////////////////
-	countryOfOrigin: {},
-	trailer: {
-		isMulti: true
-	},
 
 	//////////////////////////////////
 	//http://schema.org/Review //
 	///////////////////////////////////
-
 	reviewBody: {
 		//should be accompanied with a writeFrom directive in all types carrying this property
 		//this signals that reviewBody will not be part of the domain
@@ -168,4 +164,67 @@ module.exports = {
 	},
 	//rating GIVEN in review. AggregateRating is rating of the review
 	reviewRating: {},
+
+
+	//////////////////////////////////
+	//http://schema.org/Movie //
+	///////////////////////////////////
+	actor: {
+		isMulti: true
+	},
+	countryOfOrigin: {},
+	director: {
+		isMulti: true
+	},
+	musicBy: {
+		isMulti: true
+	},
+	productionCompany: {},
+	trailer: {
+		isMulti: true
+	},
+
+	/////////////////////////////
+	//http://schema.org/Person //
+	/////////////////////////////
+	additionalName: {},
+	birthDate: {},
+	deathDate: {},
+	familyName: {},
+	gender: {},
+	givenName: {}, //use along side familyName. More specific than 'name'
+	honorificPrefix: {},
+	honorificSuffix: {},
+	jobTitle: {},
+	memberOf: {
+		ranges: ["Organization"], //Don't allow ProgramMembership for now
+		isMulti: true
+	},
+	nationality: {},
+
+
+	///////////////////////////////////
+	//http://schema.org/Organization //
+	///////////////////////////////////
+	department: {},
+	dissolutionDate: {},
+	employee: {
+		isMulti: true
+	},
+	founder: {
+		isMulti: true
+	},
+	foundingDate: {},
+	legalName: {},
+	location: {
+		isMulti: true
+	},
+	member: { //e.g.: org or persons
+		isMulti: true
+	},
+	parentOrganization: {},
+	subOrganization: {
+		isMulti: true
+	},
+
 };

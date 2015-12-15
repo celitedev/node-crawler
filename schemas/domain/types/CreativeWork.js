@@ -3,8 +3,12 @@ module.exports = {
 		about: {},
 		aggregateRating: {},
 		alternativeHeadline: {},
-		//author: //person || org
-		//character //peron (fictional character. So not actor for instance)
+		author: { //person || org
+			isMulti: true
+		},
+		character: { //peron (fictional character. So not actor for instance)
+			isMulti: true
+		},
 		citation: {
 			isMulti: true
 		},
@@ -14,10 +18,9 @@ module.exports = {
 		commentCount: {},
 		contentRating: {}, //MPAA PG-13
 		copyrightYear: {},
-
-		//NOTE. 
-		//creator 
-		//encoding: MediaObject
+		encoding: {
+			isMulti: true
+		},
 		genre: {
 			isMulti: true
 		},
@@ -32,8 +35,12 @@ module.exports = {
 			"isMulti": true
 		},
 		license: {},
-		//producer
-		//publisher
+		producer: {
+			isMulti: true
+		},
+		publisher: {
+			isMulti: true
+		},
 		text: {},
 		thumbnailUrl: {},
 	}

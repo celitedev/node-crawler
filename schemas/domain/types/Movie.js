@@ -1,13 +1,19 @@
 module.exports = {
 	properties: {
-		// actor: {}, //person
+		actor: {
+			isMulti: true
+		},
 		countryOfOrigin: {},
-		//director //person
+		director: {
+			isMulti: true
+		},
 		// duration: {}, //duration
-		// musicBy: //person  | musicGroup
-		// productionCompany: //org
+		musicBy: {
+			isMulti: true
+		},
+		productionCompany: {},
 		trailer: {
 			isMulti: true
-		} //videoObject
+		}
 	}
 };
