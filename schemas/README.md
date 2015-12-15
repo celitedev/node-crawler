@@ -79,37 +79,39 @@ Still over time we want to keep up-to-date with schema.org by migrating our sche
 ## Datamodel schemas
 
 For storing data into various datasources. 
+Extra technical properties (such as id, lastModified) are added here. These live outside of the domain. 
+
 
 Defines schemas: 
 
 * per datasource 
-* for entire pologlot facade. 
+* for entire polyglot facade. 
 
-TBD
+**TBD**
 
 
 ## Eventmessage schemas
 
 For various stages of data pipeline. 
 
-TBD
+**TBD**
 
 
 
 ## FilterContext schemas
 
-A filtercontext is build on top of Domain schema. 
-
 Since both Datamodel schemas as well as FilterContext schemas are based on Domain Schemas, we can translate between the two automatically. 
-
 This means we can automatically generate a query plan, based on a FilterContext. That's the idea anyway.
+
+**TBD: Not sure Filtercontext schemas are needed**
+
 
 
 ## NLP Reverse Index schemas
 
 Part of the Natural Language Query -> FilterContext translation is based on quickly finding terms in reverse indices. E.g.: adjectives such as *cosy, cool, relaxed*,  nouns such as *bar, restaurant* or proper nouns such as *The oxford club*. 
 
-These reverse indices are auto-generated based on NLP Reverse Index Schemas, where each reverse index takes one of more entity-type properties (called *features* in the NLP realm) and parses them in certain ways, e.g.: lowercase, etc. 
+These reverse indices are auto-generated based on NLP Reverse Index Schemas, where each reverse index takes one of more entity-type properties (called *features* in the NLP realm) and analyzes/parses them in certain ways, e.g.: lowercase, etc. 
 
 The NLP Reverse Index Schemas keep track of which index refers to which entity-types and properties as defined by the Domain schemas. Hence, there's these schemas help in discovering which properties are queried by a Natural Language question. Based on this it will be possible to create a FilterContext.
 
