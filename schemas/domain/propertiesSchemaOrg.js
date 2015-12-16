@@ -187,6 +187,7 @@ module.exports = {
 	publisher: {
 		isMulti: true
 	},
+	recordedIn: {},
 	text: {},
 	thumbnailUrl: {},
 
@@ -372,6 +373,7 @@ module.exports = {
 	foundingDate: {},
 	legalName: {},
 	location: {
+		ranges: ["Place"], //important
 		isMulti: true
 	},
 	member: { //e.g.: org or persons
@@ -398,7 +400,62 @@ module.exports = {
 	},
 	coach: {
 		isMulti: true
-	}
+	},
 
+
+	////////////////////////////
+	//http://schema.org/Event //
+	////////////////////////////
+	doorTime: {},
+	// offers: //offers -> NOTE: shouldn't this be 'offer' 
+	organizer: {
+		isMulti: true
+	},
+	performer: {
+		isMulti: true
+	},
+	recordedIn: {}, //creativeWork
+	subEvent: {
+		isMulti: true
+	},
+	superEvent: {},
+
+	//A work featured in some event, e.g. exhibited in an ExhibitionEvent. 
+	//Specific subproperties are available for workPerformed (e.g. a play), 
+	//or a workPresented (a Movie at a ScreeningEvent).
+	workFeatured: {
+		isMulti: true
+	},
+
+	//A work performed in some event, for example a play performed in a TheaterEvent.
+	workPerformed: {
+		isMulti: true
+	},
+
+
+	///////////////////////////////////////
+	//http://schema.org/PublicationEvent //
+	///////////////////////////////////////
+	isAccessibleForFree: {},
+
+
+	//////////////////////////////////////
+	// http://schema.org/ScreeningEvent //
+	//////////////////////////////////////
+	subtitleLanguage: {
+		ranges: ["Text"]
+	},
+	videoFormat: {},
+	workPresented: {},
+
+
+	///////////////////////////////////
+	// http://schema.org/SportsEvent //
+	///////////////////////////////////
+	awayTeam: {}, //The away team in a sports event.
+	competitor: { //A competitor in a sports event.
+		isMulti: true
+	},
+	homeTeam: {}, //The home team in a sports event.
 
 };
