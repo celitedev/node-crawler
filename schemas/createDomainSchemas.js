@@ -113,7 +113,8 @@ _.each(types, function(t, k) {
 	_.defaults(t, {
 		id: overwrites.id,
 		overwrites: k,
-		properties: [],
+		properties: {},
+		ancestors: _.clone(overwrites.ancestors),
 		supertypes: _.clone(overwrites.supertypes),
 	});
 
@@ -150,6 +151,7 @@ _.each(types, function(t, k) {
 		}
 
 		_.defaults(propObj, prop);
+
 	});
 
 
@@ -182,8 +184,6 @@ var typeDirectivesToInherit = [
 //add `properties` which consists of all `specific_properties` of current type + all suptypes
 //TODO: minus `remove_ancestor_properties`
 _.each(types, function(t, k) {
-	// console.log("******************");
-	// console.log("type", k);
 	t.properties = _.cloneDeep(t.specific_properties);
 	addSupertypeStuff(t, k, t.properties);
 });
@@ -218,10 +218,6 @@ function addSupertypeStuff(walkType, passTypeName, passProps) {
 		addSupertypeStuff(supertype, passTypeName, passProps);
 	});
 }
-
-///////////////////////////////////////////////////////////////////////////////
-//TODO: check all types that are referenced by property exist in our schemas //
-///////////////////////////////////////////////////////////////////////////////
 
 module.exports = {
 	properties: properties,
