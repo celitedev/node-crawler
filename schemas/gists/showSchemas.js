@@ -98,13 +98,23 @@ function inbound() {
 function outbound() {
 
 	var stopRecursionAt;
+	var ambiguousRangesOnly = argv.ambiguousRangesOnly;
+	var isTransitive = argv.transitive;
 
 	if (argv.excludeDataTypes) {
 		console.log(("Excluding datatypes").yellow);
 	}
-	if (argv.transitive) {
-		console.log(("Transitive Walk").red);
 
+	if (argv.ambiguousRangesOnly && argv.excludeDataTypes) {
+		throw new Error("--excludeDataTypes doesn't make sense when --ambiguousRangesOnly=true");
+	}
+
+	if (argv.ambiguousRangesOnly) {
+		console.log(("show ambiguous only").green);
+	}
+
+	if (isTransitive) {
+		console.log(("Transitive Walk").red);
 
 		if (!argv.roots) {
 			//e.g: ["AggregateRating", "ImageObject", "Review"];
@@ -115,21 +125,23 @@ function outbound() {
 		//AggregateRating,ImageObject,Review
 
 		//Total example: node schemas/gists/showSchemas --type=Place --command=outbound --excludeDataTypes --transitive --roots=AggregateRating,ImageObject,Review
-		stopRecursionAt = argv.roots.split(",");
 	}
 
-	function children(type) {
+	stopRecursionAt = (argv.roots || []).split(",");
+
+	function children(type, isDeep) {
 		return _.reduce(type.properties, function(agg, p, propName) {
 			var ranges = argv.excludeDataTypes ? _.intersection(_.keys(generatedSchemas.types), p.ranges) : p.ranges;
 			if (ranges.length) {
-				agg[type.id + "." + propName] = ranges;
+				var key = isDeep ? propName : type.id + "." + propName;
+				agg[key] = ranges;
 			}
 			return agg;
 		}, {});
 	}
 
-	function walkRec(type, ancestors) {
-		var childObj = children(type);
+	function walkRec(type, ancestors, isDeep) {
+		var childObj = children(type, isDeep);
 		_.each(childObj, function(range, typeAndAttributeRef) {
 
 			//iterate range for particular typeAndAttributeRef
@@ -144,86 +156,52 @@ function outbound() {
 					var typeChainRec = _.uniq(_.clone(typeRec.ancestors).concat(tNameRec));
 
 					//For all types (incl supertypes) not already traversed along this path > recurse
-					if (!_.intersection(typeChainRec, ancestors).length) {
+					if (!_.intersection(typeChainRec, ancestors).length && (isTransitive || (!isTransitive && isDeep))) {
 						var obj = range[i] = {};
-						obj[tNameRec] = walkRec(typeRec, ancestors.concat([tNameRec]));
+						var subgraph = walkRec(typeRec, ancestors.concat([tNameRec]), true);
+						obj[tNameRec] = subgraph;
 					}
 				}
 			}
 
+			if (ambiguousRangesOnly) {
+				//TODO: don't treat [URL,Text] as ambiguous since supertype(URL) = Text
+				//This should be done for: 
+				//- datatypes
+				//- types as long as both below to the same root.
+			}
+
+
+			///////////////////////////////////////////////
+			//Simplify display for easier consumption // //
+			///////////////////////////////////////////////
+
 			//simplify display: if range only has 1 element -> take that 1 el instead of range
 			if (range.length === 1) {
-				childObj[typeAndAttributeRef] = range[0];
+				if (ambiguousRangesOnly && _.isString(range[0])) {
+
+					//delete non ambiguous ranges iff not expanded, so focus is on problem areas. 
+					delete childObj[typeAndAttributeRef];
+				} else {
+					childObj[typeAndAttributeRef] = range[0];
+				}
+			} else { //possible ambiguous range
+
+				//condesnse ambiguous range to string (comma-separated) if all elements are string
+				if (!_.filter(range, _.isObject).length) {
+					childObj[typeAndAttributeRef] = range.join(",");
+				}
 			}
+
 
 		});
 		return childObj;
 	}
 
-	if (!argv.transitive) {
-		console.log(children(type));
-	} else {
-		var typeChainExThing = _.difference(typeChain, ["Thing"]);
-		var result = walkRec(type, stopRecursionAt.concat(typeChainExThing));
-		console.log(JSON.stringify(result, null, 2));
-	}
+	var typeChainExThing = _.difference(typeChain, ["Thing"]);
+	var result = walkRec(type, stopRecursionAt.concat(typeChainExThing));
+
+	// console.log(result);
+	console.log(JSON.stringify(result, null, 2));
+
 }
-
-
-// function ambiguous() {
-
-// 	//if Text + Url supported we can get by by just having Text. So don't flag as ambiguous
-// 	if (argv.excludeDataSubtypes) {
-// 		console.log(("Exclude datasubtypes").yellow);
-// 	}
-
-// 	var datatypes = generatedSchemas.datatypes;
-
-// 	var results = {},
-// 		alreadyCovered = [];
-// 	var typesInDagOrder = utils.getTypesInDAGOrder(generatedSchemas.types);
-
-// 	_.each(typesInDagOrder, function(tName) {
-
-// 		var t = generatedSchemas.types[tName];
-// 		_.each(t.properties, function(p, pName) {
-
-// 			if (alreadyCovered.indexOf(pName) !== -1) return; //already tackecled by a parent type
-
-// 			var i = 0;
-// 			var ranges = _.reduce(p.ranges, function(arr, rName) {
-// 				var range = datatypes[rName];
-// 				if (range) {
-
-// 					console.log(p.ranges);
-// 					// //range should only be added if supertype isn't avail as well.
-// 					// //In that case we can make do with the supertype encoding and do validation 
-// 					// //on subtype to recognize 
-
-// 					// var rangeClone = _.clone(p.ranges);
-// 					// rangeClone.splice(i, 1); //delete own el
-// 					// if (!_.intersection(rangeClone, range.ancestors).length) {
-// 					// 	if (rName === "URL") {
-// 					// 		console.log("AAAAAAAAAAAAAAAa", p.ranges);
-// 					// 	}
-// 					// 	arr.push(rName);
-// 					// 	console.log("DATATYPES", rName);
-// 					// }
-
-// 				} else {
-// 					//type should be added
-// 					arr.push(rName);
-// 				}
-// 				i++;
-// 				return arr;
-// 			}, []);
-
-// 			if (p.ranges.length > 1) {
-// 				alreadyCovered.push(pName);
-// 				var obj = results[tName] = results[tName] || {};
-// 				obj[pName] = p.ranges;
-// 			}
-// 		});
-// 	});
-// 	console.log(results);
-// }
