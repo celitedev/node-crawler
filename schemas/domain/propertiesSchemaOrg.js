@@ -60,7 +60,9 @@ module.exports = {
 	////////////////////////////////////
 	//http://schema.org/PostalAddress //
 	////////////////////////////////////
-	addressCountry: {},
+	addressCountry: {
+		ranges: ["Country"],
+	},
 	addressLocality: {},
 	addressRegion: {},
 	postOfficeBoxNumber: {},
