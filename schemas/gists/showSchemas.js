@@ -157,14 +157,21 @@ function outbound() {
 
 					//For all types (incl supertypes) not already traversed along this path > recurse
 					if (!_.intersection(typeChainRec, ancestors).length && (isTransitive || (!isTransitive && isDeep))) {
+
 						var obj = range[i] = {};
 						var subgraph = walkRec(typeRec, ancestors.concat([tNameRec]), true);
-						obj[tNameRec] = subgraph;
+
+						if (ambiguousRangesOnly && _.isObject(subgraph) && !_.size(subgraph)) {
+							delete obj[tNameRec];
+						} else {
+							obj[tNameRec] = subgraph;
+						}
 					}
 				}
 			}
 
 			if (ambiguousRangesOnly) {
+				//#62
 				//TODO: don't treat [URL,Text] as ambiguous since supertype(URL) = Text
 				//This should be done for: 
 				//- datatypes
@@ -178,9 +185,10 @@ function outbound() {
 
 			//simplify display: if range only has 1 element -> take that 1 el instead of range
 			if (range.length === 1) {
-				if (ambiguousRangesOnly && _.isString(range[0])) {
-
-					//delete non ambiguous ranges iff not expanded, so focus is on problem areas. 
+				if (ambiguousRangesOnly && (_.isString(range[0]) || !_.size(range[0]))) {
+					//delete non ambiguous ranges iff: 
+					//- not expanded (so string)
+					//- expanded (object) but empty object (bc it was preuned earlier -> see ambiguousRangesOnly ref above)
 					delete childObj[typeAndAttributeRef];
 				} else {
 					childObj[typeAndAttributeRef] = range[0];
@@ -193,6 +201,7 @@ function outbound() {
 				}
 			}
 
+			var kv = childObj[typeAndAttributeRef];
 
 		});
 		return childObj;
