@@ -151,7 +151,12 @@ module.exports = {
 	///////////////////////////////////
 	//http://schema.org/CreativeWork //
 	///////////////////////////////////
-	about: {},
+
+	//problematic since linking to Thing. 
+	//This would be possible with Disambugation Table (#58)
+	//For now, dont' support.
+	// about: {}, 
+
 	alternativeHeadline: {},
 	author: {
 		isMulti: true
