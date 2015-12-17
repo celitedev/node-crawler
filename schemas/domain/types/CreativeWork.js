@@ -1,6 +1,6 @@
 module.exports = {
 	properties: {
-		about: {},
+		// about: {}, part of #63
 		aggregateRating: {},
 		alternativeHeadline: {},
 		author: { //person || org
