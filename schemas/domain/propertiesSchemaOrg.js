@@ -30,9 +30,15 @@ module.exports = {
 	/////////////////////////////
 	//http://schema.org/Rating //
 	/////////////////////////////
-	bestRating: {}, //The highest value allowed in this rating system. If bestRating is omitted, 5 is assumed.
-	ratingValue: {},
-	worstRating: {},
+	bestRating: {
+		ranges: ["Number"]
+	}, //The highest value allowed in this rating system. If bestRating is omitted, 5 is assumed.
+	ratingValue: {
+
+	},
+	worstRating: {
+		ranges: ["Number"]
+	},
 
 	//////////////////////////////////////
 	//http://schema.org/AggregateRating //
@@ -124,7 +130,11 @@ module.exports = {
 	////////////////////////////////////
 	//https://schema.org/FoodEstablishment //
 	////////////////////////////////////
-	acceptsReservations: {},
+	acceptsReservations: {
+		//was: ["Text", "URL", Boolean]
+		//Text + Url can be supported since supertypee(url) = text
+		ranges: ["Text", "URL"]
+	},
 	menu: {},
 	servesCuisine: {
 		isMulti: true
@@ -150,6 +160,7 @@ module.exports = {
 		isMulti: true
 	},
 	citation: {
+		ranges: ["Text"],
 		isMulti: true
 	},
 	comment: {
@@ -180,7 +191,9 @@ module.exports = {
 			return keywordsArr.join(","); //from arr -> comma-delimited
 		}
 	},
-	license: {},
+	license: {
+		ranges: ["URL"]
+	},
 	producer: {
 		isMulti: true
 	},
@@ -318,7 +331,9 @@ module.exports = {
 	//////////////////////////////////////////
 	numberOfEpisodes: {},
 	partOfSeries: {},
-	seasonNumber: {},
+	seasonNumber: {
+		ranges: ["Text"]
+	},
 
 
 	////////////////////////////////
@@ -336,7 +351,9 @@ module.exports = {
 	///////////////////////////////
 	//https://schema.org/Episode //
 	///////////////////////////////
-	episodeNumber: {},
+	episodeNumber: {
+		ranges: ["Text"]
+	},
 	partOfSeason: {},
 
 
