@@ -88,7 +88,8 @@ module.exports = {
 	////////////////////////////
 	aggregateRating: {}, //also avail in CreativeWork
 	address: {
-		ranges: ["PostalAddress"] //require PostalAddress instead of Text: format nicely where we can
+		//require PostalAddress instead of Text: format nicely where we can
+		ranges: ["PostalAddress"]
 	},
 	branchCode: {},
 	containedInPlace: { //we probably store entire place hierarchy
