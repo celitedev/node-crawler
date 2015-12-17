@@ -4,4 +4,15 @@ var _ = require("lodash");
 
 var utils = require("../utils");
 
-utils.printHierarchy(generatedSchemas.types);
+var commands = ["typeHierarchy"];
+
+var command = argv.command;
+if (!command || commands.indexOf(command) === -1) {
+	throw new Error("commandline --command required. Available options: " + commands.join(","));
+}
+
+switch (command) {
+	case "typeHierarchy":
+		utils.printHierarchy(generatedSchemas.types);
+		break;
+}

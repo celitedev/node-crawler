@@ -220,6 +220,7 @@ function addSupertypeStuff(walkType, passTypeName, passProps) {
 }
 
 module.exports = {
+	datatypes: schemaOrgDef.datatypes,
 	properties: properties,
 	types: types,
 };
