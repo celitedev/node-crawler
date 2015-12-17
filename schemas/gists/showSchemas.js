@@ -201,7 +201,6 @@ function outbound() {
 	var typeChainExThing = _.difference(typeChain, ["Thing"]);
 	var result = walkRec(type, stopRecursionAt.concat(typeChainExThing));
 
-	// console.log(result);
 	console.log(JSON.stringify(result, null, 2));
 
 }

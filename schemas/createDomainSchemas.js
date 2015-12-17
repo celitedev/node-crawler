@@ -109,13 +109,14 @@ _.each(types, function(t, k) {
 		throw new Error("CONFIG ERR: overwrites type specified which doesn't exist (type, overwrite type): " + k + ", " + t.overwrites);
 	}
 
-	//inherit some defaults
+	//inherit some defaults from schema.org
 	_.defaults(t, {
 		id: overwrites.id,
 		overwrites: k,
 		properties: {},
 		ancestors: _.clone(overwrites.ancestors),
 		supertypes: _.clone(overwrites.supertypes),
+		removeProperties: [],
 	});
 
 	/////////////////////////////////////////////
@@ -145,12 +146,13 @@ _.each(types, function(t, k) {
 			return;
 		}
 
-		var prop = properties[propK];
-		if (propObj.isMulti && !prop.isMulti) {
+		//find property from schemaOrg
+		var propSchemaOrg = properties[propK];
+		if (propObj.isMulti && !propSchemaOrg.isMulti) {
 			propsWithUnsupportedIsMulti.push(propK);
 		}
 
-		_.defaults(propObj, prop);
+		_.defaults(propObj, propSchemaOrg);
 
 	});
 
@@ -178,7 +180,8 @@ _.each(types, function(t, k) {
 
 //type directives to inherit
 var typeDirectivesToInherit = [
-	"isValueObject"
+	"isValueObject",
+	"removeProperties"
 ];
 
 //add `properties` which consists of all `specific_properties` of current type + all suptypes
@@ -212,9 +215,9 @@ function addSupertypeStuff(walkType, passTypeName, passProps) {
 		if (!supertype) {
 			throw new Error("supertype not defined in Kwhen config (Supertype, refDirect, refTrans) " + supertypeName + ", " + passTypeName);
 		}
-		// console.log("super", supertypeName);
 		_.defaults(walkType, _.pick(supertype, typeDirectivesToInherit));
-		_.extend(passProps, supertype.specific_properties);
+		_.extend(passProps, _.omit(supertype.specific_properties, walkType.removeProperties));
+
 		addSupertypeStuff(supertype, passTypeName, passProps);
 	});
 }
