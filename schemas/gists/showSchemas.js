@@ -12,11 +12,13 @@ var generatedSchemas = require("../createDomainSchemas.js");
 
 var typeName = argv.type;
 var type = generatedSchemas.types[typeName];
-var typeChain = _.uniq(_.clone(type.ancestors).concat(typeName));
 
 if (!type) {
 	throw new Error("type not found for:" + typeName);
 }
+
+var typeChain = _.uniq(_.clone(type.ancestors).concat(typeName));
+
 
 var commands = ["schema", "schemafull", "inbound", "outbound", "ambiguous"];
 
