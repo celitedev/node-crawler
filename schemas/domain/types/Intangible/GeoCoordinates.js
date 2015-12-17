@@ -8,5 +8,8 @@ module.exports = {
 		elevation: {},
 		latitude: {},
 		longitude: {}
-	}
+	},
+	removeProperties: [
+		"name", "url", "description", "alternateName", "sameAs"
+	]
 };
