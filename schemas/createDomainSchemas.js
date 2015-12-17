@@ -180,15 +180,15 @@ _.each(types, function(t, k) {
 
 //type directives to inherit
 var typeDirectivesToInherit = [
-	"isValueObject",
-	"removeProperties"
+	"isValueObject"
 ];
 
 //add `properties` which consists of all `specific_properties` of current type + all suptypes
 //TODO: minus `remove_ancestor_properties`
 _.each(types, function(t, k) {
 	t.properties = _.cloneDeep(t.specific_properties);
-	addSupertypeStuff(t, k, t.properties);
+	addSupertypeStuff(t, t);
+	t.properties = _.omit(t.properties, t.removeProperties);
 });
 
 
@@ -208,17 +208,16 @@ if (transientPropWithoutWriteFromDirective.length) {
 	throw new Error("defined prop with transient=true for which no writeFrom directive was set: " + JSON.stringify(transientPropWithoutCopyOfDirective));
 }
 
-
-function addSupertypeStuff(walkType, passTypeName, passProps) {
+function addSupertypeStuff(walkType, appliedType) {
 	_.each(walkType.supertypes, function(supertypeName) {
 		var supertype = types[supertypeName];
 		if (!supertype) {
-			throw new Error("supertype not defined in Kwhen config (Supertype, refDirect, refTrans) " + supertypeName + ", " + passTypeName);
+			throw new Error("supertype not defined in Kwhen config (Supertype, refDirect, refTrans) " + supertypeName + ", " + appliedType.id);
 		}
-		_.defaults(walkType, _.pick(supertype, typeDirectivesToInherit));
-		_.extend(passProps, _.omit(supertype.specific_properties, walkType.removeProperties));
-
-		addSupertypeStuff(supertype, passTypeName, passProps);
+		_.defaults(appliedType, _.pick(supertype, typeDirectivesToInherit));
+		appliedType.removeProperties = _.uniq(appliedType.removeProperties.concat(supertype.removeProperties));
+		_.extend(appliedType.properties, supertype.specific_properties);
+		addSupertypeStuff(supertype, appliedType);
 	});
 }
 
