@@ -62,7 +62,15 @@ module.exports = {
 	////////////////////////////////////
 	addressCountry: {
 		ranges: ["Country"],
+		//WIP: #70: open q: should this be on domain or more on outside?
+		linkByLookup: {
+			fields: {
+				name: "addressCountry"
+			}
+		}
 	},
+
+	//support lookup by name as discussed in #69
 	addressLocality: {},
 	addressRegion: {},
 	postOfficeBoxNumber: {},
