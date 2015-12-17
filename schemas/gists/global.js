@@ -21,18 +21,13 @@ switch (command) {
 }
 
 function allDefined(types) {
-	var roots = [
-		"Place",
-		"Organization",
-		"Person",
-		"Event",
-		"LocalBusiness",
-		"CreativeWork",
-		"ImageObject",
-		"Comment",
-		"Review",
-		"AggregateRating"
-	];
+
+	if (!argv.roots) {
+		//e.g: ["AggregateRating", "ImageObject", "Review"];
+		throw new Error("option `roots` required. I.e.: a comma-delimited collection of Root Objects.");
+	}
+
+	var roots = argv.roots.split(",");
 
 	var obj = utils.generateDAG(types);
 	var hierarchy = obj.hierarchy;
