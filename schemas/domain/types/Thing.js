@@ -1,5 +1,7 @@
 module.exports = {
 
+	isAbstract: true,
+
 	// overwrites: "Thing",
 
 	//limit to the following Schema.org properties that the direct supertyped defines
