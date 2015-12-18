@@ -2,20 +2,20 @@
 module.exports = {
 	properties: {
 		actor: {
-			isMulti: true
+
 		},
 		director: {
-			isMulti: true
+
 		},
 		episodeNumber: {},
 		musicBy: {
-			isMulti: true
+
 		},
 		partOfSeason: {},
 		partOfSeries: {},
 		productionCompany: {},
 		trailer: {
-			isMulti: true
+
 		},
 	}
 };

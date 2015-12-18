@@ -4,10 +4,10 @@ module.exports = {
 		address: {},
 		branchCode: {},
 		containedInPlace: {
-			"isMulti": true // TBD: not sure want entire hierarchy displayed?
+			// TBD: not sure want entire hierarchy displayed?
 		},
 		containsPlace: {
-			"isMulti": true
+
 		},
 		//event: we'll have events be looked up in separate index
 		faxNumber: {
@@ -18,7 +18,7 @@ module.exports = {
 		// openingHoursSpecification: {}; //TODO
 		//photo: //TODO ? There's already an image
 		review: {
-			isMulti: true
+
 		},
 		telephone: {
 			writeFrom: "address.telephone"

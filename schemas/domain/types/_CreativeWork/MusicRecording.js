@@ -2,14 +2,14 @@
 module.exports = {
 	properties: {
 		byArtist: {
-			isMulti: true
+
 		},
 		duration: {},
 		inAlbum: {
-			isMulti: true
+
 		},
 		inPlaylist: {
-			isMulti: true
+
 		},
 		isrcCode: {}, //The International Standard Recording Code for the recording.
 		recordingOf: {}

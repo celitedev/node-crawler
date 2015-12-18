@@ -2,17 +2,17 @@
 module.exports = {
 	properties: {
 		actor: {
-			isMulti: true
+
 		},
 		director: {
-			isMulti: true
+
 		},
 		musicBy: {
-			isMulti: true
+
 		},
 		productionCompany: {},
 		trailer: {
-			isMulti: true
+
 		}
 	}
 };
