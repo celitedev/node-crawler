@@ -45,7 +45,7 @@ function ambiguous(types) {
 			props.push(propName);
 		});
 	});
-	console.log(out);
+	console.log(JSON.stringify(out, null, 2));
 }
 
 function allDefined(types) {
