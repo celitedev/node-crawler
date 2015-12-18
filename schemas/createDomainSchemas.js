@@ -193,16 +193,20 @@ module.exports = function(configObj) {
 	//Directly make sure order of ancestors is correct: end with most specific //
 	/////////////////////////////////////////////////////////////////////////////
 
-	var dagObj = utils.generateDAG(types);
-	recalcAncestorsRec(dagObj.hierarchy, []);
-
-	function recalcAncestorsRec(hierarchy, ancestors) {
-		_.each(hierarchy, function(childs, typeName) {
-			var type = types[typeName];
-			type.ancestors = ancestors;
-			recalcAncestorsRec(childs, ancestors.concat(typeName));
-		});
+	//Bottom up recursion. Top down isn't possible because of multiple supertypes
+	function recalcAncestorsRec(t) {
+		return _.reduce(t.supertypes, function(arr, superName) {
+			return arr.concat(recalcAncestorsRec(types[superName]));
+		}, []).concat(t.supertypes);
 	}
+	_.each(types, function(t) {
+		//reverse + uniq + reverse solves order in case of multiple supertypes
+		//remember: most right one is lowest root)
+		t.ancestors = _.uniq(recalcAncestorsRec(t).reverse()).reverse();
+	});
+
+	//NOTE: this guarantees A valid sort ordering (from generic to specific) but it's ambiguous. 
+	//
 
 	var roots = config.domain.roots;
 	_.each(types, function(t) {
@@ -213,7 +217,9 @@ module.exports = function(configObj) {
 			t.isRoot = rootsForType[rootsForType.length - 1] === t.id;
 			t.rootName = rootsForType[rootsForType.length - 1];
 		}
+		// console.log(t.id, "->", t.ancestors.join(","));
 	});
+
 
 
 	///////////////////////////////////////////////////////////////////////////

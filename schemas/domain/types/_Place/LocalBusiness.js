@@ -3,7 +3,9 @@
 // a particular branch of a restaurant chain, a branch of a bank, a medical practice, 
 // a club, a bowling alley, etc.
 module.exports = {
-	supertypes: ["PlaceWithOpeninghours", "Organization"],
+	//NOTE: PlaceWithOpeninghours should be defined latest to make sure we select that as 'closest root'
+	//always
+	supertypes: ["Organization", "PlaceWithOpeninghours"],
 	properties: {
 		// branchCode: {}, //already on Place
 		// currenciesAccepted: {}, //now now

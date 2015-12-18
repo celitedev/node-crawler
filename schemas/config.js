@@ -2,11 +2,13 @@ module.exports = {
 	domain: {
 		roots: [
 			"Place",
-			"Organization",
-			"Person",
 			"Event",
-			"PlaceWithOpeninghours", //combines  "LocalBusiness" and CivicStructure
+			"PlaceWithOpeninghours", //combines  "LocalBusiness" and "CivicStructure"
+			"OrganizationAndPerson", //combines "Person" and "Organization"
 			"CreativeWork",
+
+			//Below are mostly user generated
+
 			"MediaObject",
 			"Comment",
 			"Review",
