@@ -110,20 +110,28 @@ _.each(types, function(t, k) {
 	/////////////////////////////////////////////
 
 	t.overwrites = t.overwrites || k; //set t.overwrites = <key> specified.
-	var overwrites = schemaOrgDef.types[t.overwrites];
-	if (!overwrites) {
+	var overwrites = schemaOrgDef.types[t.overwrites] || {}; //default to {} -> support for isCustom = true
+	if (!overwrites && !t.isCustom) {
 		throw new Error("CONFIG ERR: overwrites type specified which doesn't exist (type, overwrite type): " + k + ", " + t.overwrites);
 	}
 
 	//inherit some defaults from schema.org
 	_.defaults(t, {
-		id: overwrites.id,
+		id: overwrites.id || k,
 		overwrites: k,
 		properties: {},
 		ancestors: _.clone(overwrites.ancestors),
 		supertypes: _.clone(overwrites.supertypes),
 		removeProperties: [],
 	});
+
+	if (!t.ancestors) {
+		throw new Error("Type should have attrib 'ancestors' defined: " + k);
+	}
+
+	if (!t.supertypes) {
+		throw new Error("Type should have attrib 'supertypes' defined: " + k);
+	}
 
 	/////////////////////////////////////////////
 	//do some checks + extension of properties //
@@ -147,7 +155,7 @@ _.each(types, function(t, k) {
 		}
 
 		//check if all defined `properties` on types are indeed defined by 'overwrites' type.
-		if (overwrites.specific_properties.indexOf(propK) === -1) {
+		if (!t.isCustom && overwrites.specific_properties.indexOf(propK) === -1) {
 			undefinedProps.push(propK);
 			return;
 		}
