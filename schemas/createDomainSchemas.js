@@ -49,6 +49,9 @@ var utils = require("./utils");
 var noOrigProps = [],
 	typesNotSupported = [];
 
+///////////////////////
+//process properties //
+///////////////////////
 _.each(properties, function(p, k) {
 	var propOverwrite = schemaOrgDef.properties[k];
 	if (!propOverwrite && !p.isNew) {
@@ -97,7 +100,9 @@ if (_.size(typesNotSupported)) {
 	throw new Error("Following types are not defined, although properties referencing to them are: " + JSON.stringify(typesNotSupported, null, 2));
 }
 
-
+//////////////////
+//process types //
+//////////////////
 _.each(types, function(t, k) {
 
 	/////////////////////////////////////////////
