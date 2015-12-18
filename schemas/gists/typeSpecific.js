@@ -1,7 +1,7 @@
 var argv = require('yargs').argv;
 var _ = require("lodash");
 var colors = require("colors");
-
+var config = require("../config");
 
 if (!argv.type) {
 	throw new Error("commandline --type required");
@@ -18,7 +18,6 @@ if (!type) {
 }
 
 var typeChain = _.uniq(_.clone(type.ancestors).concat(typeName));
-
 
 var commands = ["schema", "schemafull", "inbound", "outbound", "ambiguous"];
 
@@ -118,18 +117,14 @@ function outbound() {
 	if (isTransitive) {
 		console.log(("Transitive Walk").red);
 
-		if (!argv.roots) {
-			//e.g: ["AggregateRating", "ImageObject", "Review"];
-			throw new Error("option `transitive` also requires option `roots`. I.e.: a comma-delimited collection of Root Objects. " +
-				"Traversing (transitive walk) doesn't cross these root object boundaries.");
+		if (argv.roots) {
+			console.log(("Going with overwritten roots as defined through --roots-commandline: " + argv.roots).yellow);
+		} else {
+			console.log(("Going with default roots as specified in Config: " + config.domain.roots.join(",")).yellow);
 		}
-
-		//AggregateRating,ImageObject,Review
-
-		//Total example: node schemas/gists/showSchemas --type=Place --command=outbound --excludeDataTypes --transitive --roots=AggregateRating,ImageObject,Review
 	}
 
-	stopRecursionAt = (argv.roots || []).split(",");
+	stopRecursionAt = argv.roots ? argv.roots.split(",") : config.domain.roots;
 
 	function children(type, isDeep) {
 		return _.reduce(type.properties, function(agg, p, propName) {
