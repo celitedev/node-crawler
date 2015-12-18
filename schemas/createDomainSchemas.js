@@ -47,6 +47,7 @@ var utils = require("./utils");
 
 //extend (default) our property def with schema.org property definitions.
 var noOrigProps = [],
+	customOverwritingProps = [],
 	typesNotSupported = [];
 
 ///////////////////////
@@ -54,29 +55,44 @@ var noOrigProps = [],
 ///////////////////////
 _.each(properties, function(p, k) {
 	var propOverwrite = schemaOrgDef.properties[k];
-	if (!propOverwrite && !p.isNew) {
+	if (!propOverwrite && !p.isCustom) {
 		noOrigProps.push(k);
+		return;
+	}
+
+	if (propOverwrite && p.isCustom) {
+		customOverwritingProps.push(k);
 		return;
 	}
 
 	//////////////////////////////////////////////////////
 	//check sub.ranges is proper subset of sup.ranges// //
 	//////////////////////////////////////////////////////
-	if (p.ranges) {
-
-		var unsupportedRanges = [];
-		_.each(p.ranges, function(r) {
-			if (propOverwrite.ranges.indexOf(r) === -1) {
-				unsupportedRanges.push(r);
+	if (!p.isCustom) {
+		if (p.ranges) {
+			var unsupportedRanges = [];
+			_.each(p.ranges, function(r) {
+				if (propOverwrite.ranges.indexOf(r) === -1) {
+					unsupportedRanges.push(r);
+				}
+			});
+			if (unsupportedRanges.length) {
+				throw new Error("CONFIG ERR: range is not a proper subset of prop.range of overwritten type (propName, unsupportedRanges, supported): " +
+					k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
 			}
-		});
-		if (unsupportedRanges.length) {
-			throw new Error("CONFIG ERR: range is not a proper subset of prop.range of overwritten type (propName, unsupportedRanges, supported): " +
-				k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
 		}
 	}
 
-	_.defaults(p, propOverwrite);
+	_.defaults(p, propOverwrite, {
+		isMulti: false
+	});
+
+	if (!p.ranges) {
+		throw new Error("ranges-attrib not supported on (probably isCustom) property: " + k);
+	}
+	if (!p.id) {
+		throw new Error("id-attrib not supported on (probably isCustom) property: " + k);
+	}
 
 	//check all types defined in `property.ranges` are supported
 	_.each(p.ranges, function(type) {
@@ -95,6 +111,9 @@ _.each(properties, function(p, k) {
 });
 if (noOrigProps.length) {
 	throw new Error("Following properties defined in our own definition, weren't defined in schema.org definition: " + noOrigProps.join(","));
+}
+if (customOverwritingProps.length) {
+	throw new Error("Following properties defined as isCustom but yet schema.org definition found. This is not allowed: " + customOverwritingProps.join(","));
 }
 if (_.size(typesNotSupported)) {
 	throw new Error("Following types are not defined, although properties referencing to them are: " + JSON.stringify(typesNotSupported, null, 2));
@@ -136,16 +155,10 @@ _.each(types, function(t, k) {
 	/////////////////////////////////////////////
 	//do some checks + extension of properties //
 	/////////////////////////////////////////////
-	var undefinedProps = [],
-		undefinedPropsOwn = [],
-		propsWithUnsupportedIsMulti = [];
-
-
+	var undefinedPropsOwn = [];
 	_.each(t.properties, function(propObj, propK) {
 
-		//set defaults
-		//- isMulti = false
-		propObj.isMulti = propObj.isMulti || false;
+		//TODO: schema on type.properties to define we can't have things like isMulti here (this should be defined directly on props)
 
 		//check if properties defined exist in our own properties definition 
 		//Remember: we already linked up/extened our own definition with schema.org property definitions
@@ -154,38 +167,15 @@ _.each(types, function(t, k) {
 			return;
 		}
 
-		//check if all defined `properties` on types are indeed defined by 'overwrites' type.
-		if (!t.isCustom && overwrites.specific_properties.indexOf(propK) === -1) {
-			undefinedProps.push(propK);
-			return;
-		}
-
-		//find property from schemaOrg
-		var propSchemaOrg = properties[propK];
-		if (propObj.isMulti && !propSchemaOrg.isMulti) {
-			propsWithUnsupportedIsMulti.push(propK);
-		}
-
-		_.defaults(propObj, propSchemaOrg);
-
+		//set defaults from property to type-specific property. 
+		//This property was in turn already enriched by schemaOrg if !isCustom
+		_.defaults(propObj, properties[propK]);
 	});
-
 
 	if (undefinedPropsOwn.length) {
 		throw new Error("CONFIG ERR: some properties not defined on our own properties definition (type, undefinedProps): " + k +
 			", (" + undefinedPropsOwn.join(",") + ")");
 	}
-
-	if (undefinedProps.length) {
-		throw new Error("CONFIG ERR: some properties not defined on the 'overwrite' type (type, overwrite type, undefinedProps): " + k + ", " +
-			t.overwrites + ", (" + undefinedProps.join(",") + ")");
-	}
-
-	if (propsWithUnsupportedIsMulti.length) {
-		throw new Error("CONFIG ERR: some properties defined as isMulti on type, but not defined as isMulti on property they reference (type, wrongProps): " + k +
-			", (" + propsWithUnsupportedIsMulti.join(",") + ")");
-	}
-
 
 	types[k].specific_properties = types[k].properties;
 	delete types[k].properties;

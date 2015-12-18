@@ -62,15 +62,26 @@ module.exports = {
 	////////////////////////////////////
 	addressCountry: {
 		ranges: ["Country"],
-		//WIP: #70: open q: should this be on domain or more on outside?
+		//linkByLookup WIP: #70: open q: should this be on domain or more on outside?
 		linkByLookup: {
 			fields: {
 				name: "addressCountry"
 			}
 		}
 	},
-
-	//support lookup by name as discussed in #69
+	// addressCity: {
+	// 	"id": "addressCity",
+	// 	"ranges": [
+	// 		"City"
+	// 	],
+	// 	isCustom: true, //defined ourselves!
+	// 	//WIP: #70: open q: should this be on domain or more on outside?
+	// 	linkByLookup: {
+	// 		fields: {
+	// 			name: "addressCity"
+	// 		}
+	// 	}
+	// },
 	addressLocality: {},
 	addressRegion: {},
 	postOfficeBoxNumber: {},

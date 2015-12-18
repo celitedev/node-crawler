@@ -1,6 +1,9 @@
 module.exports = {
 	properties: {
 		addressCountry: {},
+		// addressCity: {
+		// 	isCustom: true
+		// },
 		addressLocality: {},
 		addressRegion: {},
 		postOfficeBoxNumber: {},
