@@ -186,15 +186,6 @@ function outbound() {
 				}
 			}
 
-			if (ambiguousRangesOnly) {
-				//#62
-				//TODO: don't treat [URL,Text] as ambiguous since supertype(URL) = Text
-				//This should be done for: 
-				//- datatypes
-				//- types as long as both below to the same root.
-			}
-
-
 			///////////////////////////////////////////////
 			//Simplify display for easier consumption // //
 			///////////////////////////////////////////////
