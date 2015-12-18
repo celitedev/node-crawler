@@ -39,210 +39,262 @@
 //3. other *Views* such as crawled input from, say, eventful can be presented (and validated) as part of this as well.
 
 var _ = require("lodash");
+var colors = require("colors");
 
 var schemaOrgDef = require("./domain/schemaOrgDef");
 var properties = require("./domain").properties;
 var types = require("./domain").types;
 var utils = require("./utils");
+var config = require("./config");
 
-//extend (default) our property def with schema.org property definitions.
-var noOrigProps = [],
-	customOverwritingProps = [],
-	typesNotSupported = [];
+module.exports = function(configObj) {
+	configObj = configObj || {};
+	var checkSoundness = configObj.checkSoundness;
 
-///////////////////////
-//process properties //
-///////////////////////
-_.each(properties, function(p, k) {
-	var propOverwrite = schemaOrgDef.properties[k];
-	if (!propOverwrite && !p.isCustom) {
-		noOrigProps.push(k);
-		return;
+	if (checkSoundness) {
+		console.log(("CHECKING FOR SOUNDNESS").green);
+	} else {
+		console.log(("NOT CHECKING FOR SOUNDNESS").red);
 	}
 
-	if (propOverwrite && p.isCustom) {
-		customOverwritingProps.push(k);
-		return;
-	}
+	//extend (default) our property def with schema.org property definitions.
+	var noOrigProps = [],
+		customOverwritingProps = [],
+		typesNotSupported = [];
 
-	//////////////////////////////////////////////////////
-	//check sub.ranges is proper subset of sup.ranges// //
-	//////////////////////////////////////////////////////
-	if (!p.isCustom) {
-		if (p.ranges) {
-			var unsupportedRanges = [];
-			_.each(p.ranges, function(r) {
-				if (propOverwrite.ranges.indexOf(r) === -1) {
-					unsupportedRanges.push(r);
+	///////////////////////
+	//process properties //
+	///////////////////////
+	_.each(properties, function(p, k) {
+		var propOverwrite = schemaOrgDef.properties[k];
+		if (!propOverwrite && !p.isCustom) {
+			noOrigProps.push(k);
+			return;
+		}
+
+		if (propOverwrite && p.isCustom) {
+			customOverwritingProps.push(k);
+			return;
+		}
+
+		//////////////////////////////////////////////////////
+		//check sub.ranges is proper subset of propOverwrite.ranges// //
+		//////////////////////////////////////////////////////
+		if (!p.isCustom) {
+			if (p.ranges) {
+				var unsupportedRanges = [];
+				_.each(p.ranges, function(r) {
+					if (propOverwrite.ranges.indexOf(r) === -1) {
+						unsupportedRanges.push(r);
+					}
+				});
+				if (unsupportedRanges.length) {
+					throw new Error("CONFIG ERR: range is not a proper subset of prop.range of overwritten type (propName, unsupportedRanges, supported): " +
+						k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
 				}
-			});
-			if (unsupportedRanges.length) {
-				throw new Error("CONFIG ERR: range is not a proper subset of prop.range of overwritten type (propName, unsupportedRanges, supported): " +
-					k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
 			}
 		}
-	}
 
-	_.defaults(p, propOverwrite, {
-		isMulti: false
-	});
+		_.defaults(p, propOverwrite, {
+			isMulti: false
+		});
 
-	if (!p.ranges) {
-		throw new Error("ranges-attrib not supported on (probably isCustom) property: " + k);
-	}
-	if (!p.id) {
-		throw new Error("id-attrib not supported on (probably isCustom) property: " + k);
-	}
-
-	//check all types defined in `property.ranges` are supported
-	_.each(p.ranges, function(type) {
-		if (schemaOrgDef.datatypes[type]) {
-			return;
+		if (!p.ranges) {
+			throw new Error("ranges-attrib not supported on (probably isCustom) property: " + k);
 		}
-		if (types[type]) {
-			return;
+		if (!p.id) {
+			throw new Error("id-attrib not supported on (probably isCustom) property: " + k);
 		}
-		typesNotSupported.push({
-			property: k,
-			type: type
+
+		//check all types defined in `property.ranges` are supported
+		_.each(p.ranges, function(type) {
+			if (schemaOrgDef.datatypes[type]) {
+				return;
+			}
+			if (types[type]) {
+				return;
+			}
+			typesNotSupported.push({
+				property: k,
+				type: type
+			});
 		});
 	});
 
-});
-if (noOrigProps.length) {
-	throw new Error("Following properties defined in our own definition, weren't defined in schema.org definition: " + noOrigProps.join(","));
-}
-if (customOverwritingProps.length) {
-	throw new Error("Following properties defined as isCustom but yet schema.org definition found. This is not allowed: " + customOverwritingProps.join(","));
-}
-if (_.size(typesNotSupported)) {
-	throw new Error("Following types are not defined, although properties referencing to them are: " + JSON.stringify(typesNotSupported, null, 2));
-}
-
-//////////////////
-//process types //
-//////////////////
-_.each(types, function(t, k) {
-
-	/////////////////////////////////////////////
-	//check if specified overwrite-type exists //
-	/////////////////////////////////////////////
-
-	t.overwrites = t.overwrites || k; //set t.overwrites = <key> specified.
-	var overwrites = schemaOrgDef.types[t.overwrites] || {}; //default to {} -> support for isCustom = true
-	if (!overwrites && !t.isCustom) {
-		throw new Error("CONFIG ERR: overwrites type specified which doesn't exist (type, overwrite type): " + k + ", " + t.overwrites);
+	if (noOrigProps.length) {
+		throw new Error("Following properties defined in our own definition, weren't defined in schema.org definition: " + noOrigProps.join(","));
 	}
-
-	//inherit some defaults from schema.org
-	_.defaults(t, {
-		id: overwrites.id || k,
-		overwrites: k,
-		properties: {},
-		ancestors: _.clone(overwrites.ancestors),
-		supertypes: _.clone(overwrites.supertypes),
-		removeProperties: [],
-	});
-
-	if (!t.ancestors) {
-		throw new Error("Type should have attrib 'ancestors' defined: " + k);
+	if (customOverwritingProps.length) {
+		throw new Error("Following properties defined as isCustom but yet schema.org definition found. This is not allowed: " + customOverwritingProps.join(","));
 	}
-
-	if (!t.supertypes) {
-		throw new Error("Type should have attrib 'supertypes' defined: " + k);
+	if (_.size(typesNotSupported)) {
+		throw new Error("Following types are not defined, although properties referencing to them are: " + JSON.stringify(typesNotSupported, null, 2));
 	}
 
 	/////////////////////////////////////////////
-	//do some checks + extension of properties //
+	//process types + type-specific properties //
 	/////////////////////////////////////////////
-	var undefinedPropsOwn = [];
-	_.each(t.properties, function(propObj, propK) {
+	_.each(types, function(t, k) {
 
-		//TODO: schema on type.properties to define we can't have things like isMulti here (this should be defined directly on props)
-
-		//check if properties defined exist in our own properties definition 
-		//Remember: we already linked up/extened our own definition with schema.org property definitions
-		if (!properties[propK]) {
-			undefinedPropsOwn.push(propK);
-			return;
+		t.overwrites = t.overwrites || k; //set t.overwrites = <key> specified.
+		var overwrites = schemaOrgDef.types[t.overwrites] || {}; //default to {} -> support for isCustom = true
+		if (!overwrites && !t.isCustom) {
+			throw new Error("CONFIG ERR: overwrites type specified which doesn't exist (type, overwrite type): " + k + ", " + t.overwrites);
 		}
 
-		//set defaults from property to type-specific property. 
-		//This property was in turn already enriched by schemaOrg if !isCustom
-		_.defaults(propObj, properties[propK]);
+		//inherit some defaults from schema.org
+		_.defaults(t, {
+			id: overwrites.id || k,
+			overwrites: k,
+			properties: {},
+			ancestors: _.clone(overwrites.ancestors),
+			supertypes: _.clone(overwrites.supertypes),
+			removeProperties: [],
+		});
+
+		if (!t.supertypes) {
+			throw new Error("Type should have attrib 'supertypes' defined: " + k);
+		}
+
+		//////////////////////////////////////////////////////////////////////
+		//extend type-specific property schema with generic property schema //
+		//////////////////////////////////////////////////////////////////////
+		var undefinedPropsOwn = [];
+		_.each(t.properties, function(propObj, propK) {
+
+			//TODO: schema on type.properties to define we can't have things like isMulti here (this should be defined directly on props)
+
+			//check if properties defined exist in our own properties definition 
+			//Remember: we already linked up/extened our own definition with schema.org property definitions
+			if (!properties[propK]) {
+				undefinedPropsOwn.push(propK);
+				return;
+			}
+
+			//set defaults from property to type-specific property. 
+			//This property was in turn already enriched by schemaOrg if !isCustom
+			_.defaults(propObj, properties[propK]);
+		});
+
+		if (undefinedPropsOwn.length) {
+			throw new Error("CONFIG ERR: some properties not defined on our own properties definition (type, undefinedProps): " + k +
+				", (" + undefinedPropsOwn.join(",") + ")");
+		}
+
+		types[k].specific_properties = types[k].properties;
+		delete types[k].properties;
 	});
 
-	if (undefinedPropsOwn.length) {
-		throw new Error("CONFIG ERR: some properties not defined on our own properties definition (type, undefinedProps): " + k +
-			", (" + undefinedPropsOwn.join(",") + ")");
+
+
+	/////////////////////////////////////////////////////////////////////////////
+	//recalculate ancestors from supertypes                                    //
+	//Needed since we possibly may have added types in between                 //
+	//Directly make sure order of ancestors is correct: end with most specific //
+	/////////////////////////////////////////////////////////////////////////////
+
+	var dagObj = utils.generateDAG(types);
+	recalcAncestorsRec(dagObj.hierarchy, []);
+
+	function recalcAncestorsRec(hierarchy, ancestors) {
+		_.each(hierarchy, function(childs, typeName) {
+			var type = types[typeName];
+			type.ancestors = ancestors;
+			recalcAncestorsRec(childs, ancestors.concat(typeName));
+		});
 	}
 
-	types[k].specific_properties = types[k].properties;
-	delete types[k].properties;
-});
+	var roots = config.domain.roots;
+	_.each(types, function(t) {
+		var ancestorsAndSelf = _.uniq(t.ancestors.concat(t.id));
+		var rootsForType = _.intersection(ancestorsAndSelf, roots); //guarantees sort order first arr
+		if (rootsForType.length) {
+			t.isEntity = true;
+			t.isRoot = rootsForType[rootsForType.length - 1] === t.id;
+			t.rootName = rootsForType[rootsForType.length - 1];
+		}
+	});
 
 
-//type directives to inherit
-var typeDirectivesToInherit = [
-	"isValueObject"
-];
+	///////////////////////////////////////////////////////////////////////////
+	//Walk the typechain (using supertype) to add properties from supertypes //
+	///////////////////////////////////////////////////////////////////////////
 
-//add `properties` which consists of all `specific_properties` of current type + all suptypes
-//TODO: minus `remove_ancestor_properties`
-_.each(types, function(t, k) {
-	// if (k === "Place") {
-	// 	console.log("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-	// 	console.log(t.specific_properties);
-	// 	console.log("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-	// }
-	t.properties = _.cloneDeep(t.specific_properties);
-	addSupertypeStuff(t, t);
-	t.properties = _.omit(t.properties, t.removeProperties);
-});
+	//type directives to inherit
+	var typeDirectivesToInherit = [
+		"isValueObject"
+	];
+
+	//add `properties` which consists of all `specific_properties` of current type + all suptypes
+	_.each(types, function(t, k) {
+		t.properties = _.cloneDeep(t.specific_properties);
+		_.each(_.clone(t.ancestors).reverse(), function(supertypeName) { //reverse: travel up chain instead of down
+			var supertype = types[supertypeName];
+			if (!supertype) {
+				throw new Error("supertype not defined in Kwhen config (Supertype, refDirect, refTrans) " + supertypeName + ", " + appliedType.id);
+			}
+			_.defaults(t, _.pick(supertype, typeDirectivesToInherit));
+			_.extend(t.properties, supertype.specific_properties);
+			t.removeProperties = t.removeProperties.concat(supertype.removeProperties);
+		});
+		t.properties = _.omit(t.properties, t.removeProperties);
+	});
 
 
-//https://github.com/Kwhen/crawltest/issues/52
-var transientPropWithoutWriteFromDirective = [];
-_.each(types, function(t, k) {
-	_.each(t.properties, function(p, propK) {
-		if (p.transient && !p.writeFrom) {
-			transientPropWithoutCopyOfDirective.push({
-				type: k,
-				prop: propK
+
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	// checkSoundness: isAbstract | isValueObject | isEntity no overlap + complete coverage //
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	if (checkSoundness) {
+		(function checkcoverage() {
+
+			var typesNeither = [],
+				typesMultiple = [];
+
+			_.each(types, function(t) {
+				if (!(t.isEntity || t.isValueObject || t.isAbstract)) {
+					typesNeither.push(t.id);
+				} else if ((t.isEntity && t.isValueObject) || (t.isEntity && t.isAbstract) || (t.isAbstract && t.isValueObject)) {
+					typesMultiple.push(t.id);
+				}
 			});
-		}
+
+			if (typesMultiple.length) {
+				console.log((JSON.stringify(typesMultiple, null, 2)).red);
+				throw new Error("above types define more than 1 of isEntity || isValueObject || isAbstract");
+			}
+			if (typesNeither.length) {
+				console.log((JSON.stringify(typesNeither, null, 2)).red);
+				throw new Error("above types don't define isEntity || isValueObject || isAbstract");
+			}
+		}());
+	}
+
+
+	//////////////////////////////////////////////////////////
+	//Transient property should defined writefrom-directive //
+	//https://github.com/Kwhen/crawltest/issues/52          //
+	//////////////////////////////////////////////////////////
+
+	var transientPropWithoutWriteFromDirective = [];
+	_.each(types, function(t, k) {
+		_.each(t.properties, function(p, propK) {
+			if (p.transient && !p.writeFrom) {
+				transientPropWithoutCopyOfDirective.push({
+					type: k,
+					prop: propK
+				});
+			}
+		});
 	});
-});
-if (transientPropWithoutWriteFromDirective.length) {
-	throw new Error("defined prop with transient=true for which no writeFrom directive was set: " + JSON.stringify(transientPropWithoutCopyOfDirective));
-}
 
-function addSupertypeStuff(walkType, appliedType) {
-	_.each(walkType.supertypes, function(supertypeName) {
-		var supertype = types[supertypeName];
-		if (!supertype) {
-			throw new Error("supertype not defined in Kwhen config (Supertype, refDirect, refTrans) " + supertypeName + ", " + appliedType.id);
-		}
-		_.defaults(appliedType, _.pick(supertype, typeDirectivesToInherit));
-		appliedType.removeProperties = _.uniq(appliedType.removeProperties.concat(supertype.removeProperties));
-		_.extend(appliedType.properties, supertype.specific_properties);
-		addSupertypeStuff(supertype, appliedType);
-	});
-}
+	if (transientPropWithoutWriteFromDirective.length) {
+		throw new Error("defined prop with transient=true for which no writeFrom directive was set: " + JSON.stringify(transientPropWithoutCopyOfDirective));
+	}
 
-
-//ancestors should be ordered to reflect actual subtype < supertype ordering. 
-//So start with most generic and end with most specific. 
-//NOTE: since tpye may have multiple direct supertypes there is some ambiguity here
-var order = utils.getTypesInDAGOrder(types);
-_.each(types, function(t) {
-	t.ancestors = _.sortBy(_.uniq(t.ancestors), function(sup) {
-		return order.indexOf(sup);
-	});
-});
-
-module.exports = {
-	datatypes: schemaOrgDef.datatypes,
-	properties: properties,
-	types: types,
+	return {
+		datatypes: schemaOrgDef.datatypes,
+		properties: properties,
+		types: types
+	};
 };

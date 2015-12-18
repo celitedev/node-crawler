@@ -8,7 +8,10 @@ if (!argv.type) {
 }
 
 var utils = require("../utils");
-var generatedSchemas = require("../createDomainSchemas.js");
+
+var generatedSchemas = require("../createDomainSchemas.js")({
+	checkSoundness: argv.soundness
+});
 
 var typeName = argv.type;
 var type = generatedSchemas.types[typeName];

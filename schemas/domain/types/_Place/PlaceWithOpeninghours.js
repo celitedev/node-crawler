@@ -3,7 +3,6 @@
 ///////////////////////////////////////////////////////////
 module.exports = {
 	isCustom: true,
-	ancestors: ["Thing", "Place"],
 	supertypes: ["Place"],
 	properties: {
 		openingHours: {}
