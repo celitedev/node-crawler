@@ -6,5 +6,8 @@ module.exports = {
 		postOfficeBoxNumber: {},
 		postalCode: {},
 		streetAddress: {},
-	}
+	},
+	removeProperties: [
+		"name", "url", "description", "alternateName", "sameAs"
+	]
 };
