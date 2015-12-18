@@ -4,6 +4,8 @@ var _ = require("lodash");
 var colors = require('colors');
 var utils = require("../utils");
 
+var config = require("../config");
+
 var commands = ["typeHierarchy", "allDefined"];
 
 var command = argv.command;
@@ -22,12 +24,13 @@ switch (command) {
 
 function allDefined(types) {
 
-	if (!argv.roots) {
-		//e.g: ["AggregateRating", "ImageObject", "Review"];
-		throw new Error("option `roots` required. I.e.: a comma-delimited collection of Root Objects.");
+	if (argv.roots) {
+		console.log(("Going with overwritten roots as defined through --roots-commandline: " + argv.roots).yellow);
+	} else {
+		console.log(("Going with default roots as specified in Config: " + config.domain.roots.join(",")).yellow);
 	}
 
-	var roots = argv.roots.split(",");
+	var roots = argv.roots ? argv.roots.split(",") : config.domain.roots;
 
 	var obj = utils.generateDAG(types);
 	var hierarchy = obj.hierarchy;
