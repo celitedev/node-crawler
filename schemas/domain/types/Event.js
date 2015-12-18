@@ -12,25 +12,25 @@ module.exports = {
 		location: {},
 		// offers: //offers -> NOTE: shouldn't this be 'offer' 
 		organizer: {
-			isMulti: true
+
 		},
 		performer: {
-			isMulti: true
+
 		},
 		recordedIn: {},
 		review: {
-			isMulti: true
+
 		},
 		startDate: {},
 		subEvent: {
-			isMulti: true
+
 		},
 		superEvent: {},
 		workFeatured: {
-			isMulti: true
+
 		},
 		workPerformed: {
-			isMulti: true
+
 		}
 	}
 };

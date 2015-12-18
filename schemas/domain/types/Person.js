@@ -17,7 +17,7 @@ module.exports = {
 		honorificSuffix: {},
 		jobTitle: {},
 		memberOf: {
-			isMulti: true
+
 		},
 		nationality: {},
 		telephone: {

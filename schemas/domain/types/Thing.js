@@ -8,22 +8,13 @@ module.exports = {
 	properties: {
 		"name": {},
 		"url": {},
-		"description": {
-			//isMulti : false -> default
-		},
-		"alternateName": {
-			//NOTE: isMulti needs to be defined on property `alternateName` as well. 
-			//defining on property -> signal to underlying datastore (which may be shared between types)
-			//define here on type.property -> signal for schemas
-			"isMulti": true,
-			// "minItems": 1,
-			// "maxItems": 2,
-		},
+		"description": {},
+		"alternateName": {},
 		"image": {
-			"isMulti": true
+
 		},
 		"sameAs": { //might be use to provide references from canonical to specific sources.
-			"isMulti": true
+
 		},
 	},
 	// //explicitly remove support for properties defined by ancestor types. 

@@ -2,14 +2,14 @@
 module.exports = {
 	properties: {
 		actor: {
-			isMulti: true
+
 		},
 		director: {
-			isMulti: true
+
 		},
 		endDate: {},
 		episode: {
-			isMulti: true
+
 		},
 		numberOfEpisodes: {},
 		partOfSeries: {},
@@ -17,7 +17,7 @@ module.exports = {
 		seasonNumber: {},
 		startDate: {},
 		trailer: {
-			isMulti: true
+
 		}
 	}
 };
