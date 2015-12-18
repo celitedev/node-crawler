@@ -98,12 +98,14 @@ function inbound() {
 
 function outbound() {
 
-	var stopRecursionAt;
+	var roots;
 	var ambiguousRangesOnly = argv.ambiguousRangesOnly;
 	var isTransitive = argv.transitive;
 
 	if (argv.excludeDataTypes) {
-		console.log(("Excluding datatypes").yellow);
+		console.log(("--excludeDataTypes IS specified").yellow);
+	} else {
+		console.log(("--excludeDataTypes NOT specified").green);
 	}
 
 	if (argv.ambiguousRangesOnly && argv.excludeDataTypes) {
@@ -111,24 +113,37 @@ function outbound() {
 	}
 
 	if (argv.ambiguousRangesOnly) {
-		console.log(("show ambiguous only").green);
+		console.log(("--ambiguousRangesOnly IS specified").green);
+	} else {
+		console.log(("--ambiguousRangesOnly NOT specified").green);
 	}
 
 	if (argv.includeSubtypes) {
-		console.log(("include all attributes of all subtypes").green);
+		console.log(("--includeSubtypes IS specified").green);
+
+		if (argv.stopSubtypesAtRoot) {
+			console.log(("--stopSubtypesAtRoot IS specified").green);
+		} else {
+			console.log(("--stopSubtypesAtRoot NOT specified").green);
+		}
+
+	} else {
+		console.log(("--includeSubtypes NOT specified").green);
 	}
 
 	if (isTransitive) {
-		console.log(("Transitive Walk").red);
+		console.log(("--transitive IS specified").red);
 
 		if (argv.roots) {
 			console.log(("Going with overwritten roots as defined through --roots-commandline: " + argv.roots).yellow);
 		} else {
 			console.log(("Going with default roots as specified in Config: " + config.domain.roots.join(",")).yellow);
 		}
+	} else {
+		console.log(("--transitive NOT specified").green);
 	}
 
-	stopRecursionAt = argv.roots ? argv.roots.split(",") : config.domain.roots;
+	roots = argv.roots ? argv.roots.split(",") : config.domain.roots;
 
 	function children(type, isDeep) {
 		return _.reduce(type.properties, function(agg, p, propName) {
@@ -209,10 +224,51 @@ function outbound() {
 	}
 
 	var typeChainExThing = _.difference(typeChain, ["Thing"]);
-	var result = walkRec(type, stopRecursionAt.concat(typeChainExThing));
+	var stopRecursionAt = roots.concat(typeChainExThing);
 
-	// console.log(utils.getTypesInDAGOrder(generatedSchemas.types, typeName));
+	var resultTotal = {};
+	if (!argv.includeSubtypes) {
+		resultTotal = walkRec(type, stopRecursionAt);
+	} else {
 
-	console.log(JSON.stringify(result, null, 2));
+		var propsAdded = [];
+		_.each(utils.getTypesInDAGOrder(generatedSchemas.types, typeName), function(typeNewIt) {
+			var t = generatedSchemas.types[typeNewIt];
+			var result = walkRec(t, stopRecursionAt);
+
+			if (!argv.stopSubtypesAtRoot) {
+				doWork();
+			} else if (typeName === typeNewIt) { //specified type -> process
+				doWork();
+			} else {
+				//let's check if current subtype isn't hooked to a 'lower' root or it that root itself
+				//If so -> skip
+
+				var ancestorsAndSelf = _.uniq(t.ancestors.concat(typeNewIt));
+
+				var indexOfSpecifiedType = ancestorsAndSelf.indexOf(typeName);
+				var highestRootIndex = _.reduce(roots, function(i, rootType) {
+					//we make use of fact that ancestors-attrib is ordered so that lowest-root is last in array
+					return Math.max(i, ancestorsAndSelf.indexOf(rootType));
+				}, -1);
+				if (indexOfSpecifiedType >= highestRootIndex) {
+					doWork();
+				}
+			}
+
+			function doWork() {
+				_.each(result, function(v, k) {
+					var propName = k.substring(k.lastIndexOf("."));
+					if (propsAdded.indexOf(propName) === -1) {
+						resultTotal[k] = v;
+						propsAdded.push(propName);
+					}
+				});
+			}
+
+		});
+	}
+
+	console.log(JSON.stringify(resultTotal, null, 2));
 
 }

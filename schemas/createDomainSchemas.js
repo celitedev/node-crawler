@@ -43,6 +43,7 @@ var _ = require("lodash");
 var schemaOrgDef = require("./domain/schemaOrgDef");
 var properties = require("./domain").properties;
 var types = require("./domain").types;
+var utils = require("./utils");
 
 //extend (default) our property def with schema.org property definitions.
 var noOrigProps = [],
@@ -186,6 +187,11 @@ var typeDirectivesToInherit = [
 //add `properties` which consists of all `specific_properties` of current type + all suptypes
 //TODO: minus `remove_ancestor_properties`
 _.each(types, function(t, k) {
+	// if (k === "Place") {
+	// 	console.log("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+	// 	console.log(t.specific_properties);
+	// 	console.log("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+	// }
 	t.properties = _.cloneDeep(t.specific_properties);
 	addSupertypeStuff(t, t);
 	t.properties = _.omit(t.properties, t.removeProperties);
@@ -220,6 +226,17 @@ function addSupertypeStuff(walkType, appliedType) {
 		addSupertypeStuff(supertype, appliedType);
 	});
 }
+
+
+//ancestors should be ordered to reflect actual subtype < supertype ordering. 
+//So start with most generic and end with most specific. 
+//NOTE: since tpye may have multiple direct supertypes there is some ambiguity here
+var order = utils.getTypesInDAGOrder(types);
+_.each(types, function(t) {
+	t.ancestors = _.sortBy(_.uniq(t.ancestors), function(sup) {
+		return order.indexOf(sup);
+	});
+});
 
 module.exports = {
 	datatypes: schemaOrgDef.datatypes,
