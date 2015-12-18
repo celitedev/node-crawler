@@ -114,6 +114,10 @@ function outbound() {
 		console.log(("show ambiguous only").green);
 	}
 
+	if (argv.includeSubtypes) {
+		console.log(("include all attributes of all subtypes").green);
+	}
+
 	if (isTransitive) {
 		console.log(("Transitive Walk").red);
 
@@ -206,6 +210,8 @@ function outbound() {
 
 	var typeChainExThing = _.difference(typeChain, ["Thing"]);
 	var result = walkRec(type, stopRecursionAt.concat(typeChainExThing));
+
+	// console.log(utils.getTypesInDAGOrder(generatedSchemas.types, typeName));
 
 	console.log(JSON.stringify(result, null, 2));
 

@@ -1,40 +1,60 @@
 var _ = require('lodash');
 
 var module = module.exports = {
+
 	//Generate DAG (directed acyclic graph) of schemas
 	//correctly errors out on cycle
-	generateDAG: function(inputTypes) {
+	//if fromRoot is supplied, constrain hierarchy + order to subgraph starting with optionalRootTypeName
+	generateDAG: function(inputTypes, fromRoot) {
 		var types = _.cloneDeep(inputTypes);
 		var hierarchy = {};
 		var typePrefix = {},
-			order = [];
+			order = [],
+			rootOrSubs;
+
+		//create an array of ids containing the fromRoot + all subtypes
+		if (fromRoot) {
+			rootOrSubs = _.reduce(types, function(arr, t) {
+				if (t.id === fromRoot || t.ancestors.indexOf(fromRoot) !== -1) {
+					arr.push(t.id);
+				}
+				return arr;
+			}, []);
+		}
 
 		while (true) {
 			var typesWithoutDepsInThisIt = 0;
 			_.each(types, function(t, k) {
+
 				if (t.supertypes.length) {
-					// console.log(k);
 					return;
 				}
+
+				var logHierarchy = !fromRoot || (fromRoot && rootOrSubs.indexOf(k) !== -1);
 
 				typesWithoutDepsInThisIt++; //detect cycle
 
 				//we've found a type without deps -> create array
 				var hierForType = typePrefix[k];
 				var arr;
-				if (!hierForType) {
-					arr = hierarchy[k] = {};
-				} else {
-					// console.log(hierForType);
-					arr = _.property(hierForType)(hierarchy)[k] = {};
+
+				if (logHierarchy) {
+
+					if (!hierForType) {
+						arr = hierarchy[k] = {};
+					} else {
+						// console.log(hierForType);
+						arr = _.property(hierForType)(hierarchy)[k] = {};
+					}
+					order.push(k);
 				}
-				order.push(k);
 
 				_.each(types, function(innerT, innerK) {
 					if (innerT.supertypes.indexOf(k) !== -1) {
 						innerT.supertypes.splice(innerT.supertypes.indexOf(k), 1);
-						typePrefix[innerK] = hierForType ? hierForType + "." + k : k; //assign hierarchyPrefix
-						// arr.push(innerK);
+						if (logHierarchy) {
+							typePrefix[innerK] = hierForType ? hierForType + "." + k : k; //assign hierarchyPrefix
+						}
 					}
 				});
 
@@ -52,8 +72,8 @@ var module = module.exports = {
 			order: order
 		};
 	},
-	printHierarchy: function(inputTypes) {
-		module._printHierarchy(module.generateDAG(inputTypes).hierarchy);
+	printHierarchy: function(inputTypes, fromRoot) {
+		module._printHierarchy(module.generateDAG(inputTypes, fromRoot).hierarchy);
 	},
 
 	_printHierarchy: function(hier, prefix) {
@@ -69,8 +89,8 @@ var module = module.exports = {
 	//always come before subtypes
 	//
 	//Tech: return a breadth-first search soluation over the DAG.
-	getTypesInDAGOrder: function(inputTypes) {
-		return module.generateDAG(inputTypes).order;
+	getTypesInDAGOrder: function(inputTypes, optionalRootTypeName) {
+		return module.generateDAG(inputTypes, optionalRootTypeName).order;
 	}
 
 };

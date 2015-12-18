@@ -15,7 +15,12 @@ if (!command || commands.indexOf(command) === -1) {
 
 switch (command) {
 	case "typeHierarchy":
-		utils.printHierarchy(generatedSchemas.types);
+		if (argv.fromRoot) {
+			console.log(("printing hierarchy starting from root=" + argv.fromRoot).yellow);
+		} else {
+			console.log(("printing entire hierarchy. You know you can limit this with --fromRoot right?").yellow);
+		}
+		utils.printHierarchy(generatedSchemas.types, argv.fromRoot);
 		break;
 	case "allDefined":
 		//check if all types are defined as root|isAbstract|isValueObject
