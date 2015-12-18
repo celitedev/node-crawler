@@ -1,5 +1,3 @@
-var ZSchema = require("z-schema");
-
 //Abstract schema. 
 //Used to type-check the envelope. 
 module.exports = {
