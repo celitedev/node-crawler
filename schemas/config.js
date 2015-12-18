@@ -6,6 +6,7 @@ module.exports = {
 			"Person",
 			"Event",
 			"LocalBusiness",
+			"CivicStructure",
 			"CreativeWork",
 			"ImageObject",
 			"Comment",
