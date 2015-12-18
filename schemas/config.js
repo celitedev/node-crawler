@@ -8,7 +8,7 @@ module.exports = {
 			"LocalBusiness",
 			"CivicStructure",
 			"CreativeWork",
-			"ImageObject",
+			"MediaObject",
 			"Comment",
 			"Review",
 			"AggregateRating"
