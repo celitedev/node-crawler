@@ -6,7 +6,7 @@ var utils = require("../utils");
 
 var config = require("../config");
 
-var commands = ["typeHierarchy", "allDefined"];
+var commands = ["typeHierarchy", "allDefined", "ambiguous"];
 
 var command = argv.command;
 if (!command || commands.indexOf(command) === -1) {
@@ -22,9 +22,30 @@ switch (command) {
 		}
 		utils.printHierarchy(generatedSchemas.types, argv.fromRoot);
 		break;
+	case "ambiguous":
+		ambiguous(generatedSchemas.types);
+		break;
 	case "allDefined":
 		//check if all types are defined as root|isAbstract|isValueObject
 		allDefined(generatedSchemas.types);
+		break;
+}
+
+function ambiguous(types) {
+	var order = utils.getTypesInDAGOrder(types);
+	var props = [];
+	var out = {};
+	_.each(order, function(typeName) {
+		var type = types[typeName];
+		_.each(type.properties, function(prop, propName) {
+			if (props.indexOf(propName) !== -1) return;
+			if (prop.ranges.length > 1) {
+				out[typeName + "." + propName] = prop.ranges.join(",");
+			}
+			props.push(propName);
+		});
+	});
+	console.log(out);
 }
 
 function allDefined(types) {
