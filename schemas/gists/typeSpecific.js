@@ -245,6 +245,8 @@ function outbound() {
 					//we make use of fact that ancestors-attrib is ordered so that lowest-root is last in array
 					return Math.max(i, ancestorsAndSelf.indexOf(rootType));
 				}, -1);
+
+				// console.log(typeNewIt, indexOfSpecifiedType, highestRootIndex, ancestorsAndSelf.join(","));
 				if (indexOfSpecifiedType >= highestRootIndex) {
 					doWork();
 				}

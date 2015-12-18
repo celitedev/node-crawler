@@ -1,4 +1,5 @@
 module.exports = {
+	supertypes: ["OrganizationAndPerson"],
 	properties: {
 		additionalName: {}, //used for a middle name
 		address: {},

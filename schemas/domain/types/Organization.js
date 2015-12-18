@@ -1,4 +1,5 @@
 module.exports = {
+	supertypes: ["OrganizationAndPerson"],
 	properties: {
 		address: {},
 		aggregateRating: {},
