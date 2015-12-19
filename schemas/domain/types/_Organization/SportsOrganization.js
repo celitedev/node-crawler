@@ -1,5 +1,5 @@
 module.exports = {
-	sport: {
-
+	properties: {
+		sport: {}
 	}
 };

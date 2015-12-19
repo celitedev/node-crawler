@@ -382,6 +382,24 @@ module.exports = function(configObj) {
 						}
 
 						break;
+					case "indicateRoot":
+						var datatypeFound = false;
+						nonEntityFound = false;
+						_.each(p.ranges, function(typeName) {
+							var type = types[typeName];
+							if (!type) {
+								datatypeFound = true;
+							}
+							if (!type.isEntity) {
+								nonEntityFound = true;
+							}
+						});
+						if (datatypeFound || nonEntityFound) {
+							ambiguousStrategyWrong.push(p.id);
+						} else {
+
+						}
+						break;
 					default:
 						throw new Error("ambiguitySolvedBy.type not supported. (propertyname, type) " + p.id + "," + p.ambiguitySolvedBy.type);
 				}
