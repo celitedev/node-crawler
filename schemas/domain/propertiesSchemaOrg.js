@@ -56,6 +56,10 @@ module.exports = {
 			"OrganizationAndPerson",
 			"CreativeWork"
 		],
+		ambiguitySolvedBy: {
+			//indiates that a separate field `itemOfRootType` indicates type of root
+			type: "indicateRoot"
+		}
 
 	},
 
@@ -395,10 +399,10 @@ module.exports = {
 	/////////////////////////////////////
 	//https://schema.org/MusicRelease //
 	/////////////////////////////////////
-	catalogNumber: {},
-	creditedTo: {},
-	recordLabel: {},
-	releaseOf: {}, //points to MusicAlbum
+	// catalogNumber: {},
+	// creditedTo: {},
+	// recordLabel: {},
+	// releaseOf: {}, //points to MusicAlbum
 
 
 	//////////////////////////////////////////
@@ -493,7 +497,10 @@ module.exports = {
 	//https://schema.org/SportsOrganization //
 	//////////////////////////////////////////
 	sport: {
-		isMulti: true
+		isMulti: true,
+		ambiguitySolvedBy: {
+			type: "urlVsSomething"
+		}
 	},
 
 
