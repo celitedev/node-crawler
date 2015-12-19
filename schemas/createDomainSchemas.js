@@ -340,6 +340,21 @@ module.exports = function(configObj) {
 				ambiguousStrategyUndefined.push(p.id);
 			} else {
 				switch (p.ambiguitySolvedBy.type) {
+					case "urlVsSomething": //if 1 item is a URL and only 2 items, we can disciminate on that
+						if (p.ranges.length === 2) {
+							var itemsAsUrl = _.filter(p.ranges, function(t) {
+								return t === "URL";
+							});
+							if (itemsAsUrl.length !== 1) { //exactly 1 item should match URL
+								ambiguousStrategyWrong.push(p.id);
+							} else {
+								p.isAmbiguitySolved = true;
+							}
+						} else {
+							//length !=2 not supported
+							ambiguousStrategyWrong.push(p.id);
+						}
+						break;
 					case "sharedRoot": //all mentioned types in range should have same root
 
 						var nonEntityFound = false,
@@ -384,6 +399,16 @@ module.exports = function(configObj) {
 			throw new Error("Above property define ambiguous ranges for which no `ambiguitySolvedBy` is defined. This should be solved");
 		}
 	}
+
+	//add extra props from prop -> type.prop
+	//NOTE: we already did this before but order of func requires us to do it again
+	_.each(types, function(t) {
+		_.each(t.properties, function(p) {
+			var prop = properties[p.id];
+			//NOTE: extend instead of defaults
+			_.extend(p, _.pick(prop, ["ranges", "isAmbiguous", "isAmbiguitySolved", "supertypes", "id", "ancestors", "ambiguitySolvedBy", "isMulti"]));
+		});
+	});
 
 	return {
 		datatypes: schemaOrgDef.datatypes,
