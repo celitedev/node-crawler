@@ -1,6 +1,6 @@
 module.exports = {
 	properties: {
-		itemReviewed: {},
+		// itemReviewed: {}, moved up to Rating
 		ratingCount: {},
 		reviewCount: {}
 	}

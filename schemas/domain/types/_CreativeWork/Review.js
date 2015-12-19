@@ -3,6 +3,7 @@ module.exports = {
 		itemReviewed: {
 			writeFrom: "about"
 		},
+		itemOfRootType: {},
 		reviewBody: {
 			writeFrom: "text"
 		},
