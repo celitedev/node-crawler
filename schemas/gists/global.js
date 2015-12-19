@@ -53,86 +53,52 @@ function ambiguous(types) {
 
 function allDefined(types) {
 
-	var out = {};
+	if (argv.onlyShowErrors) {
+		console.log(("only showing errors").yellow);
+	} else {
+		console.log(("showing errors and non errors. Can be changed with supplying --onlyShowErrors").yellow);
+	}
+
+	var out = {
+		errors: {
+			all3: [],
+			abstractAndValueObject: [],
+			abstractAndEntity: [],
+			entityAndValueObject: [],
+			none: []
+		},
+		valueObjects: [],
+		abstract: [],
+		entity: {
+
+		}
+	};
 	_.each(types, function(t) {
-		out[t.id] = _.pick(t, ['rootName']);
+		var id = t.id;
+		if (t.isAbstract && t.isValueObject && t.isEntity) {
+			out.errors.all3.push(id);
+		} else if (!(t.isAbstract || t.isValueObject || t.isEntity)) {
+			out.errors.none.push(id);
+		} else if (t.isAbstract && t.isValueObject) {
+			out.errors.abstractAndValueObject.push(id);
+		} else if (t.isAbstract && t.isEntity) {
+			out.errors.abstractAndEntity.push(id);
+		} else if (t.isEntity && t.isValueObject) {
+			out.errors.entityAndValueObject.push(id);
+		} else if (t.isAbstract) {
+			out.abstract.push(id);
+		} else if (t.isValueObject) {
+			out.valueObjects.push(id);
+		} else {
+			//entity
+			var arr = out.entity[t.rootName] = out.entity[t.rootName] || [];
+			arr.push(id);
+		}
 	});
 
+	if (argv.onlyShowErrors) {
+		out = out.errors;
+	}
 	console.log(JSON.stringify(out, null, 2));
 
-	// if (argv.roots) {
-	// 	console.log(("Going with overwritten roots as defined through --roots-commandline: " + argv.roots).yellow);
-	// } else {
-	// 	console.log(("Going with default roots as specified in Config: " + config.domain.roots.join(",")).yellow);
-	// }
-
-	// var roots = argv.roots ? argv.roots.split(",") : config.domain.roots;
-
-	// var obj = utils.generateDAG(types);
-	// var hierarchy = obj.hierarchy;
-
-	// var out = {
-	// 	errors: {
-	// 		undef: [],
-	// 		rootCovered: {
-	// 			isAbstract: [],
-	// 			isValueObject: []
-	// 		},
-	// 		abstractAndValueObject: []
-	// 	},
-	// 	isValueObject: [],
-	// 	isAbstract: [],
-	// 	roots: {
-	// 		// array per root
-	// 	}
-	// };
-
-	// walk(hierarchy);
-
-	// function walk(tree, rootNameSuper) {
-	// 	_.each(tree, function(struct, name) {
-	// 		var node = generatedSchemas.types[name];
-	// 		var rootName = rootNameSuper;
-	// 		if (roots.indexOf(name) !== -1) {
-	// 			//FACT: node defined as root
-	// 			rootName = name;
-	// 		}
-	// 		if (rootName) {
-	// 			//FACT: node is root or covered by root
-
-	// 			//CHECK: should not define isAbstract
-	// 			if (node.isAbstract) {
-	// 				out.errors.rootCovered.isAbstract.push(name);
-	// 				return;
-	// 			}
-
-	// 			//CHECK: should not define isValueObject
-	// 			if (node.isValueObject) {
-	// 				out.errors.rootCovered.isValueObject.push(name);
-	// 				return;
-	// 			}
-
-	// 			var agg = out.roots[rootName] = out.roots[rootName] || [];
-	// 			agg.push(name);
-
-	// 		} else {
-	// 			if (node.isAbstract && node.isValueObject) {
-	// 				out.errors.abstractAndValueObject.push(name);
-	// 			} else if (node.isAbstract) {
-	// 				out.isAbstract.push(name);
-	// 			} else if (node.isValueObject) {
-	// 				out.isValueObject.push(name);
-	// 			} else {
-	// 				out.errors.undef.push(name);
-	// 			}
-	// 		}
-	// 		//recurse
-	// 		walk(struct, rootName);
-	// 	});
-	// }
-	// if (argv.onlyShowErrors) {
-	// 	console.log(("only showing errors").yellow);
-	// 	out = out.errors;
-	// }
-	// console.log(JSON.stringify(out, null, 2));
 }
