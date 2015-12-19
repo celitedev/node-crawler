@@ -301,6 +301,10 @@ module.exports = function(configObj) {
 		throw new Error("defined prop with transient=true for which no writeFrom directive was set: " + JSON.stringify(transientPropWithoutCopyOfDirective));
 	}
 
+
+	var ambiguousStrategyUndefined = [],
+		ambiguousStrategyWrong = [];
+
 	//extra checks on properties now that ancestors tree on on types has been correctly rebuild
 	_.each(properties, function(p, k) {
 		var propOverwrite = schemaOrgDef.properties[k];
@@ -324,8 +328,62 @@ module.exports = function(configObj) {
 				}
 			}
 		}
+
+		////////////////////////////////////////////////////////////
+		//check ambiguity ranges supply a strategy for solving it
+		//and this strategy is indeed applicable to supplied range //
+		////////////////////////////////////////////////////////////
+		if (p.ranges.length > 1) {
+			p.isAmbiguous = true;
+
+			if (!p.ambiguitySolvedBy) {
+				ambiguousStrategyUndefined.push(p.id);
+			} else {
+				switch (p.ambiguitySolvedBy.type) {
+					case "sharedRoot": //all mentioned types in range should have same root
+
+						var nonEntityFound = false,
+							nonRootCoveredEntityFound = false;
+
+						var roots = _.uniq(_.reduce(p.ranges, function(arr, typeName) {
+							var t = types[typeName];
+							if (!t) {
+								nonEntityFound = true;
+								return arr;
+							}
+							if (!t.rootName) {
+								nonRootCoveredEntityFound = true;
+								return arr;
+							}
+							arr.push(t.rootName);
+							return arr;
+						}, []));
+
+						//not all root covered entities || not all share the same root entity -> wrong
+						if (nonEntityFound || nonRootCoveredEntityFound || roots.length > 1) {
+							ambiguousStrategyWrong.push(p.id);
+						} else {
+							p.isAmbiguitySolved = true;
+						}
+
+						break;
+					default:
+						throw new Error("ambiguitySolvedBy.type not supported. (propertyname, type) " + p.id + "," + p.ambiguitySolvedBy.type);
+				}
+			}
+		}
 	});
 
+	if (checkSoundness) {
+		if (ambiguousStrategyWrong.length) {
+			console.log((JSON.stringify(ambiguousStrategyWrong, null, 2).red));
+			throw new Error("Above property define ambiguous ranges for which wrong `ambiguitySolvedBy`-strategy defined. This should be solved");
+		}
+		if (ambiguousStrategyUndefined.length) {
+			console.log((JSON.stringify(ambiguousStrategyUndefined, null, 2).red));
+			throw new Error("Above property define ambiguous ranges for which no `ambiguitySolvedBy` is defined. This should be solved");
+		}
+	}
 
 	return {
 		datatypes: schemaOrgDef.datatypes,
