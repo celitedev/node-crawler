@@ -205,8 +205,11 @@ module.exports = function(configObj) {
 		t.ancestors = _.uniq(recalcAncestorsRec(t).reverse()).reverse();
 	});
 
-	//NOTE: this guarantees A valid sort ordering (from generic to specific) but it's ambiguous. 
-	//
+	//////////////////////////////////////////////////////////////////////////////////////////////
+	//NOTE: this guarantees *some* valid sort ordering (from generic to specific)               //
+	//If a types has multiple supertypes and both of those supertypes are defined to be roots,  //
+	//the last one specified is the one under which the type is placed.                         //
+	//////////////////////////////////////////////////////////////////////////////////////////////
 
 	var roots = config.domain.roots;
 	_.each(types, function(t) {
@@ -217,9 +220,7 @@ module.exports = function(configObj) {
 			t.isRoot = rootsForType[rootsForType.length - 1] === t.id;
 			t.rootName = rootsForType[rootsForType.length - 1];
 		}
-		// console.log(t.id, "->", t.ancestors.join(","));
 	});
-
 
 
 	///////////////////////////////////////////////////////////////////////////
@@ -272,6 +273,26 @@ module.exports = function(configObj) {
 			if (typesNeither.length) {
 				console.log((JSON.stringify(typesNeither, null, 2)).red);
 				throw new Error("above types don't define isEntity || isValueObject || isAbstract");
+			}
+		}());
+
+		(function checkNoAbstractReference() {
+			var abstractRefs = [];
+			_.each(properties, function(p) {
+				_.each(p.ranges, function(refTypeName) {
+					var refType = types[refTypeName];
+					if (!refType) return; //dataType
+					if (refType.isAbstract) {
+						abstractRefs.push({
+							propName: p.id,
+							abstractType: refTypeName
+						});
+					}
+				});
+			});
+			if (abstractRefs.length) {
+				console.log((JSON.stringify(abstractRefs, null, 2)).red);
+				throw new Error("above properties reference abstract types. This should be solved");
 			}
 		}());
 	}
