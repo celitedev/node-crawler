@@ -77,24 +77,6 @@ module.exports = function(configObj) {
 			return;
 		}
 
-		//////////////////////////////////////////////////////
-		//check sub.ranges is proper subset of propOverwrite.ranges// //
-		//////////////////////////////////////////////////////
-		if (!p.isCustom) {
-			if (p.ranges) {
-				var unsupportedRanges = [];
-				_.each(p.ranges, function(r) {
-					if (propOverwrite.ranges.indexOf(r) === -1) {
-						unsupportedRanges.push(r);
-					}
-				});
-				if (unsupportedRanges.length) {
-					throw new Error("CONFIG ERR: range is not a proper subset of prop.range of overwritten type (propName, unsupportedRanges, supported): " +
-						k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
-				}
-			}
-		}
-
 		_.defaults(p, propOverwrite, {
 			isMulti: false
 		});
@@ -318,6 +300,32 @@ module.exports = function(configObj) {
 	if (transientPropWithoutWriteFromDirective.length) {
 		throw new Error("defined prop with transient=true for which no writeFrom directive was set: " + JSON.stringify(transientPropWithoutCopyOfDirective));
 	}
+
+	//extra checks on properties now that ancestors tree on on types has been correctly rebuild
+	_.each(properties, function(p, k) {
+		var propOverwrite = schemaOrgDef.properties[k];
+
+		//check sub.ranges is proper subset of propOverwrite.ranges
+		//It's ok if overwritten type is a subtype of a defined type as well
+		if (!p.isCustom) {
+			if (p.ranges) {
+				var unsupportedRanges = [];
+				_.each(p.ranges, function(r) {
+
+					var type = types[r] || schemaOrgDef.datatypes[r];
+					var ancestorsOrSelf = type.ancestors.concat([r]);
+					if (!_.intersection(propOverwrite.ranges, ancestorsOrSelf).length) {
+						unsupportedRanges.push(r);
+					}
+				});
+				if (unsupportedRanges.length) {
+					throw new Error("CONFIG ERR: range is not a proper subset of prop.range of overwritten type (propName, unsupportedRanges, supported): " +
+						k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
+				}
+			}
+		}
+	});
+
 
 	return {
 		datatypes: schemaOrgDef.datatypes,
