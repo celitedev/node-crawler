@@ -21,6 +21,7 @@ module.exports = {
 		encoding: {
 
 		},
+		// recordedAt: {}, //nope: points to Event. We don't store this
 		genre: {
 
 		},

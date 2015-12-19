@@ -35,14 +35,23 @@ switch (command) {
 }
 
 function ambiguous(types) {
+
+	if (argv.hideAmbiguitySolved) {
+		console.log(("Hiding ambiguous items if ambigutiySolved").yellow);
+	} else {
+		console.log(("Showing all ambiguous even if solved. Can change with --hideAmbiguitySolved").yellow);
+	}
+
+	var removeIfSolved = argv.hideAmbiguitySolved;
 	var order = utils.getTypesInDAGOrder(types);
 	var props = [];
 	var out = {};
 	_.each(order, function(typeName) {
 		var type = types[typeName];
-		_.each(type.properties, function(prop, propName) {
+		_.each(type.properties, function(p, propName) {
+			var prop = generatedSchemas.properties[propName];
 			if (props.indexOf(propName) !== -1) return;
-			if (prop.ranges.length > 1) {
+			if (prop.isAmbiguous && (!removeIfSolved || (!prop.isAmbiguitySolved && removeIfSolved))) {
 				out[typeName + "." + propName] = prop.ranges.join(",");
 			}
 			props.push(propName);

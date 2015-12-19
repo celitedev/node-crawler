@@ -142,7 +142,9 @@ module.exports = {
 	geo: {
 		ranges: ["GeoCoordinates"]
 	},
-	logo: {},
+	logo: {
+
+	},
 	review: {
 		isMulti: true
 	},
@@ -201,7 +203,12 @@ module.exports = {
 
 	alternativeHeadline: {},
 	author: {
-		isMulti: true
+		isMulti: true,
+
+		//Person || Organization
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		}
 	},
 	character: {
 		isMulti: true
@@ -242,12 +249,19 @@ module.exports = {
 		ranges: ["URL"]
 	},
 	producer: {
+		//Person || Organization
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		},
 		isMulti: true
 	},
 	publisher: {
+		//Person || Organization
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		},
 		isMulti: true
 	},
-	recordedIn: {},
 	text: {},
 	thumbnailUrl: {},
 
@@ -298,6 +312,9 @@ module.exports = {
 		isMulti: true
 	},
 	musicBy: {
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		},
 		isMulti: true
 	},
 	productionCompany: {},
@@ -320,6 +337,9 @@ module.exports = {
 	//https://schema.org/MusicComposition //
 	////////////////////////////////////////
 	composer: {
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		},
 		isMulti: true
 	},
 	iswcCode: {},
@@ -417,6 +437,9 @@ module.exports = {
 	honorificSuffix: {},
 	jobTitle: {},
 	memberOf: {
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		},
 		ranges: ["Organization"], //Don't allow ProgramMembership for now
 		isMulti: true
 	},
@@ -473,9 +496,17 @@ module.exports = {
 	doorTime: {},
 	// offers: //offers -> NOTE: shouldn't this be 'offer' 
 	organizer: {
+		//Person || Organization
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		},
 		isMulti: true
 	},
 	performer: {
+		//Person || Organization
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		},
 		isMulti: true
 	},
 	recordedIn: {}, //creativeWork
@@ -516,10 +547,21 @@ module.exports = {
 	///////////////////////////////////
 	// http://schema.org/SportsEvent //
 	///////////////////////////////////
-	awayTeam: {}, //The away team in a sports event.
+	awayTeam: {
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		}
+	}, //The away team in a sports event.
 	competitor: { //A competitor in a sports event.
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		},
 		isMulti: true
 	},
-	homeTeam: {}, //The home team in a sports event.
+	homeTeam: {
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		}
+	}, //The home team in a sports event.
 
 };
