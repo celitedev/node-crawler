@@ -13,7 +13,9 @@ module.exports = {
 	},
 	image: {
 		"isMulti": true,
-
+		ambiguitySolvedBy: {
+			type: "urlVsSomething"
+		},
 		//TODO
 		validation: {
 			URL: { //validation per range-object
@@ -54,6 +56,7 @@ module.exports = {
 			"OrganizationAndPerson",
 			"CreativeWork"
 		],
+
 	},
 
 	//define which rootType is supplied
@@ -143,7 +146,9 @@ module.exports = {
 		ranges: ["GeoCoordinates"]
 	},
 	logo: {
-
+		ambiguitySolvedBy: {
+			type: "urlVsSomething"
+		}
 	},
 	review: {
 		isMulti: true
@@ -177,9 +182,16 @@ module.exports = {
 	acceptsReservations: {
 		//was: ["Text", "URL", Boolean]
 		//Text + Url can be supported since supertypee(url) = text
-		ranges: ["Text", "URL"]
+		ranges: ["Text", "URL"],
+		ambiguitySolvedBy: {
+			type: "urlVsSomething"
+		}
 	},
-	menu: {},
+	menu: {
+		ambiguitySolvedBy: {
+			type: "urlVsSomething"
+		}
+	},
 	servesCuisine: {
 		isMulti: true
 	},
@@ -227,6 +239,9 @@ module.exports = {
 		isMulti: true
 	},
 	genre: {
+		ambiguitySolvedBy: {
+			type: "urlVsSomething"
+		},
 		isMulti: true
 	},
 	hasPart: {
@@ -464,6 +479,9 @@ module.exports = {
 		isMulti: true
 	},
 	member: { //e.g.: org or persons
+		ambiguitySolvedBy: {
+			type: "sharedRoot"
+		},
 		isMulti: true
 	},
 	parentOrganization: {},

@@ -48,8 +48,8 @@ function ambiguous(types) {
 	var out = {};
 	_.each(order, function(typeName) {
 		var type = types[typeName];
-		_.each(type.properties, function(p, propName) {
-			var prop = generatedSchemas.properties[propName];
+		_.each(type.properties, function(prop, propName) {
+			// var prop = generatedSchemas.properties[propName];
 			if (props.indexOf(propName) !== -1) return;
 			if (prop.isAmbiguous && (!removeIfSolved || (!prop.isAmbiguitySolved && removeIfSolved))) {
 				out[typeName + "." + propName] = prop.ranges.join(",");
