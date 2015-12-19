@@ -135,7 +135,7 @@ function outbound() {
 	}
 
 	if (isTransitive) {
-		console.log(("--transitive IS specified").red);
+		console.log(("--transitive IS specified").green);
 
 		if (argv.roots) {
 			console.log(("Going with overwritten roots as defined through --roots-commandline: " + argv.roots).yellow);
@@ -175,8 +175,12 @@ function outbound() {
 					var typeChainRec = _.uniq(_.clone(typeRec.ancestors).concat(tNameRec));
 
 					//For all types (incl supertypes) not already traversed along this path > recurse
+
 					if (!_.intersection(typeChainRec, ancestors).length && (isTransitive || (!isTransitive && isDeep))) {
 
+						if (tNameRec === "Thing") { //Thing should never be expanded regardless if root
+							continue;
+						}
 						var obj = range[i] = {};
 						var subgraph = walkRec(typeRec, ancestors.concat([tNameRec]), true);
 
