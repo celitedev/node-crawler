@@ -43,7 +43,18 @@ module.exports = {
 	//////////////////////////////////////
 	//http://schema.org/AggregateRating //
 	//////////////////////////////////////
-	itemReviewed: {},
+	itemReviewed: {
+		//schema.org defines Thing. We define proper subtypes that may be reviewed. 
+		//This includes all entities except for Review and Rating (these may not be reviewed themselves)
+		//Of course, we've now created an ambiguous range so we need to specify how we're going to solve this
+		ranges: [
+			"Place",
+			"Event",
+			"PlaceWithOpeninghours",
+			"OrganizationAndPerson",
+			"CreativeWork"
+		],
+	},
 	ratingCount: {},
 	reviewCount: {}, //bit weird, but can be used to list nr or reviews. Although factually not related to ratings
 
