@@ -6,23 +6,11 @@ module.exports = {
 		// brand: {} // Org or Brand
 		department: {},
 		dissolutionDate: {},
-		email: {
-			writeFrom: "address.email"
-		},
-		employee: {
-
-		},
-		faxNumber: {
-			writeFrom: "address.faxNumber"
-		},
-		founder: {
-
-		},
+		employee: {},
+		founder: {},
 		foundingDate: {},
 		legalName: {},
-		location: {
-
-		},
+		location: {},
 		logo: {},
 		member: { //e.g.: org or persons
 
@@ -32,14 +20,19 @@ module.exports = {
 		},
 		// numberOfEmployees: {}, QuantitativeValue
 		parentOrganization: {},
-		review: {
-
+		review: {},
+		subOrganization: {},
+	},
+	//properties added on JSON-LD schema.org generation
+	out_properties: {
+		email: {
+			aliasOf: "address.email"
 		},
-		subOrganization: {
-
+		faxNumber: {
+			aliasOf: "address.faxNumber"
 		},
 		telephone: {
-			writeFrom: "address.telephone"
+			aliasOf: "address.telephone"
 		},
 	}
 };

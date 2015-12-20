@@ -46,20 +46,15 @@ module.exports = {
 	//http://schema.org/AggregateRating //
 	//////////////////////////////////////
 	itemReviewed: {
-		//schema.org defines Thing. We define proper subtypes that may be reviewed. 
-		//This includes all entities except for Review and Rating (these may not be reviewed themselves)
-		//Of course, we've now created an ambiguous range so we need to specify how we're going to solve this
+		aliasOf: "about",
+		//support same range as about is required
 		ranges: [
 			"Place",
 			"Event",
 			"PlaceWithOpeninghours",
 			"OrganizationAndPerson",
 			"CreativeWork"
-		],
-		ambiguitySolvedBy: {
-			type: "thingIndex"
-		}
-
+		]
 	},
 
 	//define which rootType is supplied
@@ -214,7 +209,18 @@ module.exports = {
 	//problematic since linking to Thing. 
 	//This would be possible with Disambugation Table (#58)
 	//For now, dont' support.
-	// about: {}, 
+	about: {
+		ranges: [
+			"Place",
+			"Event",
+			"PlaceWithOpeninghours",
+			"OrganizationAndPerson",
+			"CreativeWork"
+		],
+		ambiguitySolvedBy: {
+			type: "thingIndex"
+		}
+	},
 
 	alternativeHeadline: {},
 	author: {
@@ -310,10 +316,7 @@ module.exports = {
 	//http://schema.org/Review //
 	///////////////////////////////////
 	reviewBody: {
-		//should be accompanied with a writeFrom directive in all types carrying this property
-		//this signals that reviewBody will not be part of the domain
-		//https://github.com/Kwhen/crawltest/issues/52
-		"transient": true
+		aliasOf: "text"
 	},
 	//rating GIVEN in review. AggregateRating is rating of the review
 	reviewRating: {},
