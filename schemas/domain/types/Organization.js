@@ -20,7 +20,7 @@ module.exports = {
 		},
 		// numberOfEmployees: {}, QuantitativeValue
 		parentOrganization: {},
-		review: {},
+		// review: {}, //stored separately
 		subOrganization: {},
 	},
 	//properties added on JSON-LD schema.org generation

@@ -1,6 +1,7 @@
 module.exports = {
+	supertypes: ["RatingAbstract"],
+	isValueObject: true, //contained by some
 	properties: {
-		// itemReviewed: {}, moved up to Rating
 		ratingCount: {},
 		reviewCount: {}
 	}

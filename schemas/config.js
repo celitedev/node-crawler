@@ -13,13 +13,8 @@ module.exports = {
 			"Comment",
 			"Review",
 
-			//all ratings are stored as root. This includes AggregateRating as subtype. 
-			//This completes coverage as per https://github.com/Kwhen/crawltest/issues/76
 			"Rating"
-
-			//TODO: might bring review and rating together in same root 
-			//(by creating a new placeholder type as with PlaceWithOpeninghours)
-
+			//NOTE: aggregateRating is separated from Rating and is contained as valueObject in other entities
 		]
 	}
 };

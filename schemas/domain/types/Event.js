@@ -18,9 +18,7 @@ module.exports = {
 
 		},
 		recordedIn: {},
-		review: {
-
-		},
+		// review: {}, //reviews are kept separately
 		startDate: {},
 		subEvent: {
 

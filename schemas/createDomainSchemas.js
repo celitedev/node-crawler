@@ -423,9 +423,8 @@ module.exports = function(configObj) {
 	}());
 
 
-	(function checkSoundness() {
+	(function checkSoundnessFN() {
 		if (checkSoundness) {
-
 			//check isAbstract | isValueObject | isEntity no overlap + complete coverage
 			(function checkcoverage() {
 
