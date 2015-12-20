@@ -76,11 +76,18 @@ function inbound() {
 		alreadyCovered = [],
 		typesInDagOrder = utils.getTypesInDAGOrder(generatedSchemas.types);
 
-	_.each(typesInDagOrder, function(tName) {
+	var typeChainUpToRoot = _.clone(typeChain);
 
+	//e.g.: references to CreativeWork are not shown for Review, since Review is a different Root
+	//see: https://github.com/Kwhen/crawltest/issues/83
+	if (type.isEntity) {
+		typeChainUpToRoot = typeChainUpToRoot.slice(typeChainUpToRoot.indexOf(type.rootName));
+	}
+
+	_.each(typesInDagOrder, function(tName) {
 		var t = generatedSchemas.types[tName];
 		_.each(t.properties, function(p, propName) {
-			var interSect = _.intersection(typeChain, p.ranges);
+			var interSect = _.intersection(typeChainUpToRoot, p.ranges);
 			if (interSect.length) {
 				var key = tName + "." + propName;
 				var isAlreadyCovered = false;
