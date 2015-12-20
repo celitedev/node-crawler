@@ -41,8 +41,7 @@ module.exports = {
 	// },
 
 	itemReviewed: {
-		// aliasOf: "about", //don't alias anymore since we got rid of `about` for Rating and Review
-		// 
+		aliasOf: "about", //alias althought not really needed, but to get the alias stuff in
 		ranges: [
 			"Place",
 			"Event",
@@ -50,9 +49,9 @@ module.exports = {
 			"OrganizationAndPerson",
 			"CreativeWork"
 		],
-		ambiguitySolvedBy: {
-			type: "thingIndex"
-		}
+		// ambiguitySolvedBy: {
+		// 	type: "thingIndex"
+		// }
 	},
 
 
