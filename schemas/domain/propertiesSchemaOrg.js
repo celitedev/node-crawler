@@ -50,12 +50,11 @@ module.exports = {
 		//This includes all entities except for Review and Rating (these may not be reviewed themselves)
 		//Of course, we've now created an ambiguous range so we need to specify how we're going to solve this
 		ranges: [
-		"Thing"
-		// "Place",
-		// "Event",
-		// "PlaceWithOpeninghours",
-		// "OrganizationAndPerson",
-		// "CreativeWork"
+			"Place",
+			"Event",
+			"PlaceWithOpeninghours",
+			"OrganizationAndPerson",
+			"CreativeWork"
 		],
 		ambiguitySolvedBy: {
 			type: "thingIndex"
