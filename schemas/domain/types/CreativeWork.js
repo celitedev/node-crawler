@@ -12,9 +12,7 @@ module.exports = {
 		citation: {
 
 		},
-		comment: {
-
-		},
+		// comment: { }, //own index
 		commentCount: {},
 		contentRating: {}, //MPAA PG-13
 		copyrightYear: {},

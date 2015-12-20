@@ -7,12 +7,13 @@ module.exports = {
 			"OrganizationAndPerson", //combines "Person" and "Organization"
 			"CreativeWork",
 
-			//Below are mostly user generated
 
-			"MediaObject",
+			"VideoObject",
+			"ImageObject",
+
+			//Below are mostly user generated
 			"Comment",
 			"Review",
-
 			"Rating"
 			//NOTE: aggregateRating is separated from Rating and is contained as valueObject in other entities
 		]
