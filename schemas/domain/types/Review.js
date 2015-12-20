@@ -1,6 +1,7 @@
 module.exports = {
 	supertypes: ["Thing"],
 	properties: {
+		about: {},
 		itemReviewed: {},
 		reviewBody: {},
 		reviewRating: {},
