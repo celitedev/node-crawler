@@ -57,14 +57,7 @@ module.exports = {
 		]
 	},
 
-	//define which rootType is supplied
-	//see: ambiguitySolvedBy-issue: https://github.com/Kwhen/crawltest/issues/75
-	itemOfRootType: {
-		id: "itemOfRootType",
-		isCustom: true,
-		ranges: ["Text"], //TODO: enum that should restrict to roots
-		required: true //TODO: if part of schema it's required.
-	},
+
 	ratingCount: {},
 	reviewCount: {}, //bit weird, but can be used to list nr or reviews. Although factually not related to ratings
 
