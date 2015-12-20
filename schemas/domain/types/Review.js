@@ -1,7 +1,8 @@
 module.exports = {
 	supertypes: ["Thing"],
 	properties: {
-		about: {},
+		about: {}, //from creativeWOrk
+		author: {}, //from creativeWOrk
 		itemReviewed: {},
 		reviewBody: {},
 		reviewRating: {},
