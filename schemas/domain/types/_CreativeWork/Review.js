@@ -1,12 +1,8 @@
 module.exports = {
 	properties: {
-		itemReviewed: {
-			writeFrom: "about"
-		},
+		itemReviewed: {},
 		itemOfRootType: {},
-		reviewBody: {
-			writeFrom: "text"
-		},
-		reviewRating: {}
-	}
+		reviewBody: {},
+		reviewRating: {},
+	},
 };

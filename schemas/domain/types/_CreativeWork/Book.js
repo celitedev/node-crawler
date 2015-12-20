@@ -1,8 +1,6 @@
 module.exports = {
 	properties: {
-		illustrator: {
-
-		},
+		illustrator: {},
 		isbn: {},
 		numberOfPages: {}
 	}

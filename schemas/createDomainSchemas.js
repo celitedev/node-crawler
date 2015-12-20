@@ -130,175 +130,222 @@ module.exports = function(configObj) {
 		}, []));
 	}());
 
-
 	(function extendProperties() {
 
-		//Extend properties
-		//Requires `ancestors` set on type as done in `calcTypeHierarchy`
 
-		var noOrigProps = [],
-			customOverwritingProps = [],
-			typesNotSupported = [],
-			ambiguousStrategyUndefined = [],
-			ambiguousStrategyWrong = [];
+		_extendPropertiesNonAliased();
+		_extendPropertiesAliased();
 
-		_.each(properties, function(p, k) {
+		function _extendPropertiesNonAliased() {
+			//Extend properties
+			//Requires `ancestors` set on type as done in `calcTypeHierarchy`
 
-			//check if property found in schemaOrg. 
-			//isCustom=true properties should not exit on schema.org def
-			var propOverwrite = schemaOrgDef.properties[k];
-			if (!propOverwrite && !p.isCustom) {
-				noOrigProps.push(k);
-				return;
-			}
-			if (propOverwrite && p.isCustom) {
-				customOverwritingProps.push(k);
-				return;
-			}
+			var noOrigProps = [],
+				customOverwritingProps = [],
+				typesNotSupported = [],
+				ambiguousStrategyUndefined = [],
+				ambiguousStrategyWrong = [];
 
-			//Extend property with schemaOrg defaults
-			_.defaults(p, propOverwrite, {
-				isMulti: false
-			});
+			_.each(properties, function(p, k) {
 
-			//missing attribute checks
-			if (!p.ranges) {
-				throw new Error("ranges-attrib not supported on (probably isCustom) property: " + k);
-			}
-			if (!p.id) {
-				throw new Error("id-attrib not supported on (probably isCustom) property: " + k);
-			}
-
-			//check all types defined in `property.ranges` exist
-			//also check for isCustom=false that ranges is compatible with underlying schema.org property.
-			var unsupportedRanges = [];
-			_.each(p.ranges, function(typeName) {
-
-				var type = types[typeName] || schemaOrgDef.datatypes[typeName];
-
-				if (!type) {
-					typesNotSupported.push({
-						property: k,
-						type: typeName
-					});
+				if (p.aliasOf) { //don't process aliased properties yet
 					return;
 				}
 
-				//check compatibility with underlying schema.org property: 
-				//ranges should consist of types or subtypes as defined on schema.org property
-				if (!p.isCustom) {
-					var ancestorsOrSelf = type.ancestors.concat([typeName]);
-					if (!_.intersection(propOverwrite.ranges, ancestorsOrSelf).length) {
-						if (p.id === "itemReviewed") {
-							console.log(ancestorsOrSelf);
-						}
-						unsupportedRanges.push(typeName);
-					}
+				//check if property found in schemaOrg. 
+				//isCustom=true properties should not exit on schema.org def
+				var propOverwrite = schemaOrgDef.properties[k];
+				if (!propOverwrite && !p.isCustom) {
+					noOrigProps.push(k);
+					return;
 				}
-			});
+				if (propOverwrite && p.isCustom) {
+					customOverwritingProps.push(k);
+					return;
+				}
 
-			if (unsupportedRanges.length) {
-				throw new Error("range is not a proper subset of prop.range of overwritten type (propName, unsupportedRanges, supported): " +
-					k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
-			}
+				//Extend property with schemaOrg defaults
+				_.defaults(p, propOverwrite, {
+					isMulti: false
+				});
 
-			(function checkRangeAmbiguity() {
-				if (p.ranges.length > 1) {
-					p.isAmbiguous = true;
+				//missing attribute checks
+				if (!p.ranges) {
+					throw new Error("ranges-attrib not supported on (probably isCustom) property: " + k);
+				}
+				if (!p.id) {
+					throw new Error("id-attrib not supported on (probably isCustom) property: " + k);
+				}
 
-					if (!p.ambiguitySolvedBy) {
-						ambiguousStrategyUndefined.push(p.id);
-					} else {
-						switch (p.ambiguitySolvedBy.type) {
-							case "urlVsSomething": //if 1 item is a URL and only 2 items, we can disciminate on that
-								if (p.ranges.length === 2) {
-									var itemsAsUrl = _.filter(p.ranges, function(t) {
-										return t === "URL";
-									});
-									if (itemsAsUrl.length !== 1) { //exactly 1 item should match URL
+				//check all types defined in `property.ranges` exist
+				//also check for isCustom=false that ranges is compatible with underlying schema.org property.
+				var unsupportedRanges = [];
+				_.each(p.ranges, function(typeName) {
+
+					var type = types[typeName] || schemaOrgDef.datatypes[typeName];
+
+					if (!type) {
+						typesNotSupported.push({
+							property: k,
+							type: typeName
+						});
+						return;
+					}
+
+					//check compatibility with underlying schema.org property: 
+					//ranges should consist of types or subtypes as defined on schema.org property
+					if (!p.isCustom) {
+						var ancestorsOrSelf = type.ancestors.concat([typeName]);
+						if (!_.intersection(propOverwrite.ranges, ancestorsOrSelf).length) {
+							unsupportedRanges.push(typeName);
+						}
+					}
+				});
+
+				if (unsupportedRanges.length) {
+					throw new Error("range is not a proper subset of prop.range of overwritten type (propName, unsupportedRanges, supported): " +
+						k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
+				}
+
+				(function checkRangeAmbiguity() {
+					if (p.ranges.length > 1) {
+						p.isAmbiguous = true;
+
+						if (!p.ambiguitySolvedBy) {
+							ambiguousStrategyUndefined.push(p.id);
+						} else {
+							switch (p.ambiguitySolvedBy.type) {
+								case "urlVsSomething": //if 1 item is a URL and only 2 items, we can disciminate on that
+									if (p.ranges.length === 2) {
+										var itemsAsUrl = _.filter(p.ranges, function(t) {
+											return t === "URL";
+										});
+										if (itemsAsUrl.length !== 1) { //exactly 1 item should match URL
+											ambiguousStrategyWrong.push(p.id);
+										} else {
+											p.isAmbiguitySolved = true;
+										}
+									} else {
+										//length !=2 not supported
+										ambiguousStrategyWrong.push(p.id);
+									}
+									break;
+								case "sharedRoot": //all mentioned types in range should have same root
+
+									var nonEntityFound = false,
+										nonRootCoveredEntityFound = false;
+
+									var roots = _.uniq(_.reduce(p.ranges, function(arr, typeName) {
+										var t = types[typeName];
+										if (!t) {
+											nonEntityFound = true;
+											return arr;
+										}
+										if (!t.rootName) {
+											nonRootCoveredEntityFound = true;
+											return arr;
+										}
+										arr.push(t.rootName);
+										return arr;
+									}, []));
+
+									//not all root covered entities || not all share the same root entity -> wrong
+									if (nonEntityFound || nonRootCoveredEntityFound || roots.length > 1) {
 										ambiguousStrategyWrong.push(p.id);
 									} else {
 										p.isAmbiguitySolved = true;
 									}
-								} else {
-									//length !=2 not supported
-									ambiguousStrategyWrong.push(p.id);
-								}
-								break;
-							case "sharedRoot": //all mentioned types in range should have same root
 
-								var nonEntityFound = false,
-									nonRootCoveredEntityFound = false;
-
-								var roots = _.uniq(_.reduce(p.ranges, function(arr, typeName) {
-									var t = types[typeName];
-									if (!t) {
-										nonEntityFound = true;
-										return arr;
+									break;
+								case "thingIndex":
+									var datatypeFound = false;
+									nonEntityFound = false;
+									_.each(p.ranges, function(typeName) {
+										var type = types[typeName];
+										if (!type) {
+											datatypeFound = true;
+											return;
+										}
+										if (!type.isEntity) {
+											nonEntityFound = true;
+										}
+									});
+									if (datatypeFound || nonEntityFound) {
+										ambiguousStrategyWrong.push(p.id);
+									} else {
+										//all our entities. These are all guarenteed to be covered by ThingIndex. 
+										p.isAmbiguitySolved = true;
 									}
-									if (!t.rootName) {
-										nonRootCoveredEntityFound = true;
-										return arr;
-									}
-									arr.push(t.rootName);
-									return arr;
-								}, []));
-
-								//not all root covered entities || not all share the same root entity -> wrong
-								if (nonEntityFound || nonRootCoveredEntityFound || roots.length > 1) {
-									ambiguousStrategyWrong.push(p.id);
-								} else {
-									p.isAmbiguitySolved = true;
-								}
-
-								break;
-							case "thingIndex":
-								var datatypeFound = false;
-								nonEntityFound = false;
-								_.each(p.ranges, function(typeName) {
-									var type = types[typeName];
-									if (!type) {
-										datatypeFound = true;
-										return;
-									}
-									if (!type.isEntity) {
-										nonEntityFound = true;
-									}
-								});
-								if (datatypeFound || nonEntityFound) {
-									ambiguousStrategyWrong.push(p.id);
-								} else {
-									//all our entities. These are all guarenteed to be covered by ThingIndex. 
-									p.isAmbiguitySolved = true;
-								}
-								break;
-							default:
-								throw new Error("ambiguitySolvedBy.type not supported. (propertyname, type) " + p.id + "," + p.ambiguitySolvedBy.type);
+									break;
+								default:
+									throw new Error("ambiguitySolvedBy.type not supported. (propertyname, type) " + p.id + "," + p.ambiguitySolvedBy.type);
+							}
 						}
 					}
+				}());
+
+			});
+			if (noOrigProps.length) {
+				throw new Error("Following properties defined in our own definition, weren't defined in schema.org definition: " + noOrigProps.join(","));
+			}
+			if (customOverwritingProps.length) {
+				throw new Error("Following properties defined as isCustom but yet schema.org definition found. This is not allowed: " + customOverwritingProps.join(","));
+			}
+			if (_.size(typesNotSupported)) {
+				throw new Error("Following types are not defined, although properties referencing to them are: " + JSON.stringify(typesNotSupported, null, 2));
+			}
+
+			if (checkSoundness) {
+				if (ambiguousStrategyWrong.length) {
+					console.log((JSON.stringify(ambiguousStrategyWrong, null, 2).red));
+					throw new Error("Above property define ambiguous ranges for which wrong `ambiguitySolvedBy`-strategy defined. This should be solved");
 				}
-			}());
-
-		});
-		if (noOrigProps.length) {
-			throw new Error("Following properties defined in our own definition, weren't defined in schema.org definition: " + noOrigProps.join(","));
-		}
-		if (customOverwritingProps.length) {
-			throw new Error("Following properties defined as isCustom but yet schema.org definition found. This is not allowed: " + customOverwritingProps.join(","));
-		}
-		if (_.size(typesNotSupported)) {
-			throw new Error("Following types are not defined, although properties referencing to them are: " + JSON.stringify(typesNotSupported, null, 2));
+				if (ambiguousStrategyUndefined.length) {
+					console.log((JSON.stringify(ambiguousStrategyUndefined, null, 2).red));
+					throw new Error("Above property define ambiguous ranges for which no `ambiguitySolvedBy` is defined. This should be solved");
+				}
+			}
 		}
 
-		if (checkSoundness) {
-			if (ambiguousStrategyWrong.length) {
-				console.log((JSON.stringify(ambiguousStrategyWrong, null, 2).red));
-				throw new Error("Above property define ambiguous ranges for which wrong `ambiguitySolvedBy`-strategy defined. This should be solved");
-			}
-			if (ambiguousStrategyUndefined.length) {
-				console.log((JSON.stringify(ambiguousStrategyUndefined, null, 2).red));
-				throw new Error("Above property define ambiguous ranges for which no `ambiguitySolvedBy` is defined. This should be solved");
-			}
+		function _extendPropertiesAliased() {
+			//process aliased properties
+			_.each(properties, function(p, k) {
+				if (!p.aliasOf) { //properties without aliasOf have already been processed
+					return;
+				}
+
+				var alias = properties[p.aliasOf];
+
+				if (!alias) {
+					throw new Error("property defines alias which doesn't exist: " + k);
+				}
+
+				//check no attributes defined on prop-definition (except isCustom)
+				if (_.size(_.omit(p, ["aliasOf", "isCustom", "ranges"]))) {
+					throw new Error("property containing `aliasOf` may only contain prop (aliasOf, isCustom, ranges): " + k);
+				}
+
+				//if !isCustom - > check ranges the same.
+				if (!p.isCustom) {
+					var propOverwrite = schemaOrgDef.properties[k];
+					if (!propOverwrite) {
+						throw new Error("Following aliasOf-property defined in our own definition, wasn't defined in schema.org definition: " + k);
+					}
+					_.defaults(p, _.pick(propOverwrite, ["id", "comment", "comment_plain", "label", "url"]));
+					if (_.difference(p.ranges, alias.ranges).length) {
+						throw new Error("aliasOf-property doesn't have exact same range as aliased property: " + k);
+					}
+				}
+
+				//fill in needed blanks for isCustom-property
+				_.defaults(p, {
+					id: k,
+					label: k
+				});
+
+				//inherit remainder from aliased property, e.g.: ambiguitySolvedBy
+				_.defaults(p, _.omit(alias, ["comment", "comment_plain", "url"]));
+			});
 		}
 	}());
 
@@ -330,6 +377,29 @@ module.exports = function(configObj) {
 	}());
 
 
+	(function recalcDomainsAttributeOnProperties() {
+
+		//Recalc `domains` attrib on property
+		//This is useful for later lookups
+		var order = utils.getTypesInDAGOrder(types);
+
+		//reset `domains`-attrib
+		_.each(properties, function(p) {
+			p.domains = [];
+		});
+
+		_.each(order, function(tName) {
+			var t = types[tName];
+			_.each(properties, function(p, pName) {
+				if (!t.properties[pName]) return;
+				if (!_.intersection(p.domains, t.ancestors).length) { //type not covered yet by ancestor
+					p.domains.push(tName);
+				}
+			});
+		});
+	}());
+
+
 	(function extendTypesByInheriting() {
 
 		//Traverseing hierary tree to set inherited properties, etc. 
@@ -351,6 +421,7 @@ module.exports = function(configObj) {
 			t.properties = _.omit(t.properties, t.removeProperties);
 		});
 	}());
+
 
 	(function checkSoundness() {
 		if (checkSoundness) {
@@ -398,6 +469,28 @@ module.exports = function(configObj) {
 					console.log((JSON.stringify(abstractRefs, null, 2)).red);
 					throw new Error("above properties reference abstract types. This should be solved");
 				}
+			}());
+
+			(function checkAliasedPropertiesCovered() {
+				//given `A.aliasOf = B` check that all types that define A also define B.
+				//https://github.com/Kwhen/crawltest/issues/82
+				_.each(properties, function(p) {
+					if (p.aliasOf) {
+
+						var uncoveredDomains = [];
+						_.each(p.domains, function(tName) {
+							var t = types[tName];
+							if (!t.properties[p.aliasOf]) {
+								uncoveredDomains.push(tName);
+							}
+						});
+
+						if (uncoveredDomains.length) {
+							throw new Error("the following types don't contain the required prop: '" + p.aliasOf +
+								"' which '" + p.id + "' aliases to: " + uncoveredDomains.join(","));
+						}
+					}
+				});
 			}());
 		}
 	}());

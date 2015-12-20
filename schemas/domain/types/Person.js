@@ -5,13 +5,7 @@ module.exports = {
 		address: {},
 		birthDate: {},
 		deathDate: {},
-		email: {
-			writeFrom: "address.email"
-		},
 		familyName: {},
-		faxNumber: {
-			writeFrom: "address.faxNumber"
-		},
 		gender: {},
 		givenName: {}, //use along side familyName. More specific than 'name'
 		honorificPrefix: {},
@@ -21,8 +15,17 @@ module.exports = {
 
 		},
 		nationality: {},
+	},
+	//properties added on JSON-LD schema.org generation
+	out_properties: {
+		email: {
+			aliasOf: "address.email"
+		},
+		faxNumber: {
+			aliasOf: "address.faxNumber"
+		},
 		telephone: {
-			writeFrom: "address.telephone"
+			aliasOf: "address.telephone"
 		},
 	}
 };
