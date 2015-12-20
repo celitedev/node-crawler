@@ -3,7 +3,6 @@ module.exports = {
 	isCustom: true,
 	supertypes: ["Intangible"],
 	properties: {
-		about: {}, //added bc 'itemReviewed'  aliases to this. 
 		itemReviewed: {},
 		// bestRating: {}, //curious: this seems type-level attribute?
 		ratingValue: {},

@@ -4,6 +4,6 @@ module.exports = {
 	properties: {
 		ratingTotal: {}, //custom: keep a tally 
 		ratingCount: {},
-		// reviewCount: {} // believe this is totally out of context here
+		// reviewCount: {} // seems totally out of context here
 	}
 };

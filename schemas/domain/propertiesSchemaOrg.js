@@ -32,30 +32,33 @@ module.exports = {
 	/////////////////////////////
 	//http://schema.org/Rating //
 	/////////////////////////////
-	bestRating: { //The highest value allowed in this rating system. If bestRating is omitted, 5 is assumed.
-		ranges: ["Number"]
-	},
-	ratingValue: {
+	// bestRating: { //The highest value allowed in this rating system. If bestRating is omitted, 5 is assumed.
+	// 	ranges: ["Number"]
+	// },
+	ratingValue: {},
+	// worstRating: {
+	// 	ranges: ["Number"]
+	// },
 
-	},
-	worstRating: {
-		ranges: ["Number"]
-	},
-
-	//////////////////////////////////////
-	//http://schema.org/AggregateRating //
-	//////////////////////////////////////
 	itemReviewed: {
-		aliasOf: "about",
-		//support same range as about is required
+		// aliasOf: "about", //don't alias anymore since we got rid of `about` for Rating and Review
+		// 
 		ranges: [
 			"Place",
 			"Event",
 			"PlaceWithOpeninghours",
 			"OrganizationAndPerson",
 			"CreativeWork"
-		]
+		],
+		ambiguitySolvedBy: {
+			type: "thingIndex"
+		}
 	},
+
+
+	//////////////////////////////////////
+	//http://schema.org/AggregateRating //
+	//////////////////////////////////////
 
 	ratingTotal: { //keep tally of total. Allows for calculating ratingValue
 		id: "ratingTotal",
@@ -308,7 +311,7 @@ module.exports = {
 	//http://schema.org/Review //
 	///////////////////////////////////
 	reviewBody: {
-		aliasOf: "text"
+		// aliasOf: "text"
 	},
 	//rating GIVEN in review. AggregateRating is rating of the review
 	reviewRating: {},
