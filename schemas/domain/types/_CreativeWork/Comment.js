@@ -1,10 +1,12 @@
 module.exports = {
+	supertypes: ["Thing"], //not CreativeWork
 	properties: {
-		//text -> text of comment (from CreativeWork)
-		//about -> Thing being commented about
-
+		about: {},
+		author: {},
+		text: {}
 		//NOT NOW
 		//upvoteCount
 		//downvoteCount
-	}
+	},
+	removeProperties: ["sameAs", "alternateName", "description"]
 };

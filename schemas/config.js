@@ -7,9 +7,7 @@ module.exports = {
 			"OrganizationAndPerson", //combines "Person" and "Organization"
 			"CreativeWork",
 
-
-			"VideoObject",
-			"ImageObject",
+			"MediaObject", //VideoObject and ImageObject together for now in index
 
 			//Below are mostly user generated
 			"Comment",
