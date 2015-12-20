@@ -133,6 +133,9 @@ module.exports = function(configObj) {
 
 	(function extendProperties() {
 
+		//Extend properties
+		//Requires `ancestors` set on type as done in `calcTypeHierarchy`
+
 		var noOrigProps = [],
 			customOverwritingProps = [],
 			typesNotSupported = [],
@@ -199,81 +202,82 @@ module.exports = function(configObj) {
 					k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
 			}
 
-			//check range ambiguity
-			if (p.ranges.length > 1) {
-				p.isAmbiguous = true;
+			(function checkRangeAmbiguity() {
+				if (p.ranges.length > 1) {
+					p.isAmbiguous = true;
 
-				if (!p.ambiguitySolvedBy) {
-					ambiguousStrategyUndefined.push(p.id);
-				} else {
-					switch (p.ambiguitySolvedBy.type) {
-						case "urlVsSomething": //if 1 item is a URL and only 2 items, we can disciminate on that
-							if (p.ranges.length === 2) {
-								var itemsAsUrl = _.filter(p.ranges, function(t) {
-									return t === "URL";
-								});
-								if (itemsAsUrl.length !== 1) { //exactly 1 item should match URL
+					if (!p.ambiguitySolvedBy) {
+						ambiguousStrategyUndefined.push(p.id);
+					} else {
+						switch (p.ambiguitySolvedBy.type) {
+							case "urlVsSomething": //if 1 item is a URL and only 2 items, we can disciminate on that
+								if (p.ranges.length === 2) {
+									var itemsAsUrl = _.filter(p.ranges, function(t) {
+										return t === "URL";
+									});
+									if (itemsAsUrl.length !== 1) { //exactly 1 item should match URL
+										ambiguousStrategyWrong.push(p.id);
+									} else {
+										p.isAmbiguitySolved = true;
+									}
+								} else {
+									//length !=2 not supported
+									ambiguousStrategyWrong.push(p.id);
+								}
+								break;
+							case "sharedRoot": //all mentioned types in range should have same root
+
+								var nonEntityFound = false,
+									nonRootCoveredEntityFound = false;
+
+								var roots = _.uniq(_.reduce(p.ranges, function(arr, typeName) {
+									var t = types[typeName];
+									if (!t) {
+										nonEntityFound = true;
+										return arr;
+									}
+									if (!t.rootName) {
+										nonRootCoveredEntityFound = true;
+										return arr;
+									}
+									arr.push(t.rootName);
+									return arr;
+								}, []));
+
+								//not all root covered entities || not all share the same root entity -> wrong
+								if (nonEntityFound || nonRootCoveredEntityFound || roots.length > 1) {
 									ambiguousStrategyWrong.push(p.id);
 								} else {
 									p.isAmbiguitySolved = true;
 								}
-							} else {
-								//length !=2 not supported
-								ambiguousStrategyWrong.push(p.id);
-							}
-							break;
-						case "sharedRoot": //all mentioned types in range should have same root
 
-							var nonEntityFound = false,
-								nonRootCoveredEntityFound = false;
-
-							var roots = _.uniq(_.reduce(p.ranges, function(arr, typeName) {
-								var t = types[typeName];
-								if (!t) {
-									nonEntityFound = true;
-									return arr;
+								break;
+							case "thingIndex":
+								var datatypeFound = false;
+								nonEntityFound = false;
+								_.each(p.ranges, function(typeName) {
+									var type = types[typeName];
+									if (!type) {
+										datatypeFound = true;
+										return;
+									}
+									if (!type.isEntity) {
+										nonEntityFound = true;
+									}
+								});
+								if (datatypeFound || nonEntityFound) {
+									ambiguousStrategyWrong.push(p.id);
+								} else {
+									//all our entities. These are all guarenteed to be covered by ThingIndex. 
+									p.isAmbiguitySolved = true;
 								}
-								if (!t.rootName) {
-									nonRootCoveredEntityFound = true;
-									return arr;
-								}
-								arr.push(t.rootName);
-								return arr;
-							}, []));
-
-							//not all root covered entities || not all share the same root entity -> wrong
-							if (nonEntityFound || nonRootCoveredEntityFound || roots.length > 1) {
-								ambiguousStrategyWrong.push(p.id);
-							} else {
-								p.isAmbiguitySolved = true;
-							}
-
-							break;
-						case "indicateRoot":
-							var datatypeFound = false;
-							nonEntityFound = false;
-							_.each(p.ranges, function(typeName) {
-								var type = types[typeName];
-								if (!type) {
-									datatypeFound = true;
-									return;
-								}
-								if (!type.isEntity) {
-									nonEntityFound = true;
-								}
-							});
-							if (datatypeFound || nonEntityFound) {
-								ambiguousStrategyWrong.push(p.id);
-							} else {
-								//TODO: check all types that reference this property have an extra property 
-								//`itemOfRootType` defined
-							}
-							break;
-						default:
-							throw new Error("ambiguitySolvedBy.type not supported. (propertyname, type) " + p.id + "," + p.ambiguitySolvedBy.type);
+								break;
+							default:
+								throw new Error("ambiguitySolvedBy.type not supported. (propertyname, type) " + p.id + "," + p.ambiguitySolvedBy.type);
+						}
 					}
 				}
-			} //DONE: //check range ambiguity
+			}());
 
 		});
 		if (noOrigProps.length) {

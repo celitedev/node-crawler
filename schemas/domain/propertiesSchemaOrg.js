@@ -57,8 +57,7 @@ module.exports = {
 			"CreativeWork"
 		],
 		ambiguitySolvedBy: {
-			//indiates that a separate field `itemOfRootType` indicates type of root
-			type: "indicateRoot"
+			type: "thingIndex"
 		}
 
 	},
