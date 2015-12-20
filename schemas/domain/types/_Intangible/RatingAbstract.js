@@ -5,8 +5,9 @@ module.exports = {
 	properties: {
 		about: {}, //added bc 'itemReviewed'  aliases to this. 
 		itemReviewed: {},
-		bestRating: {},
+		// bestRating: {}, //curious: this seems type-level attribute?
 		ratingValue: {},
-		worstRating: {}
-	}
+		// worstRating: {} //curious: this seems type-level attribute?
+	},
+	removeProperties: ["sameAs", "alternateName", "url", "description", "name"]
 };
