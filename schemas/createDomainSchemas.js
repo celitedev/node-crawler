@@ -79,6 +79,7 @@ module.exports = function(configObj) {
 				properties: {},
 				supertypes: _.clone(overwrites.supertypes),
 				removeProperties: [],
+				required: []
 			});
 
 			if (!t.supertypes) {
@@ -417,6 +418,7 @@ module.exports = function(configObj) {
 				_.defaults(t, _.pick(supertype, typeDirectivesToInherit));
 				_.defaults(t.properties, supertype.specific_properties);
 				t.removeProperties = t.removeProperties.concat(supertype.removeProperties);
+				t.required = t.required.concat(supertype.required);
 			});
 			t.properties = _.omit(t.properties, t.removeProperties);
 		});

@@ -7,13 +7,13 @@ module.exports = {
 			// TBD: not sure want entire hierarchy displayed?
 		},
 		containsPlace: {},
-		//event: we'll have events be looked up in separate index
 		geo: {},
 		logo: {},
 		// openingHoursSpecification: {}; //TODO
 		//photo: //TODO ? There's already an image
 		// review: {}, //stored separately
 	},
+	required: ["address"],
 	//properties added on JSON-LD schema.org generation
 	out_properties: {
 		faxNumber: {

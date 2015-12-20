@@ -5,5 +5,6 @@ module.exports = {
 		reviewBody: {},
 		reviewRating: {},
 	},
+	required: ["itemReviewed", "reviewBody"],
 	removeProperties: ["sameAs", "image", "alternateName", "description"]
 };
