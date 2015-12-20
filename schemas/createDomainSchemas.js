@@ -389,6 +389,7 @@ module.exports = function(configObj) {
 							var type = types[typeName];
 							if (!type) {
 								datatypeFound = true;
+								return;
 							}
 							if (!type.isEntity) {
 								nonEntityFound = true;
@@ -397,7 +398,8 @@ module.exports = function(configObj) {
 						if (datatypeFound || nonEntityFound) {
 							ambiguousStrategyWrong.push(p.id);
 						} else {
-
+							//TODO: check all types that reference this property have an extra property 
+							//`itemOfRootType` defined
 						}
 						break;
 					default:
