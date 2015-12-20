@@ -32,9 +32,9 @@ module.exports = {
 	/////////////////////////////
 	//http://schema.org/Rating //
 	/////////////////////////////
-	bestRating: {
+	bestRating: { //The highest value allowed in this rating system. If bestRating is omitted, 5 is assumed.
 		ranges: ["Number"]
-	}, //The highest value allowed in this rating system. If bestRating is omitted, 5 is assumed.
+	},
 	ratingValue: {
 
 	},
@@ -57,10 +57,12 @@ module.exports = {
 		]
 	},
 
-
+	ratingTotal: { //keep tally of total. Allows for calculating ratingValue
+		id: "ratingTotal",
+		isCustom: true,
+		ranges: ["Number"]
+	},
 	ratingCount: {},
-	reviewCount: {}, //bit weird, but can be used to list nr or reviews. Although factually not related to ratings
-
 
 	///////////////////////////////////
 	//http://schema.org/ContactPoint //
