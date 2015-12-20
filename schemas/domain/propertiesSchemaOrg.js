@@ -11,18 +11,18 @@ module.exports = {
 	alternateName: {
 		"isMulti": true
 	},
-	image: {
-		"isMulti": true,
-		ambiguitySolvedBy: {
-			type: "urlVsSomething"
-		},
-		//TODO
-		validation: {
-			URL: { //validation per range-object
+	// image: { //stored in separate index ImageObject
+	// 	"isMulti": true,
+	// 	ambiguitySolvedBy: {
+	// 		type: "urlVsSomething"
+	// 	},
+	// 	//TODO
+	// 	validation: {
+	// 		URL: { //validation per range-object
 
-			}
-		}
-	},
+	// 		}
+	// 	}
+	// },
 	sameAs: {
 		"isMulti": true
 	},
@@ -230,9 +230,6 @@ module.exports = {
 	},
 	citation: {
 		ranges: ["Text"],
-		isMulti: true
-	},
-	comment: {
 		isMulti: true
 	},
 	commentCount: {},
