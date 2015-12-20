@@ -12,7 +12,7 @@ module.exports = {
 		logo: {},
 		// openingHoursSpecification: {}; //TODO
 		//photo: //TODO ? There's already an image
-		review: {},
+		// review: {}, //stored separately
 	},
 	//properties added on JSON-LD schema.org generation
 	out_properties: {

@@ -141,9 +141,6 @@ module.exports = {
 			type: "urlVsSomething"
 		}
 	},
-	review: {
-		isMulti: true
-	},
 
 
 	//////////////////////////////////////
