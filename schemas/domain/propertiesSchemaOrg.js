@@ -106,6 +106,23 @@ module.exports = {
 	postalCode: {},
 	streetAddress: {},
 
+	//////////////////////////////////
+	//http://schema.org/Enumeration //
+	//////////////////////////////////
+	supersededBy: {
+		//TODO: what does supersededBy mean? 
+		ranges: ["Enumeration"]
+	},
+
+
+	////////////////////////////////////////////////
+	//http://schema.org/OpeningHoursSpecification //
+	////////////////////////////////////////////////
+	closes: {},
+	dayOfWeek: {},
+	opens: {},
+	validFrom: {},
+	validThrough: {},
 
 	//////////////////////////////////////
 	//https://schema.org/GeoCoordinates //
@@ -146,7 +163,6 @@ module.exports = {
 		}
 	},
 
-
 	//////////////////////////////////////
 	// https://schema.org/LocalBusiness //
 	//////////////////////////////////////
@@ -157,6 +173,9 @@ module.exports = {
 	// - Times are specified using 24:00 time. For example, 3pm is specified as 15:00. 
 	// - Here is an example: <time itemprop="openingHours" datetime="Tu,Th 16:00-20:00">Tuesdays and Thursdays 4-8pm</time>. 
 	// - If a business is open 7 days a week, then it can be specified as <time itemprop="openingHours" datetime="Mo-Su">Monday through Sunday, all day</time>.
+	openingHoursSpecification: {
+		isMulti: true
+	},
 	openingHours: {},
 	paymentAccepted: {},
 	priceRange: {},
