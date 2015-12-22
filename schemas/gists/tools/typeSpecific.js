@@ -1,15 +1,15 @@
 var argv = require('yargs').argv;
 var _ = require("lodash");
 var colors = require("colors");
-var config = require("../config");
+var config = require("../../config");
 
 if (!argv.type) {
 	throw new Error("commandline --type required");
 }
 
-var utils = require("../utils");
+var utils = require("../../utils");
 
-var generatedSchemas = require("../createDomainSchemas.js")({
+var generatedSchemas = require("../../createDomainSchemas.js")({
 	checkSoundness: argv.soundness
 });
 

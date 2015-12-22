@@ -5,7 +5,7 @@ module.exports = {
 	////////////////////////////
 
 	name: {
-		// jemeoder: "sadasd",
+		required: true
 	},
 	description: {},
 	alternateName: {
@@ -24,7 +24,8 @@ module.exports = {
 	// 	}
 	// },
 	sameAs: {
-		"isMulti": true
+		"isMulti": true,
+
 	},
 	url: {},
 
@@ -128,13 +129,13 @@ module.exports = {
 	//https://schema.org/GeoCoordinates //
 	//////////////////////////////////////
 	elevation: {
-		ranges: ["Number"]
+		ranges: ["Number"] //From Number
 	},
 	latitude: {
-		ranges: ["Number"]
+		ranges: ["Number"] //From Number
 	},
 	longitude: {
-		ranges: ["Number"]
+		ranges: ["Number"] //From Number
 	},
 
 
