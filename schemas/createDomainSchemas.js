@@ -14,18 +14,18 @@
 //- to extend a schema with certain attributes after having verified that on attributes possibly cover the meaning as intended. 
 //  - these attributes will be clearly marked as such using a namespace `kwhen`
 //
-//Validation (json-schema) will be specified over the crated entitytypes. 
-//Again, this validation should NEVER conflict with a, imaginable json-schema defined for schema.org entities. IOW: 
+//validate (json-schema) will be specified over the crated entitytypes. 
+//Again, this validate should NEVER conflict with a, imaginable json-schema defined for schema.org entities. IOW: 
 //our json-schema will be a superset of rules: it only tightens restrictions, instead of losening or changing them. 
 //
-//Validation also specifies cardinality for all attributes. 
+//validate also specifies cardinality for all attributes. 
 //
 //End goal of this is: 
 //
 //INPUT: 
 //1. generated JSON schema.org definition
 //2. added properties not supported by schema.org but supported by subtypes.
-//3. manually written json-schema validation on all individual *properties* as defined in 1 ans 2. 
+//3. manually written json-schema validate on all individual *properties* as defined in 1 ans 2. 
 //   NOTE: this may *limit* the `ranges` of a particular property defined in 2. 
 //3. manually written concice subtypes of schema.org types (from 1), which may include added properties from 2.
 //4. json-schema over types defined in 3. Covering: 
@@ -33,7 +33,7 @@
 //  - required properties
 //
 //OUTPUT:
-//1. datamodel including schema and attribute level validation. Later on this will enable us to generate mappings for ES, etc. 
+//1. datamodel including schema and attribute level validate. Later on this will enable us to generate mappings for ES, etc. 
 //2. generate JSON-ld (or other formats) to output for all data, with link to schema.org type. 
 //Unsupported attibs on schema.org are defined by additional Kwhen vocab.  
 //3. other *Views* such as crawled input from, say, eventful can be presented (and validated) as part of this as well.
@@ -165,9 +165,21 @@ module.exports = function(configObj) {
 					return;
 				}
 
+				//set validate and transform to arrays
+				if (p.validate) {
+					p.validate = _.isArray(p.validate) ? p.validate : [p.validate];
+				}
+
+				if (p.transform) {
+					p.transform = _.isArray(p.transform) ? p.transform : [p.transform];
+				}
+
 				//Extend property with schemaOrg defaults
 				_.defaults(p, propOverwrite, {
-					isMulti: false
+					isMulti: false,
+					required: false,
+					validate: [],
+					transform: []
 				});
 
 				//missing attribute checks
@@ -355,7 +367,18 @@ module.exports = function(configObj) {
 
 		//Array defining attributes that type-property is extended with from property. 
 		//This directly makes sure that these attributes are not overwritten be set on type-property.
-		var propertyDirectivesToInherit = ["id", "ranges", "supertypes", "ancestors", "ambiguitySolvedBy", "isAmbiguous", "isAmbiguitySolved", "isMulti"];
+		var propertyDirectivesToInherit = [
+			"id",
+			"ranges",
+			"supertypes",
+			"ancestors",
+			"ambiguitySolvedBy",
+			"isAmbiguous",
+			"isAmbiguitySolved",
+			"isMulti",
+			"validate",
+			"transform"
+		];
 
 		_.each(types, function(t, k) {
 
@@ -365,7 +388,16 @@ module.exports = function(configObj) {
 					undefinedPropsOwn.push(propK);
 					return;
 				}
-				_.extend(propObj, _.pick(properties[propK], propertyDirectivesToInherit));
+				var propGlobal = properties[propK];
+				_.extend(propObj, _.pick(propGlobal, propertyDirectivesToInherit)); //extend some
+
+				// required is OR'ed 
+				propObj.required = !!(propGlobal.required || propObj.required || ~t.required.indexOf(propK));
+
+				// DO NOT ALLOW CONCAT. THIS COMPLCIATES DATAMODEL FOR NOW GAIN. //validate is concatted
+				// propObj.validate = (propObj.validate || []);
+				// propObj.validate = propGlobal.validate.concat(_.isArray(propObj.validate) ? propObj.validate : [propObj.validate]);
+
 			});
 			if (undefinedPropsOwn.length) {
 				throw new Error("some properties not defined on our own properties definition (type, undefinedProps): " + k +
