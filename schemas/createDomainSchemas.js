@@ -305,15 +305,10 @@ module.exports = function(configObj) {
 							//if same root, everything can be stored in same index and queried there
 							//This requires for all types to be Type (instead of DataType) and of the same root
 
-							var nonRootCoveredEntityFound = false;
 							var roots = _.uniq(_.reduce(p.ranges, function(arr, typeName) {
 								var t = types[typeName];
 								if (!t || !t.isEntity) {
 									nonEntityFound = true;
-									return arr;
-								}
-								if (!t.rootName) {
-									nonRootCoveredEntityFound = true;
 									return arr;
 								}
 								arr.push(t.rootName);
@@ -321,7 +316,7 @@ module.exports = function(configObj) {
 							}, []));
 
 							//not all root covered entities || not all share the same root entity -> wrong
-							if (nonEntityFound || nonRootCoveredEntityFound || roots.length > 1) {
+							if (nonEntityFound || roots.length > 1) {
 								ambiguousStrategyWrong.push(p.id);
 							} else {
 								p.isAmbiguitySolved = true;
