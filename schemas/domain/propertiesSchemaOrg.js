@@ -126,16 +126,16 @@ module.exports = {
 	//https://schema.org/GeoCoordinates //
 	//////////////////////////////////////
 	elevation: {
-		ranges: ["Number"] //From Number
+		ranges: ["Number"]
 	},
 	latitude: {
-		ranges: ["Number"] //From Number
+		required: true,
+		ranges: ["Number"]
 	},
 	longitude: {
+		required: true,
 		ranges: ["Number"] //From Number
 	},
-
-
 
 	////////////////////////////
 	//http://schema.org/Place //
@@ -153,6 +153,7 @@ module.exports = {
 		"isMulti": true
 	},
 	geo: {
+		// required: true,
 		ranges: ["GeoCoordinates"]
 	},
 	logo: {
