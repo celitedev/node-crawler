@@ -220,82 +220,131 @@ module.exports = function(configObj) {
 						k + ", (" + unsupportedRanges.join(",") + ")" + ", (" + propOverwrite.ranges.join(",") + ")");
 				}
 
-				(function checkRangeAmbiguity() {
+				checkAmbiguousRangeType();
+
+				function checkAmbiguousRangeType() {
 					if (p.ranges.length > 1) {
 						p.isAmbiguous = true;
 
 						if (!p.ambiguitySolvedBy) {
 							ambiguousStrategyUndefined.push(p.id);
 						} else {
+							//how to solve ambiguity on data presented to validation layer?
 							switch (p.ambiguitySolvedBy.type) {
-								case "urlVsSomething": //if 1 item is a URL and only 2 items, we can disciminate on that
+								case "explicitType":
+									//simplest strategy which requires that _type be defined
+									checkAmbiguousRangeStorageStrategy();
+									break;
+								case "urlVsSomething":
+									//if 1 item is a URL and only 2 items, we can disciminate on that
 									if (p.ranges.length === 2) {
 										var itemsAsUrl = _.filter(p.ranges, function(t) {
 											return t === "URL";
 										});
 										if (itemsAsUrl.length !== 1) { //exactly 1 item should match URL
-											ambiguousStrategyWrong.push(p.id);
-										} else {
-											p.isAmbiguitySolved = true;
+											return ambiguousStrategyWrong.push(p.id);
 										}
+										p.ambiguitySolvedBy.storage = "sharedField"; //default
+										checkAmbiguousRangeStorageStrategy();
 									} else {
 										//length !=2 not supported
 										ambiguousStrategyWrong.push(p.id);
 									}
 									break;
-								case "sharedRoot": //all mentioned types in range should have same root
 
-									var nonEntityFound = false,
-										nonRootCoveredEntityFound = false;
-
-									var roots = _.uniq(_.reduce(p.ranges, function(arr, typeName) {
-										var t = types[typeName];
-										if (!t) {
-											nonEntityFound = true;
-											return arr;
-										}
-										if (!t.rootName) {
-											nonRootCoveredEntityFound = true;
-											return arr;
-										}
-										arr.push(t.rootName);
-										return arr;
-									}, []));
-
-									//not all root covered entities || not all share the same root entity -> wrong
-									if (nonEntityFound || nonRootCoveredEntityFound || roots.length > 1) {
-										ambiguousStrategyWrong.push(p.id);
-									} else {
-										p.isAmbiguitySolved = true;
-									}
-
-									break;
-								case "thingIndex":
-									var datatypeFound = false;
-									nonEntityFound = false;
-									_.each(p.ranges, function(typeName) {
-										var type = types[typeName];
-										if (!type) {
-											datatypeFound = true;
-											return;
-										}
-										if (!type.isEntity) {
-											nonEntityFound = true;
-										}
-									});
-									if (datatypeFound || nonEntityFound) {
-										ambiguousStrategyWrong.push(p.id);
-									} else {
-										//all our entities. These are all guarenteed to be covered by ThingIndex. 
-										p.isAmbiguitySolved = true;
-									}
-									break;
 								default:
 									throw new Error("ambiguitySolvedBy.type not supported. (propertyname, type) " + p.id + "," + p.ambiguitySolvedBy.type);
 							}
 						}
 					}
-				}());
+				}
+
+				function checkAmbiguousRangeStorageStrategy() {
+					//how to store ambiguous data? 
+					switch (p.ambiguitySolvedBy.storage) {
+						case "sharedField":
+							//sharedField requires all types to be datatypes and share a common datatype
+
+							var dts = _.map(p.ranges, function(typeName) {
+								return schemaOrgDef.datatypes[typeName];
+							});
+
+							//if not all types are datetypes -> break 
+							if (dts.length !== _.compact(dts).length) {
+								ambiguousStrategyWrong.push(p.id);
+								break;
+							}
+
+							var intersection = _.reduce(dts, function(inter, dt) {
+								var ancestorOrSelf = dt.ancestors.concat(dt.id);
+								return !inter ? ancestorOrSelf : _.intersection(inter, ancestorOrSelf);
+							}, undefined);
+
+							//if intersection.length > 0 -> there's a shared datatype left
+							if (intersection.length) {
+								p.ambiguousSharedParentDataType = intersection[intersection.length - 1];
+								p.isAmbiguitySolved = true;
+							} else {
+								ambiguousStrategyWrong.push(p.id);
+							}
+
+							break;
+						case "sharedRoot":
+							//if same root, everything can be stored in same index and queried there
+							//This requires for all types to be Type (instead of DataType) and of the same root
+
+							var nonEntityFound = false,
+								nonRootCoveredEntityFound = false;
+
+							var roots = _.uniq(_.reduce(p.ranges, function(arr, typeName) {
+								var t = types[typeName];
+								if (!t) {
+									nonEntityFound = true;
+									return arr;
+								}
+								if (!t.rootName) {
+									nonRootCoveredEntityFound = true;
+									return arr;
+								}
+								arr.push(t.rootName);
+								return arr;
+							}, []));
+
+							//not all root covered entities || not all share the same root entity -> wrong
+							if (nonEntityFound || nonRootCoveredEntityFound || roots.length > 1) {
+								ambiguousStrategyWrong.push(p.id);
+							} else {
+								p.isAmbiguitySolved = true;
+							}
+
+							break;
+						case "thingIndex":
+							//everything can be queried through the thingIndex. This overaches different roots/type-indices.
+							//This requires for all types to be Type (instead of DataType)
+							//
+							var datatypeFound = false;
+							nonEntityFound = false;
+							_.each(p.ranges, function(typeName) {
+								var type = types[typeName];
+								if (!type) {
+									datatypeFound = true;
+									return;
+								}
+								if (!type.isEntity) {
+									nonEntityFound = true;
+								}
+							});
+							if (datatypeFound || nonEntityFound) {
+								ambiguousStrategyWrong.push(p.id);
+							} else {
+								//all our entities. These are all guarenteed to be covered by ThingIndex. 
+								p.isAmbiguitySolved = true;
+							}
+							break;
+						default:
+							throw new Error("ambiguitySolvedBy.storage not supported. (propertyname, type) " + p.id + "," + p.ambiguitySolvedBy.storage);
+					}
+				}
 
 			});
 			if (noOrigProps.length) {
@@ -366,7 +415,8 @@ module.exports = function(configObj) {
 	(function extendTypesWithProperties() {
 
 		//Array defining attributes that type-property is extended with from property. 
-		//This directly makes sure that these attributes are not overwritten be set on type-property.
+		//This directly makes sure that these attributes are not overwritten by type-specific property.
+
 		var propertyDirectivesToInherit = [
 			"id",
 			"ranges",
@@ -383,20 +433,22 @@ module.exports = function(configObj) {
 		_.each(types, function(t, k) {
 
 			var undefinedPropsOwn = [];
-			_.each(t.properties, function(propObj, propK) {
+			_.each(t.properties, function(propTypeSpecific, propK) {
 				if (!properties[propK]) {
 					undefinedPropsOwn.push(propK);
 					return;
 				}
+
 				var propGlobal = properties[propK];
-				_.extend(propObj, _.pick(propGlobal, propertyDirectivesToInherit)); //extend some
+
+				_.extend(propTypeSpecific, _.pick(propGlobal, propertyDirectivesToInherit)); //extend some
 
 				// required is OR'ed 
-				propObj.required = !!(propGlobal.required || propObj.required || ~t.required.indexOf(propK));
+				propTypeSpecific.required = !!(propGlobal.required || propTypeSpecific.required || ~t.required.indexOf(propK));
 
-				// DO NOT ALLOW CONCAT. THIS COMPLCIATES DATAMODEL FOR NOW GAIN. //validate is concatted
-				// propObj.validate = (propObj.validate || []);
-				// propObj.validate = propGlobal.validate.concat(_.isArray(propObj.validate) ? propObj.validate : [propObj.validate]);
+				// DO NOT ALLOW CONCAT. THIS COMPLCIATES DATAMODEL FOR NO GAIN. //validate is concatted
+				// propTypeSpecific.validate = (propTypeSpecific.validate || []);
+				// propTypeSpecific.validate = propGlobal.validate.concat(_.isArray(propTypeSpecific.validate) ? propTypeSpecific.validate : [propTypeSpecific.validate]);
 
 			});
 			if (undefinedPropsOwn.length) {

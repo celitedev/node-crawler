@@ -96,16 +96,36 @@ Schema.plugin([
 ]);
 
 
+var datatypesEnum = ["Boolean", "Date", "DateTime", "Number", "Float", "Integer", "Text", "Time", "URL"];
 
-function isSimpleRange(p) {
-	if (p.ranges.length > 1) {
-		return false;
-	} else {
-		return !generatedSchemas.types[p.ranges[0]];
-	}
+
+// function isSimpleRange(p) {
+// 	if (p.ranges.length > 1) {
+// 		return false;
+// 	} else {
+// 		return !generatedSchemas.types[p.ranges[0]];
+// 	}
+// }
+
+
+//Calc if type is allowed in range. 
+function isTypeAllowedForRange(typeOrTypeName, fieldtype) {
+
+	//Calculated by taking the intersection of the type (including it's ancestors) 
+	//and the range and checking for non-empty.
+	//We take the ancestors as well since type may be a subtype of any of the types defined in range.
+
+	var type = _.isString(typeOrTypeName) ?
+		generatedSchemas.types[typeOrTypeName] || generatedSchemas.datatypes[typeOrTypeName] :
+		typeOrTypeName;
+
+	var ancestorsAndSelf = _.uniq(type.ancestors.concat(type.id));
+	return _.intersection(ancestorsAndSelf, fieldtype.ranges).length;
 }
 
-var datatypesEnum = ["Boolean", "Date", "DateTime", "Number", "Float", "Integer", "Text", "Time", "URL"];
+function isFieldTypeAmbiguous(fieldtype) {
+	return fieldtype.ranges.length > 1;
+}
 
 function generateDataTypeValidator(prop) {
 
@@ -208,101 +228,136 @@ function passInTypeClosure(parentName) {
 
 		var fieldName = rule.field;
 		var fieldtype = generatedSchemas.properties[fieldName];
-		var rangeTypeName = value._type;
+		var typeName = value._type;
 
+		var isToplevel = !parentName;
 
 		//Q: is type defined explicitly?
-		// if (rangeTypeName) {
-		// 	//A: type is defined explicitly
-		// 	console.
+		if (typeName) {
+			//A: yes, type is defined explicitly
 
-		// }else{
-		// 	//A: type is NOT defined explicitly
-		// }
+			var isDataType = false;
 
-		if (!rangeTypeName) {
+			var type = generatedSchemas.types[typeName];
 
-			if (!fieldtype.isAmbiguous) {
-
+			if (!type) {
+				//type not found. Check if it's a datatype instead
+				type = generatedSchemas.datatypes[typeName];
+				isDataType = true;
 			}
 
-			//TYPE NOT DEFINED EXPLICITLY
-			//LETS TRY TO DERIVE IT ANYHOW
-
-			//lookup fieldname
-			//this gives ranges + ambiguityRule for ambiguous range
-			//This allows us to find type and this validator
-			//If we fail -> pass object that will cause an error
+			//Q: does specified type exist (as either Type or DataType)?
+			if (!type) {
+				throw new Error("type not found: " + typeName); //A: nope, error out
+			}
+			//A: yes, type exists and is either a Type (.e.: CreativeWork) or a Datatype (e.g.: Text)
 
 
-			//rangeTypeName = ...
+			//Q: is type allowed for fieldtype?  
+			if (parentName && !isTypeAllowedForRange(type, fieldtype)) {
+				throw new Error("type not allowed for fieldname: " + fieldName); //A: nope, error out
+			}
 
-			//_type not supplied and couldn't be inferred. 
-			if (!rangeTypeName) {
+			if (!parentName) {
+
+				////////////////////////////////////////////////
+				//TBD: checks to do when object is toplevel?  //
+				////////////////////////////////////////////////
+				//e.g.: check if type != valueObject? 
+			}
+
+
+			//A: yes, type is allowed for field or we're at toplevel. 
+			//Regardless, type is allowed here. 
+
+			//Q: is type a DataType (e.g.: Text, Number) ? 
+			if (isDataType) {
+				//A: yes it is. 
+
+				//SOLUTION: create a field validator as follows: 
+				//- passed value should be an object. This is already checked
+				//- object should have a `_value` field. This field is required.
+				//- `value` should pass fieldValidator. 
+				//- this fieldValidator is a simple datatype validator
+
+
+				/////////////////////////////////////////////////////////////////
+				//- TBD:fieldValidator should be mixed in with field-specific  //
+				//`validate` and `transform`  
+				//NOTE: validate + transform only make sense on datatypes as opposed to types right? 
+				/////////////////////////////////////////////////////////////////
+
+				var valueFieldValidator = generateDataTypeValidator({
+					ranges: [typeName]
+				});
+
+				//_value required as per above
+				valueFieldValidator.required = true;
+
 				return {
 					type: 'object',
 					fields: {
-						_type: {
-							type: "string",
-							required: true
-						}
+						_value: valueFieldValidator
 					}
 				};
 			}
-		} else if (parentType && !~parentType.properties[fieldName].ranges.indexOf(rangeTypeName)) {
-			//wrong explicitly defined type
-			//TODO: return some object as above that fails with correct message
-			throw new Error("wrong type for (prop) should be (range) (prop, range) " +
-				fieldName + ", (" + parentType.properties[fieldName].ranges.join(",") + ")");
-		}
+			//A: no, type is a Type (e.g.: CreativeWork) instead of a DataType
 
-		//POST: EXPLICIT AND CORRECT TYPE SPECIFIED
-		//Not clear yet if: 
-		//- datatype (with explicitly passed _type)
-		//- type
+			//Q: is Type a ValueObject or toplevel? 
+			if (type.isValueObject || isToplevel) {
 
-		var datatype = generatedSchemas.datatypes[rangeTypeName];
-		if (datatype) { //supplied _type is a datatype
+				//A: yes, type is a ValueObject or it's toplevel. 
 
-			//value is of format: {
-			//	_type: "String", //or other datatype
-			//  _value: "blaa" //this should always exist in this case
-			//}
-			var valueFieldValidator = generateDataTypeValidator({
-				ranges: [rangeTypeName]
-			});
+				//SOLUTION: Since type is a valueobject, type-object should be included by reference.
+				//Create a type validator as follows: 
+				//- use the typeValidator as proto
+				//- filter `fields` on typeValidator to exclude non-avail and optional fields. 
+				//This effectively prunes fields to check, limits recursion and likely improves performance quite a bit
 
-			//_values required as per above
-			valueFieldValidator.required = true;
+				//fetch typeValidator (which must exist as per app logic) and remove `fields`
+				//typeValidators[typeName] must exist as per app logic
+				var validatorObj = _.omit(typeValidators[typeName], "fields");
 
-			return {
-				type: 'object',
-				fields: {
-					_value: valueFieldValidator
-				}
-			};
-		}
+				//prune fields to only leave required or available fields
+				validatorObj.fields = _.reduce(typeValidators[typeName].fields, function(agg, obj, k) {
+					if (obj.required || value[k]) {
+						agg[k] = obj;
+					}
+					return agg;
+				}, {});
 
-		//POST: _TYPE IS EXPLCIT AND CORREC CLASSTYPE SPECIFIED
-		var staticInputForType = typeValidators[rangeTypeName];
-		if (!staticInputForType) {
-			throw new Error("validator object not found in typeValidators: " + staticInputForType);
-		}
-
-		var valObject = _.omit(staticInputForType, "fields");
-
-		//Implement 'optional' by removing non-required fields on schema if not supplied on value 
-		//cloning doesn't seem to work since field-functions are transformed into objects. 
-		//Therefore we 'clone' like this
-		valObject.fields = _.reduce(staticInputForType.fields, function(agg, obj, k) {
-			//only not include in schema if optional + value not provided
-			if (obj.required || value[k]) {
-				agg[k] = obj;
+				return validatorObj;
 			}
-			return agg;
-		}, {});
 
-		return valObject;
+			//A: no, type is NOT a valueObject. Therefore eitehr isEntity = true || isAbstract = true
+			throw new Error("isEntity || isAbstract not implemented yet");
+
+		} else {
+			//A: type is NOT defined explicitly
+
+			//Q: is type toplevel? 
+			if (isToplevel) {
+				//A: yep. This is a problem since toplevel element should define _type. 
+				//Otherwise, how to know what we're looking at?
+				throw new Error("toplevel element should define `_type`.");
+			}
+			//A: type is not toplevel. Therefore `fieldtype` is guaranteed to be defined
+
+			//Q: can type be inferred straightforward?  
+			if (!isFieldTypeAmbiguous(fieldtype)) {
+				//A: yes, there's only 1 type defined on fieldtype.ranges
+
+				//SOLUTION:
+				//Based on preprocessing `value` is guaranteed to be an object 
+				//let's add _type to that `value`
+
+				value._type = fieldtype.ranges[0];
+				return passInSchema(rule, value);
+			}
+			//A: no, we're looking at an ambiguous range, so we need to infer type in some other way
+
+
+		}
 	};
 
 	fn.isSchemaFunction = true;
@@ -331,33 +386,26 @@ function passInTypeClosure(parentName) {
 
 var obj = {
 	_type: "CreativeWork",
-	// name: {
-	// 	_type: "Text",
-	// 	_value: "Home sweet home",
-	// },
 	name: "Home sweet home",
-	genre: {
-		_type: "URL",
-		_value: "adssad"
-	}
-	// genre: "Text"
+	// genre: {
+	// 	_type: "URL",
+	// 	_value: "adssad"
+	// }
+	genre: "asdasd"
 };
 
+//We can use schema globally now
+var schema = new Schema(passInTypeClosure(null));
+
+extendObject(obj);
 validate(obj);
+
 
 function validate(obj) {
 
 	if (!obj._type) {
 		throw new Error("to be validated root object doesn't have _type: " + JSON.stringify(obj.null, 2));
 	}
-
-	var schemaFunction = passInTypeClosure(null);
-	if (!schemaFunction) {
-		throw new Error("SANITY CHECK: validationOBJ not found for type: '" + obj._type +
-			"'. Possible values: " + _.values(validatorFnObj).jon(","));
-	}
-
-	var schema = new Schema(schemaFunction);
 
 	schema.validate(obj, function(err, res) {
 		if (err) {
@@ -372,11 +420,26 @@ function validate(obj) {
 		// validation passed
 	});
 
-
 	//TODO: 
 	//- non-described fields are forbidden
 	//- polymorhpic types -> https://github.com/freeformsystems/async-validate/issues/56
 	//- single/multivalued
 	//- field-level sanitization  / coercing -> async-validate transform()
 	//
+}
+
+//transform obj so all values are expanded into objects. 
+//E.g.: "some value" is expanded to {"_value": "some value"}
+function extendObject(obj) {
+	_.each(obj, function(v, k) {
+		if (k === "_type" || k === "_value") return;
+		if (_.isObject(v)) {
+			obj[k] = extendObject(v);
+		} else {
+			obj[k] = {
+				_value: v
+			};
+		}
+	});
+	return obj;
 }
