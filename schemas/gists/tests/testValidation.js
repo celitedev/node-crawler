@@ -140,7 +140,7 @@ function passInTypeClosure(parentName) {
 			//- is not a ValueObject
 			//- can not be Abstract, since otherwise an error would have been raised during schema creation
 
-			//SOLUTION: type-object should be included by referencing
+			//SOLUTION: type-object should be included by REFERENCING
 
 			var uuidValidator = generateDataTypeValidator({
 				ranges: ["Text"]
