@@ -236,6 +236,12 @@ module.exports = function(configObj) {
 						} else {
 							//how to solve ambiguity on data presented to validation layer?
 							switch (p.ambiguitySolvedBy.type) {
+								case "implicitType":
+									//simplest strategy which doesn't care at all. 
+									//This proxies responsibility to storage layer to come up with correct instance. 
+									//This requires any of the storage layers mentioned below:
+									checkAmbiguousRangeStorageStrategy(["sharedRoot", "thingIndex"]);
+									break;
 								case "explicitType":
 									//simplest strategy which requires that _type be defined
 									checkAmbiguousRangeStorageStrategy();
@@ -266,6 +272,7 @@ module.exports = function(configObj) {
 
 				function checkAmbiguousRangeStorageStrategy() {
 					//how to store ambiguous data? 
+					var nonEntityFound = false;
 					switch (p.ambiguitySolvedBy.storage) {
 						case "sharedField":
 							//sharedField requires all types to be datatypes and share a common datatype
@@ -298,12 +305,10 @@ module.exports = function(configObj) {
 							//if same root, everything can be stored in same index and queried there
 							//This requires for all types to be Type (instead of DataType) and of the same root
 
-							var nonEntityFound = false,
-								nonRootCoveredEntityFound = false;
-
+							var nonRootCoveredEntityFound = false;
 							var roots = _.uniq(_.reduce(p.ranges, function(arr, typeName) {
 								var t = types[typeName];
-								if (!t) {
+								if (!t || !t.isEntity) {
 									nonEntityFound = true;
 									return arr;
 								}
@@ -321,25 +326,18 @@ module.exports = function(configObj) {
 							} else {
 								p.isAmbiguitySolved = true;
 							}
-
 							break;
 						case "thingIndex":
 							//everything can be queried through the thingIndex. This overaches different roots/type-indices.
 							//This requires for all types to be Type (instead of DataType)
-							//
-							var datatypeFound = false;
-							nonEntityFound = false;
 							_.each(p.ranges, function(typeName) {
 								var type = types[typeName];
-								if (!type) {
-									datatypeFound = true;
+								if (!type || !type.isEntity) {
+									nonEntityFound = true;
 									return;
 								}
-								if (!type.isEntity) {
-									nonEntityFound = true;
-								}
 							});
-							if (datatypeFound || nonEntityFound) {
+							if (nonEntityFound) {
 								ambiguousStrategyWrong.push(p.id);
 							} else {
 								//all our entities. These are all guarenteed to be covered by ThingIndex. 
