@@ -85,6 +85,7 @@ var generatedSchemas = require("../../createDomainSchemas.js")({
 });
 
 var Rule = require("async-validate").Rule;
+var urlRegex = require('url-regex');
 
 Schema.plugin([
 	require('async-validate/plugin/object'),
@@ -121,10 +122,6 @@ function isTypeAllowedForRange(typeOrTypeName, fieldtype) {
 
 	var ancestorsAndSelf = _.uniq(type.ancestors.concat(type.id));
 	return _.intersection(ancestorsAndSelf, fieldtype.ranges).length;
-}
-
-function isFieldTypeAmbiguous(fieldtype) {
-	return fieldtype.ranges.length > 1;
 }
 
 function generateDataTypeValidator(prop) {
@@ -187,25 +184,10 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 	//p.transform  -> array of object guaranteed to exist
 	//TODO: error when other fields are found then those specified.
 	typeValidator.fields = _.reduce(type.properties, function(fields, prop, pName) {
-		// if (isSimpleRange(prop)) {
-
-		// 	//guaranteed: range of 1 + datatype instead of type
-		// 	fields[pName] = [generateDataTypeValidator(prop)].concat(prop.validate);
-
-		// } else {
-
-		// 	var fn = passInTypeClosure(tName);
-		// 	if (prop.required) {
-		// 		fn.required = prop.required; //we can just set props on functions remember...
-		// 	}
-		// 	fields[pName] = fn;
-		// }
 		var fn = passInTypeClosure(tName);
 		fn.required = prop.required; //we can just set props on functions remember...
 		fn.validate = prop.validate;
-
 		fields[pName] = fn;
-
 		return fields;
 	}, {});
 
@@ -329,7 +311,7 @@ function passInTypeClosure(parentName) {
 				return validatorObj;
 			}
 
-			//A: no, type is NOT a valueObject. Therefore eitehr isEntity = true || isAbstract = true
+			//A: no, type is NOT a valueObject. Therefore either isEntity = true || isAbstract = true
 			throw new Error("isEntity || isAbstract not implemented yet");
 
 		} else {
@@ -343,19 +325,25 @@ function passInTypeClosure(parentName) {
 			}
 			//A: type is not toplevel. Therefore `fieldtype` is guaranteed to be defined
 
-			//Q: can type be inferred straightforward?  
-			if (!isFieldTypeAmbiguous(fieldtype)) {
-				//A: yes, there's only 1 type defined on fieldtype.ranges
+			//SOLUTION: infer type based on either: 
+			//- not ambiguous -> only type specified on fieldtype
+			//- ambigous -> ambiguous solver on fieldtype and value
 
-				//SOLUTION:
-				//Based on preprocessing `value` is guaranteed to be an object 
-				//let's add _type to that `value`
-
-				value._type = fieldtype.ranges[0];
-				return passInSchema(rule, value);
+			if (!fieldtype.isAmbiguous) {
+				typeName = fieldtype.ranges[0];
+			} else {
+				if (fieldtype.ambiguitySolvedBy.type === "explicitType") {
+					throw new Error("_type should be explicitly defined for (ambiguous field, value) " + fieldName + " - " + JSON.stringify(value, null, 2));
+				}
+				typeName = inferTypeForAmbiguousRange(fieldtype, value);
+				if (!typeName) {
+					throw new Error("ambiguous resolver couldn't resolve type (fieldName, value) " + fieldName + " - " + JSON.stringify(value, null, 2));
+				}
 			}
-			//A: no, we're looking at an ambiguous range, so we need to infer type in some other way
 
+			//pass in found type and run again
+			value._type = fieldtype.ranges[0];
+			return passInSchema(rule, value);
 
 		}
 	};
@@ -391,7 +379,10 @@ var obj = {
 	// 	_type: "URL",
 	// 	_value: "adssad"
 	// }
-	genre: "asdasd"
+	genre: "asdasd",
+	composer: {
+		name: "asasdasd"
+	}
 };
 
 //We can use schema globally now
@@ -401,11 +392,29 @@ extendObject(obj);
 validate(obj);
 
 
-function validate(obj) {
-
-	if (!obj._type) {
-		throw new Error("to be validated root object doesn't have _type: " + JSON.stringify(obj.null, 2));
+//infer type from value when fieldtype has ambiguous range.
+//NOTE: validity of ambiguity solver for fieldtype is already checked
+function inferTypeForAmbiguousRange(fieldtype, obj) {
+	switch (fieldtype.ambiguitySolvedBy.type) {
+		case "urlVsSomething":
+			if (urlRegex({
+					exact: true
+				}).test(obj._value)) {
+				return "URL";
+			} else {
+				//return the other thing. We know that there's exactly 2 elements, so...
+				return _.filter(fieldtype.ranges, function(t) {
+					return t !== "URL";
+				})[0];
+			}
+			break;
+		default:
+			throw new Error("Ambiguous solver not implemented: " + fieldtype.ambiguitySolvedBy.type);
 	}
+	console.log("ASDASD", fieldtype, value);
+}
+
+function validate(obj) {
 
 	schema.validate(obj, function(err, res) {
 		if (err) {
