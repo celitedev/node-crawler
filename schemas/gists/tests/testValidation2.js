@@ -176,8 +176,6 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 	var typeValidator = {};
 	typeValidator.type = "object";
 
-	//TODO: type.required -> set prop.required
-	//TODO set type of properties (datatypes)
 	//TODO: isMulti stuff 
 	//aliasOf
 	//p.validate -> array of object guaranteed to exist
@@ -195,13 +193,7 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 	return agg;
 }, {});
 
-// console.log(JSON.stringify(typeValidators, null, 2));
 
-// console.log(typeValidators);
-//schema passed in if: 
-//- range is multivalued OR 
-//- range contains a type instead of datatype
-//- object passed in 
 function passInTypeClosure(parentName) {
 
 	var parentType = generatedSchemas.types[parentName];
@@ -380,15 +372,16 @@ var obj = {
 	// 	_value: "adssad"
 	// }
 	genre: "asdasd",
-	composer: {
-		name: "asasdasd"
-	}
 };
 
 //We can use schema globally now
 var schema = new Schema(passInTypeClosure(null));
 
-extendObject(obj);
+if (!obj._type) {
+	throw new Error("_type should be defined on toplevel");
+}
+
+transformObject(obj);
 validate(obj);
 
 
@@ -439,11 +432,13 @@ function validate(obj) {
 
 //transform obj so all values are expanded into objects. 
 //E.g.: "some value" is expanded to {"_value": "some value"}
-function extendObject(obj) {
+function transformObject(obj) {
+
 	_.each(obj, function(v, k) {
-		if (k === "_type" || k === "_value") return;
+		var fieldType =
+			if (k === "_type" || k === "_value") return;
 		if (_.isObject(v)) {
-			obj[k] = extendObject(v);
+			obj[k] = transformObject(v);
 		} else {
 			obj[k] = {
 				_value: v
