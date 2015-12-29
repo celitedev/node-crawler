@@ -5,7 +5,7 @@ module.exports = {
 	////////////////////////////
 
 	name: {
-		// jemeoder: "sadasd",
+		required: true
 	},
 	description: {},
 	alternateName: {
@@ -24,7 +24,8 @@ module.exports = {
 	// 	}
 	// },
 	sameAs: {
-		"isMulti": true
+		"isMulti": true,
+
 	},
 	url: {},
 
@@ -49,9 +50,6 @@ module.exports = {
 			"OrganizationAndPerson",
 			"CreativeWork"
 		],
-		// ambiguitySolvedBy: {
-		// 	type: "thingIndex"
-		// }
 	},
 
 
@@ -131,13 +129,13 @@ module.exports = {
 		ranges: ["Number"]
 	},
 	latitude: {
+		required: true,
 		ranges: ["Number"]
 	},
 	longitude: {
-		ranges: ["Number"]
+		required: true,
+		ranges: ["Number"] //From Number
 	},
-
-
 
 	////////////////////////////
 	//http://schema.org/Place //
@@ -155,12 +153,18 @@ module.exports = {
 		"isMulti": true
 	},
 	geo: {
+		// required: true,
 		ranges: ["GeoCoordinates"]
 	},
 	logo: {
-		ambiguitySolvedBy: {
-			type: "urlVsSomething"
-		}
+		ranges: ["ImageObject"]
+
+		//redefining range to only cover ImageObejct.
+		//Orig range [Url, ImageObject] cannot solved with urlVsSomething
+		//since how would we store this range?
+		// ambiguitySolvedBy: {
+		// 	type: "urlVsSomething"
+		// }
 	},
 
 	//////////////////////////////////////
@@ -231,7 +235,8 @@ module.exports = {
 			"CreativeWork"
 		],
 		ambiguitySolvedBy: {
-			type: "thingIndex"
+			type: "implicitType",
+			storage: "thingIndex"
 		}
 	},
 
@@ -241,7 +246,8 @@ module.exports = {
 
 		//Person || Organization
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		}
 	},
 	character: {
@@ -285,14 +291,16 @@ module.exports = {
 	producer: {
 		//Person || Organization
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		},
 		isMulti: true
 	},
 	publisher: {
 		//Person || Organization
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		},
 		isMulti: true
 	},
@@ -344,7 +352,8 @@ module.exports = {
 	},
 	musicBy: {
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		},
 		isMulti: true
 	},
@@ -369,7 +378,8 @@ module.exports = {
 	////////////////////////////////////////
 	composer: {
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		},
 		isMulti: true
 	},
@@ -468,9 +478,10 @@ module.exports = {
 	honorificSuffix: {},
 	jobTitle: {},
 	memberOf: {
-		ambiguitySolvedBy: {
-			type: "sharedRoot"
-		},
+		// ambiguitySolvedBy: {
+		// 	type: "implicitType",
+		// 	storage: "sharedRoot"
+		// },
 		ranges: ["Organization"], //Don't allow ProgramMembership for now
 		isMulti: true
 	},
@@ -496,7 +507,8 @@ module.exports = {
 	},
 	member: { //e.g.: org or persons
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		},
 		isMulti: true
 	},
@@ -535,14 +547,16 @@ module.exports = {
 	organizer: {
 		//Person || Organization
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		},
 		isMulti: true
 	},
 	performer: {
 		//Person || Organization
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		},
 		isMulti: true
 	},
@@ -586,18 +600,21 @@ module.exports = {
 	///////////////////////////////////
 	awayTeam: {
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		}
 	}, //The away team in a sports event.
 	competitor: { //A competitor in a sports event.
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		},
 		isMulti: true
 	},
 	homeTeam: {
 		ambiguitySolvedBy: {
-			type: "sharedRoot"
+			type: "implicitType",
+			storage: "sharedRoot"
 		}
 	}, //The home team in a sports event.
 
