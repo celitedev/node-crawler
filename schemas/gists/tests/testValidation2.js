@@ -1,79 +1,3 @@
-//PERSON
-// {
-//   "Person.additionalName": "Text",
-//   "Person.address": {
-//     "PostalAddress": {
-//       "addressCountry": "Country",
-//       "addressLocality": "Text",
-//       "addressRegion": "Text",
-//       "postOfficeBoxNumber": "Text",
-//       "postalCode": "Text",
-//       "streetAddress": "Text",
-//       "contactType": "Text",
-//       "email": "Text",
-//       "faxNumber": "Text",
-//       "telephone": "Text"
-//     }
-//   },
-//   "Person.birthDate": "Date",
-//   "Person.deathDate": "Date",
-//   "Person.familyName": "Text",
-//   "Person.gender": "Text",
-//   "Person.givenName": "Text",
-//   "Person.honorificPrefix": "Text",
-//   "Person.honorificSuffix": "Text",
-//   "Person.jobTitle": "Text",
-//   "Person.memberOf": "Organization",
-//   "Person.nationality": "Country",
-//   "Person.name": "Text",
-//   "Person.url": "URL",
-//   "Person.description": "Text",
-//   "Person.alternateName": "Text",
-//   "Person.sameAs": "URL"
-// }
-
-
-//PLACE
-// {
-//   "Place.aggregateRating": {
-//     "AggregateRating": {
-//       "ratingTotal": "Number",
-//       "ratingCount": "Integer",
-//       "ratingValue": "Text"
-//     }
-//   },
-//   "Place.address": {
-//     "PostalAddress": {
-//       "addressCountry": "Country",
-//       "addressLocality": "Text",
-//       "addressRegion": "Text",
-//       "postOfficeBoxNumber": "Text",
-//       "postalCode": "Text",
-//       "streetAddress": "Text",
-//       "contactType": "Text",
-//       "email": "Text",
-//       "faxNumber": "Text",
-//       "telephone": "Text"
-//     }
-//   },
-//   "Place.branchCode": "Text",
-//   "Place.containedInPlace": "Place",
-//   "Place.containsPlace": "Place",
-//   "Place.geo": {
-//     "GeoCoordinates": {
-//       "elevation": "Number",
-//       "latitude": "Number",
-//       "longitude": "Number"
-//     }
-//   },
-//   "Place.logo": "URL,ImageObject",
-//   "Place.name": "Text",
-//   "Place.url": "URL",
-//   "Place.description": "Text",
-//   "Place.alternateName": "Text",
-//   "Place.sameAs": "URL"
-// }
-
 var argv = require('yargs').argv;
 var _ = require("lodash");
 var Schema = require('async-validate');
@@ -99,106 +23,118 @@ Schema.plugin([
 
 var datatypesEnum = ["Boolean", "Date", "DateTime", "Number", "Float", "Integer", "Text", "Time", "URL"];
 
-
-// function isSimpleRange(p) {
-// 	if (p.ranges.length > 1) {
-// 		return false;
-// 	} else {
-// 		return !generatedSchemas.types[p.ranges[0]];
-// 	}
-// }
-
-
-//Calc if type is allowed in range. 
-function isTypeAllowedForRange(typeOrTypeName, fieldtype) {
-
-	//Calculated by taking the intersection of the type (including it's ancestors) 
-	//and the range and checking for non-empty.
-	//We take the ancestors as well since type may be a subtype of any of the types defined in range.
-
-	var type = _.isString(typeOrTypeName) ?
-		generatedSchemas.types[typeOrTypeName] || generatedSchemas.datatypes[typeOrTypeName] :
-		typeOrTypeName;
-
-	var ancestorsAndSelf = _.uniq(type.ancestors.concat(type.id));
-	return _.intersection(ancestorsAndSelf, fieldtype.ranges).length;
-}
-
-function generateDataTypeValidator(prop) {
-
-	//in a preprocess tasks we've already pruned the optional and empty values
-	//so setting required = tru
-	var validateObj = {};
-
-	var dt = prop.ranges[0]; //guaranteed range.length=1 and contents = datatype
-	if (!~datatypesEnum.indexOf(dt)) {
-		throw new Error("should not have 0 datatypes (propName) " + prop.id + " -> " + dt);
-	}
-
-	switch (dt) {
-		case "Boolean":
-			validateObj.type = "boolean";
-			break;
-		case "Date":
-			validateObj.type = "string"; //TODO
-			break;
-		case "DateTime":
-			validateObj.type = "string"; //TODO
-			break;
-		case "Number":
-			validateObj.type = "number";
-			break;
-		case "Float":
-			validateObj.type = "float";
-			break;
-		case "Integer":
-			validateObj.type = "integer";
-			break;
-		case "Text":
-			validateObj.type = "string";
-			break;
-		case "Time":
-			validateObj.type = "string"; //TODO
-			break;
-		case "URL":
-			validateObj.type = "string";
-			//TODO:  format: "URL"
-			break;
-		default:
-			throw new Error("dattype not supported " + dt); //forgot something?
-	}
-
-	return {
-		type: 'object',
-		fields: {
-			_value: _.extend(validateObj, {
-				required: prop.required
-			})
-		}
-	};
-}
-
 var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName) {
-
-	var typeValidator = {};
-	typeValidator.type = "object";
-
 	//TODO: isMulti stuff 
 	//aliasOf
 	//p.validate -> array of object guaranteed to exist
 	//p.transform  -> array of object guaranteed to exist
-	//TODO: error when other fields are found then those specified.
-	typeValidator.fields = _.reduce(type.properties, function(fields, prop, pName) {
-		var fn = passInTypeClosure(tName);
-		fn.required = prop.required; //we can just set props on functions remember...
-		fn.validate = prop.validate;
-		fields[pName] = fn;
-		return fields;
-	}, {});
 
-	agg[tName] = typeValidator;
+	agg[tName] = {
+		type: "object",
+		fields: _.reduce(type.properties, function(fields, prop, pName) {
+			var fn = passInTypeClosure(tName);
+			fn.required = prop.required; //oeehh, setting props on a function
+			fn.validate = prop.validate;
+			fields[pName] = fn;
+			return fields;
+		}, {})
+	};
 	return agg;
 }, {});
+
+
+// var obj = {
+// 	_type: "Place",
+// 	name: "Home sweet home",
+// 	address: {
+// 		// _type: "PostalAddress", //optional since can be inferred
+// 		addressLocality: "Tilburg",
+// 		postalCode: "5021 GW",
+// 		streetAddress: "stuivesantplein 7",
+// 		email: "gbrits@gmail.com"
+// 	},
+// 	geo: {
+// 		// _type: "GeoCoordinates", //optional since can be inferred
+// 		latitude: 43.123123,
+// 		longitude: 12.123213,
+// 		elevation: 1,
+// 		// test: 43.123123,
+// 	}
+// };
+
+
+var obj = {
+	_type: "CreativeWork",
+	name: "Home sweet home",
+	genre: {
+		// _type: "URL",
+		_value: undefined //this is allowed if you really want to.
+	},
+	// about: {
+	// 	_type: "Place",
+	// 	name: "bnla"
+	// }
+	// genre: "asdasd",
+};
+
+//We can use schema globally now
+var schema = new Schema(passInTypeClosure(null));
+
+if (!obj._type) {
+	throw new Error("_type should be defined on toplevel");
+}
+
+//does a transform in place, so can skip _cloneDeep + assignment if not needed to keep orig
+var objTransformed = transformObject(_.cloneDeep(obj), true, []);
+console.log(objTransformed);
+validate(objTransformed);
+
+
+//infer type from value when fieldtype has ambiguous range.
+//NOTE: validity of ambiguity solver for fieldtype is already checked
+function inferTypeForAmbiguousRange(fieldtype, obj) {
+	switch (fieldtype.ambiguitySolvedBy.type) {
+		case "urlVsSomething":
+			if (urlRegex({
+					exact: true
+				}).test(obj._value)) {
+				return "URL";
+			} else {
+				//return the other thing. We know that there's exactly 2 elements, so...
+				return _.filter(fieldtype.ranges, function(t) {
+					return t !== "URL";
+				})[0];
+			}
+			break;
+		default:
+			throw new Error("Ambiguous solver not implemented: " + fieldtype.ambiguitySolvedBy.type);
+	}
+	console.log("ASDASD", fieldtype, value);
+}
+
+
+function validate(obj) {
+
+	schema.validate(obj, function(err, res) {
+		if (err) {
+			throw err;
+		} else if (res) {
+			// validation failed, res.errors is an array of all errors
+			// res.fields is a map keyed by field unique id (eg: `address.name`)
+			// assigned an array of errors per field
+			return console.dir(res.errors);
+		}
+		console.log("ALL FINE");
+		// validation passed
+	});
+
+	//TODO: 
+	//- non-described fields are forbidden
+	//- polymorhpic types -> https://github.com/freeformsystems/async-validate/issues/56
+	//- single/multivalued
+	//- field-level sanitization  / coercing -> async-validate transform()
+	//
+}
 
 
 function passInTypeClosure(parentName) {
@@ -216,20 +152,10 @@ function passInTypeClosure(parentName) {
 		var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName];
 
 		if (type.isDataType) {
+			//STATE: type is a DATATYPE
 
-			//SOLUTION: create a field validator as follows: 
-			//- passed value should be an object. This is already checked
-			//- object should have a `_value` field. This field is required.
-			//- `value` should pass fieldValidator. 
-			//- this fieldValidator is a simple datatype validator
-
-
-			/////////////////////////////////////////////////////////////////
-			//- TBD:fieldValidator should be mixed in with field-specific  //
-			//`validate` and `transform`  
-			//NOTE: validate + transform only make sense on datatypes as opposed to types right? 
-			/////////////////////////////////////////////////////////////////
-
+			//field specific validator
+			//TODO: add validation for fieldname
 			return generateDataTypeValidator({
 				ranges: [typeName]
 			});
@@ -239,34 +165,29 @@ function passInTypeClosure(parentName) {
 
 			if (type.isValueObject || isToplevel) {
 
-				//A: yes, type is a ValueObject or it's toplevel. 
-
 				//SOLUTION: type-object should be included by EMBEDDING.
-				//Create a type validator as follows: 
-				//- use the typeValidator as proto
-				//- filter `fields` on typeValidator to exclude non-avail and optional fields. 
-				//This effectively prunes fields to check, limits recursion and likely improves performance quite a bit
 
-				//fetch typeValidator (which must exist as per app logic) and remove `fields`
-				//typeValidators[typeName] must exist as per app logic
+				var validatorObj = _.omit(typeValidators[typeName], "fields");
 
-				// var validatorObj = _.omit(typeValidators[typeName], "fields");
+				//Prune fields to only leave required or available fields. 
+				//This makes sure recursion doesn't fail on empty results.
+				validatorObj.fields = _.reduce(typeValidators[typeName].fields, function(agg, obj, k) {
+					if (obj.required || value[k]) {
+						agg[k] = obj;
+					}
+					return agg;
+				}, {});
 
-				// //prune fields to only leave required or available fields
-				// validatorObj.fields = _.reduce(typeValidators[typeName].fields, function(agg, obj, k) {
-				// 	if (obj.required || value[k]) {
-				// 		agg[k] = obj;
-				// 	}
-				// 	return agg;
-				// }, {});
-
-				// return validatorObj;
-
-				return typeValidators[typeName];
+				return validatorObj;
 			}
 
-			//A: no, type is NOT a valueObject. Therefore either isEntity = true || isAbstract = true
-			throw new Error("isEntity || isAbstract not implemented yet");
+			//STATE: type is Entity. because it: 
+			//- is a type
+			//- is not a ValueObject
+			//- can not be Abstract, since otherwise an error would have been raised during schema creation
+
+
+			throw new Error("isEntity not implemented yet");
 		}
 	};
 
@@ -364,91 +285,72 @@ function transformObject(obj, isTopLevel, ancestors) {
 }
 
 
+//Calc if type is allowed in range. 
+function isTypeAllowedForRange(typeOrTypeName, fieldtype) {
 
-// var obj = {
-// 	_type: "Place",
-// 	name: "Home sweet home",
-// 	address: {
-// 		// _type: "PostalAddress", //optional since can be inferred
-// 		addressLocality: "Tilburg",
-// 		postalCode: "5021 GW",
-// 		streetAddress: "stuivesantplein 7",
-// 		email: "gbrits@gmail.com"
-// 	},
-// 	geo: {
-// 		// _type: "GeoCoordinates", //optional since can be inferred
-// 		latitude: 43.123123,
-// 		longitude: 12.123213,
-// 		elevation: 1,
-// 		// test: 43.123123,
-// 	}
-// };
+	//Calculated by taking the intersection of the type (including it's ancestors) 
+	//and the range and checking for non-empty.
+	//We take the ancestors as well since type may be a subtype of any of the types defined in range.
 
+	var type = _.isString(typeOrTypeName) ?
+		generatedSchemas.types[typeOrTypeName] || generatedSchemas.datatypes[typeOrTypeName] :
+		typeOrTypeName;
 
-var obj = {
-	_type: "CreativeWork",
-	name: "Home sweet home",
-	genre: {
-		// _type: "URL",
-		_value: undefined //this is allowed if you really want to.
-	}
-	// genre: "asdasd",
-};
-
-//We can use schema globally now
-var schema = new Schema(passInTypeClosure(null));
-
-if (!obj._type) {
-	throw new Error("_type should be defined on toplevel");
+	var ancestorsAndSelf = _.uniq(type.ancestors.concat(type.id));
+	return _.intersection(ancestorsAndSelf, fieldtype.ranges).length;
 }
 
-//does a transform in place, so can skip _cloneDeep + assignment if not needed to keep orig
-var objTransformed = transformObject(_.cloneDeep(obj), true, []);
-console.log(objTransformed);
-validate(objTransformed);
 
+function generateDataTypeValidator(prop) {
 
-//infer type from value when fieldtype has ambiguous range.
-//NOTE: validity of ambiguity solver for fieldtype is already checked
-function inferTypeForAmbiguousRange(fieldtype, obj) {
-	switch (fieldtype.ambiguitySolvedBy.type) {
-		case "urlVsSomething":
-			if (urlRegex({
-					exact: true
-				}).test(obj._value)) {
-				return "URL";
-			} else {
-				//return the other thing. We know that there's exactly 2 elements, so...
-				return _.filter(fieldtype.ranges, function(t) {
-					return t !== "URL";
-				})[0];
-			}
+	//in a preprocess tasks we've already pruned the optional and empty values
+	//so setting required = tru
+	var validateObj = {};
+
+	var dt = prop.ranges[0]; //guaranteed range.length=1 and contents = datatype
+	if (!~datatypesEnum.indexOf(dt)) {
+		throw new Error("should not have 0 datatypes (propName) " + prop.id + " -> " + dt);
+	}
+
+	switch (dt) {
+		case "Boolean":
+			validateObj.type = "boolean";
+			break;
+		case "Date":
+			validateObj.type = "string"; //TODO
+			break;
+		case "DateTime":
+			validateObj.type = "string"; //TODO
+			break;
+		case "Number":
+			validateObj.type = "number";
+			break;
+		case "Float":
+			validateObj.type = "float";
+			break;
+		case "Integer":
+			validateObj.type = "integer";
+			break;
+		case "Text":
+			validateObj.type = "string";
+			break;
+		case "Time":
+			validateObj.type = "string"; //TODO
+			break;
+		case "URL":
+			validateObj.type = "string";
+			//TODO:  format: "URL"
 			break;
 		default:
-			throw new Error("Ambiguous solver not implemented: " + fieldtype.ambiguitySolvedBy.type);
+			throw new Error("dattype not supported " + dt); //forgot something?
 	}
-	console.log("ASDASD", fieldtype, value);
-}
 
-function validate(obj) {
-
-	schema.validate(obj, function(err, res) {
-		if (err) {
-			throw err;
-		} else if (res) {
-			// validation failed, res.errors is an array of all errors
-			// res.fields is a map keyed by field unique id (eg: `address.name`)
-			// assigned an array of errors per field
-			return console.dir(res.errors);
+	return {
+		type: 'object',
+		fields: {
+			_value: _.extend(validateObj, {
+				required: prop.required
+			})
 		}
-		console.log("ALL FINE");
-		// validation passed
-	});
-
-	//TODO: 
-	//- non-described fields are forbidden
-	//- polymorhpic types -> https://github.com/freeformsystems/async-validate/issues/56
-	//- single/multivalued
-	//- field-level sanitization  / coercing -> async-validate transform()
-	//
+	};
 }
