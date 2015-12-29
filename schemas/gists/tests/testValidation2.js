@@ -70,11 +70,12 @@ var obj = {
 		// _type: "URL",
 		_value: undefined //this is allowed if you really want to.
 	},
-	// about: {
-	// 	_type: "Place",
-	// 	name: "bnla"
-	// }
-	// genre: "asdasd",
+	about: "bnla"
+		// about: {
+		// 	_type: "Place",
+		// 	name: "bnla"
+		// }
+		// genre: "asdasd",
 };
 
 //We can use schema globally now
@@ -90,56 +91,9 @@ console.log(objTransformed);
 validate(objTransformed);
 
 
-//infer type from value when fieldtype has ambiguous range.
-//NOTE: validity of ambiguity solver for fieldtype is already checked
-function inferTypeForAmbiguousRange(fieldtype, obj) {
-	switch (fieldtype.ambiguitySolvedBy.type) {
-		case "urlVsSomething":
-			if (urlRegex({
-					exact: true
-				}).test(obj._value)) {
-				return "URL";
-			} else {
-				//return the other thing. We know that there's exactly 2 elements, so...
-				return _.filter(fieldtype.ranges, function(t) {
-					return t !== "URL";
-				})[0];
-			}
-			break;
-		default:
-			throw new Error("Ambiguous solver not implemented: " + fieldtype.ambiguitySolvedBy.type);
-	}
-	console.log("ASDASD", fieldtype, value);
-}
-
-
-function validate(obj) {
-
-	schema.validate(obj, function(err, res) {
-		if (err) {
-			throw err;
-		} else if (res) {
-			// validation failed, res.errors is an array of all errors
-			// res.fields is a map keyed by field unique id (eg: `address.name`)
-			// assigned an array of errors per field
-			return console.dir(res.errors);
-		}
-		console.log("ALL FINE");
-		// validation passed
-	});
-
-	//TODO: 
-	//- non-described fields are forbidden
-	//- polymorhpic types -> https://github.com/freeformsystems/async-validate/issues/56
-	//- single/multivalued
-	//- field-level sanitization  / coercing -> async-validate transform()
-	//
-}
-
-
 function passInTypeClosure(parentName) {
 
-	var parentType = generatedSchemas.types[parentName];
+	// var parentType = generatedSchemas.types[parentName];
 
 	var fn = function passInSchema(rule, value) {
 
@@ -186,8 +140,15 @@ function passInTypeClosure(parentName) {
 			//- is not a ValueObject
 			//- can not be Abstract, since otherwise an error would have been raised during schema creation
 
+			//SOLUTION: type-object should be included by referencing
 
-			throw new Error("isEntity not implemented yet");
+			var uuidValidator = generateDataTypeValidator({
+				ranges: ["Text"]
+			}, true);
+
+			//TODO: add UUID validate 
+
+			return uuidValidator;
 		}
 	};
 
@@ -255,7 +216,7 @@ function transformObject(obj, isTopLevel, ancestors) {
 	}
 
 	//check that only allowed properties are passed
-	var allowedProps = ["_type", "_value"].concat(_.keys(type.properties) || []),
+	var allowedProps = ["_type", "_value", "_isBogusType"].concat(_.keys(type.properties) || []),
 		suppliedProps = _.keys(obj),
 		nonAllowedProps = _.difference(suppliedProps, allowedProps);
 
@@ -269,7 +230,7 @@ function transformObject(obj, isTopLevel, ancestors) {
 	//6. recurse
 	_.each(obj, function(v, k) {
 
-		if (k === "_type" || k === "_value") return;
+		if (k === "_type" || k === "_value" || k === "_isBogusType") return;
 
 		var fieldtype = generatedSchemas.properties[k]; //guaranteed to exist
 
@@ -282,6 +243,60 @@ function transformObject(obj, isTopLevel, ancestors) {
 
 	});
 	return obj;
+}
+
+
+//infer type from value when fieldtype has ambiguous range.
+//NOTE: validity of ambiguity solver for fieldtype is already checked
+//Also: type !== explicitType. This is already checked.
+function inferTypeForAmbiguousRange(fieldtype, obj) {
+	switch (fieldtype.ambiguitySolvedBy.type) {
+		case "urlVsSomething":
+			if (urlRegex({
+					exact: true
+				}).test(obj._value)) {
+				return "URL";
+			} else {
+				//return the other thing. We know that there's exactly 2 elements, so...
+				return _.filter(fieldtype.ranges, function(t) {
+					return t !== "URL";
+				})[0];
+			}
+			break;
+		case "implicitType":
+			//just assign the first type. It's guaranteed to be value by reference so we don't store
+			//the (bogus) assigned type. 
+			//This however, allows us to easily fake our way through the rest of the validation 
+			//checks, which we can because they don't matter for this particular code-path.
+			obj._isBogusType = true;
+			return fieldtype.ranges[0];
+		default:
+			throw new Error("Ambiguous solver not implemented: " + fieldtype.ambiguitySolvedBy.type);
+	}
+}
+
+
+function validate(obj) {
+
+	schema.validate(obj, function(err, res) {
+		if (err) {
+			throw err;
+		} else if (res) {
+			// validation failed, res.errors is an array of all errors
+			// res.fields is a map keyed by field unique id (eg: `address.name`)
+			// assigned an array of errors per field
+			return console.dir(res.errors);
+		}
+		console.log("ALL FINE");
+		// validation passed
+	});
+
+	//TODO: 
+	//- non-described fields are forbidden
+	//- polymorhpic types -> https://github.com/freeformsystems/async-validate/issues/56
+	//- single/multivalued
+	//- field-level sanitization  / coercing -> async-validate transform()
+	//
 }
 
 
@@ -301,7 +316,7 @@ function isTypeAllowedForRange(typeOrTypeName, fieldtype) {
 }
 
 
-function generateDataTypeValidator(prop) {
+function generateDataTypeValidator(prop, isRequired) {
 
 	//in a preprocess tasks we've already pruned the optional and empty values
 	//so setting required = tru
@@ -349,7 +364,7 @@ function generateDataTypeValidator(prop) {
 		type: 'object',
 		fields: {
 			_value: _.extend(validateObj, {
-				required: prop.required
+				required: isRequired || !!prop.required
 			})
 		}
 	};

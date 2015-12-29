@@ -235,7 +235,7 @@ module.exports = {
 			"CreativeWork"
 		],
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "thingIndex"
 		}
 	},
@@ -246,7 +246,7 @@ module.exports = {
 
 		//Person || Organization
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		}
 	},
@@ -291,7 +291,7 @@ module.exports = {
 	producer: {
 		//Person || Organization
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		},
 		isMulti: true
@@ -299,7 +299,7 @@ module.exports = {
 	publisher: {
 		//Person || Organization
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		},
 		isMulti: true
@@ -352,7 +352,7 @@ module.exports = {
 	},
 	musicBy: {
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		},
 		isMulti: true
@@ -378,7 +378,7 @@ module.exports = {
 	////////////////////////////////////////
 	composer: {
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		},
 		isMulti: true
@@ -479,7 +479,7 @@ module.exports = {
 	jobTitle: {},
 	memberOf: {
 		// ambiguitySolvedBy: {
-		// 	type: "explicitType",
+		// 	type: "implicitType",
 		// 	storage: "sharedRoot"
 		// },
 		ranges: ["Organization"], //Don't allow ProgramMembership for now
@@ -507,7 +507,7 @@ module.exports = {
 	},
 	member: { //e.g.: org or persons
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		},
 		isMulti: true
@@ -547,7 +547,7 @@ module.exports = {
 	organizer: {
 		//Person || Organization
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		},
 		isMulti: true
@@ -555,7 +555,7 @@ module.exports = {
 	performer: {
 		//Person || Organization
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		},
 		isMulti: true
@@ -600,20 +600,20 @@ module.exports = {
 	///////////////////////////////////
 	awayTeam: {
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		}
 	}, //The away team in a sports event.
 	competitor: { //A competitor in a sports event.
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		},
 		isMulti: true
 	},
 	homeTeam: {
 		ambiguitySolvedBy: {
-			type: "explicitType",
+			type: "implicitType",
 			storage: "sharedRoot"
 		}
 	}, //The home team in a sports event.
