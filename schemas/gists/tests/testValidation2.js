@@ -235,14 +235,13 @@ function passInTypeClosure(parentName) {
 			});
 
 		} else {
-			//A: no, type is a Type (e.g.: CreativeWork) instead of a DataType
+			//STATE: type is a TYPE not a DATATYPE
 
-			//Q: is Type a ValueObject or toplevel? 
 			if (type.isValueObject || isToplevel) {
 
 				//A: yes, type is a ValueObject or it's toplevel. 
 
-				//SOLUTION: Since type is a valueobject, type-object should be included by reference.
+				//SOLUTION: type-object should be included by EMBEDDING.
 				//Create a type validator as follows: 
 				//- use the typeValidator as proto
 				//- filter `fields` on typeValidator to exclude non-avail and optional fields. 
@@ -250,17 +249,20 @@ function passInTypeClosure(parentName) {
 
 				//fetch typeValidator (which must exist as per app logic) and remove `fields`
 				//typeValidators[typeName] must exist as per app logic
-				var validatorObj = _.omit(typeValidators[typeName], "fields");
 
-				//prune fields to only leave required or available fields
-				validatorObj.fields = _.reduce(typeValidators[typeName].fields, function(agg, obj, k) {
-					if (obj.required || value[k]) {
-						agg[k] = obj;
-					}
-					return agg;
-				}, {});
+				// var validatorObj = _.omit(typeValidators[typeName], "fields");
 
-				return validatorObj;
+				// //prune fields to only leave required or available fields
+				// validatorObj.fields = _.reduce(typeValidators[typeName].fields, function(agg, obj, k) {
+				// 	if (obj.required || value[k]) {
+				// 		agg[k] = obj;
+				// 	}
+				// 	return agg;
+				// }, {});
+
+				// return validatorObj;
+
+				return typeValidators[typeName];
 			}
 
 			//A: no, type is NOT a valueObject. Therefore either isEntity = true || isAbstract = true
