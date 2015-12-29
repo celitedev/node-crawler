@@ -282,7 +282,7 @@ module.exports = function(configObj) {
 
 							//if intersection.length > 0 -> there's a shared datatype left
 							if (intersection.length) {
-								p.ambiguousSharedParentDataType = intersection[intersection.length - 1];
+								p.ambiguitySolvedBy.sharedParentDataType = intersection[intersection.length - 1];
 								p.isAmbiguitySolved = true;
 							} else {
 								ambiguousStrategyWrong.push(p.id);

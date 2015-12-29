@@ -34,6 +34,7 @@
     "superagent-proxy": "git+https://github.com/gebrits/superagent-proxy.git#patch-1",
     "superagent-retry": "^0.5.1",
     "through": "^2.3.8",
+    "url-regex": "^3.1.0",
     "uuid": "^2.0.1",
     "valid-url": "^1.0.9",
     "validator": "^4.4.0",
