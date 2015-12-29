@@ -58,6 +58,11 @@ module.exports = function(configObj) {
 		console.log(("NOT CHECKING FOR SOUNDNESS").red);
 	}
 
+	(function enrichDatatypes() {
+		_.each(schemaOrgDef.datatypes, function(t) {
+			t.isDataType = true;
+		});
+	}());
 
 	(function extendTypes() {
 

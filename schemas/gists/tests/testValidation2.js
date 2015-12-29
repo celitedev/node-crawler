@@ -126,7 +126,10 @@ function isTypeAllowedForRange(typeOrTypeName, fieldtype) {
 
 function generateDataTypeValidator(prop) {
 
+	//in a preprocess tasks we've already pruned the optional and empty values
+	//so setting required = tru
 	var validateObj = {};
+
 	var dt = prop.ranges[0]; //guaranteed range.length=1 and contents = datatype
 	if (!~datatypesEnum.indexOf(dt)) {
 		throw new Error("should not have 0 datatypes (propName) " + prop.id + " -> " + dt);
@@ -165,10 +168,14 @@ function generateDataTypeValidator(prop) {
 			throw new Error("dattype not supported " + dt); //forgot something?
 	}
 
-	if (prop.required) {
-		validateObj.required = prop.required;
-	}
-	return validateObj;
+	return {
+		type: 'object',
+		fields: {
+			_value: _.extend(validateObj, {
+				required: prop.required
+			})
+		}
+	};
 }
 
 var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName) {
@@ -203,78 +210,31 @@ function passInTypeClosure(parentName) {
 		var fieldName = rule.field;
 		var fieldtype = generatedSchemas.properties[fieldName];
 		var typeName = value._type;
-
 		var isToplevel = !parentName;
 
-		//Q: is type defined explicitly?
-		if (typeName) {
-			//A: yes, type is defined explicitly
+		//fetch type or datatype. This is guaranteed to exist since we run all sorts of prechecks
+		var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName];
 
-			var isDataType = false;
+		if (type.isDataType) {
 
-			var type = generatedSchemas.types[typeName];
-
-			if (!type) {
-				//type not found. Check if it's a datatype instead
-				type = generatedSchemas.datatypes[typeName];
-				isDataType = true;
-			}
-
-			//Q: does specified type exist (as either Type or DataType)?
-			if (!type) {
-				throw new Error("type not found: " + typeName); //A: nope, error out
-			}
-			//A: yes, type exists and is either a Type (.e.: CreativeWork) or a Datatype (e.g.: Text)
+			//SOLUTION: create a field validator as follows: 
+			//- passed value should be an object. This is already checked
+			//- object should have a `_value` field. This field is required.
+			//- `value` should pass fieldValidator. 
+			//- this fieldValidator is a simple datatype validator
 
 
-			//Q: is type allowed for fieldtype?  
-			if (parentName && !isTypeAllowedForRange(type, fieldtype)) {
-				throw new Error("type not allowed for fieldname: " + fieldName); //A: nope, error out
-			}
+			/////////////////////////////////////////////////////////////////
+			//- TBD:fieldValidator should be mixed in with field-specific  //
+			//`validate` and `transform`  
+			//NOTE: validate + transform only make sense on datatypes as opposed to types right? 
+			/////////////////////////////////////////////////////////////////
 
-			if (!parentName) {
+			return generateDataTypeValidator({
+				ranges: [typeName]
+			});
 
-				////////////////////////////////////////////////
-				//TBD: checks to do when object is toplevel?  //
-				////////////////////////////////////////////////
-				//e.g.: check if type != valueObject? 
-			}
-
-
-			//A: yes, type is allowed for field or we're at toplevel. 
-			//Regardless, type is allowed here. 
-
-			//Q: is type a DataType (e.g.: Text, Number) ? 
-			if (isDataType) {
-				//A: yes it is. 
-
-				//SOLUTION: create a field validator as follows: 
-				//- passed value should be an object. This is already checked
-				//- object should have a `_value` field. This field is required.
-				//- `value` should pass fieldValidator. 
-				//- this fieldValidator is a simple datatype validator
-
-
-				/////////////////////////////////////////////////////////////////
-				//- TBD:fieldValidator should be mixed in with field-specific  //
-				//`validate` and `transform`  
-				//NOTE: validate + transform only make sense on datatypes as opposed to types right? 
-				/////////////////////////////////////////////////////////////////
-
-				var valueFieldValidator = generateDataTypeValidator({
-					ranges: [typeName]
-				});
-
-				//_value required as per above
-				valueFieldValidator.required = true;
-
-				return {
-					type: 'object',
-					fields: {
-						_value: valueFieldValidator
-					}
-				};
-			}
+		} else {
 			//A: no, type is a Type (e.g.: CreativeWork) instead of a DataType
 
 			//Q: is Type a ValueObject or toplevel? 
@@ -305,38 +265,6 @@ function passInTypeClosure(parentName) {
 
 			//A: no, type is NOT a valueObject. Therefore either isEntity = true || isAbstract = true
 			throw new Error("isEntity || isAbstract not implemented yet");
-
-		} else {
-			//A: type is NOT defined explicitly
-
-			//Q: is type toplevel? 
-			if (isToplevel) {
-				//A: yep. This is a problem since toplevel element should define _type. 
-				//Otherwise, how to know what we're looking at?
-				throw new Error("toplevel element should define `_type`.");
-			}
-			//A: type is not toplevel. Therefore `fieldtype` is guaranteed to be defined
-
-			//SOLUTION: infer type based on either: 
-			//- not ambiguous -> only type specified on fieldtype
-			//- ambigous -> ambiguous solver on fieldtype and value
-
-			if (!fieldtype.isAmbiguous) {
-				typeName = fieldtype.ranges[0];
-			} else {
-				if (fieldtype.ambiguitySolvedBy.type === "explicitType") {
-					throw new Error("_type should be explicitly defined for (ambiguous field, value) " + fieldName + " - " + JSON.stringify(value, null, 2));
-				}
-				typeName = inferTypeForAmbiguousRange(fieldtype, value);
-				if (!typeName) {
-					throw new Error("ambiguous resolver couldn't resolve type (fieldName, value) " + fieldName + " - " + JSON.stringify(value, null, 2));
-				}
-			}
-
-			//pass in found type and run again
-			value._type = fieldtype.ranges[0];
-			return passInSchema(rule, value);
-
 		}
 	};
 
@@ -344,22 +272,113 @@ function passInTypeClosure(parentName) {
 	return fn;
 }
 
+//1. transform obj so all values are expanded into objects. 
+//E.g.: "some value" is expanded to {"_value": "some value"}
+//2. 
+function transformObject(obj, isTopLevel, ancestors) {
+
+	if (!_.isObject(obj)) {
+		throw new Error("SANITY CHECK: `obj` passed to transformObject should be an object");
+	}
+
+	var typeName = obj._type;
+	var typeNameIsExplicit = !!typeName;
+	var fieldName;
+	var fieldtype;
+
+	if (!isTopLevel) {
+		//State: no toplevel: 
+		//- ancestors.length > 0
+		//- fieldtype is guaranteed to exist
+		fieldName = ancestors[ancestors.length - 1];
+		fieldtype = generatedSchemas.properties[fieldName];
+	}
+
+	if (!typeName) {
+
+		//State: No typeName defined explicitly. Let's get it implicitly. 
+		if (isTopLevel) {
+			throw new Error("toplevel element should define `_type`.");
+		}
+
+		//STATE: fieldtype guaranteed to exist.
+		if (!fieldtype.isAmbiguous) {
+			typeName = fieldtype.ranges[0];
+		} else {
+			if (fieldtype.ambiguitySolvedBy.type === "explicitType") {
+				throw new Error("_type should be explicitly defined for (ambiguous field, value) " + fieldName + " - " + JSON.stringify(obj, null, 2));
+			}
+			typeName = inferTypeForAmbiguousRange(fieldtype, obj);
+			if (!typeName) {
+				throw new Error("ambiguous resolver couldn't resolve type (fieldName, value) " + fieldName + " - " + JSON.stringify(obj, null, 2));
+			}
+		}
+		//pass in found type
+		obj._type = typeName;
+	}
+
+	//State: typeName = obj._type = defined
+	var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName];
+
+	if (!type) {
+		throw new Error("type not found: " + typeName);
+	}
+
+	if (typeNameIsExplicit) {
+		//_type explicitly passed. Let's make sure it's an allowed type
+		if (!isTopLevel && !isTypeAllowedForRange(type, fieldtype)) {
+			throw new Error("type not allowed for fieldname, type: " + ancestors.join(".") + " - " + typeName);
+		}
+	}
+
+	//check that only allowed properties are passed
+	var allowedProps = ["_type", "_value"].concat(_.keys(type.properties) || []),
+		suppliedProps = _.keys(obj),
+		nonAllowedProps = _.difference(suppliedProps, allowedProps);
+
+	if (nonAllowedProps.length) {
+		throw new Error("non-allowed properties found (field, non-allowed props): " + ancestors.join(".") +
+			" - " + nonAllowedProps.join(","));
+	}
+
+	//walk properties and: 
+	//1. if value isn't object -> make it object
+	//6. recurse
+	_.each(obj, function(v, k) {
+
+		if (k === "_type" || k === "_value") return;
+
+		var fieldtype = generatedSchemas.properties[k]; //guaranteed to exist
+
+		if (!_.isObject(v)) {
+			v = {
+				_value: v
+			};
+		}
+		obj[k] = transformObject(v, undefined, ancestors.concat([k]));
+
+	});
+	return obj;
+}
+
+
+
 // var obj = {
 // 	_type: "Place",
 // 	name: "Home sweet home",
 // 	address: {
-// 		_type: "PostalAddress",
+// 		// _type: "PostalAddress", //optional since can be inferred
 // 		addressLocality: "Tilburg",
 // 		postalCode: "5021 GW",
 // 		streetAddress: "stuivesantplein 7",
 // 		email: "gbrits@gmail.com"
 // 	},
 // 	geo: {
-// 		_type: "GeoCoordinates",
+// 		// _type: "GeoCoordinates", //optional since can be inferred
 // 		latitude: 43.123123,
 // 		longitude: 12.123213,
 // 		elevation: 1,
-// 		test: 43.123123,
+// 		// test: 43.123123,
 // 	}
 // };
 
@@ -367,11 +386,11 @@ function passInTypeClosure(parentName) {
 var obj = {
 	_type: "CreativeWork",
 	name: "Home sweet home",
-	// genre: {
-	// 	_type: "URL",
-	// 	_value: "adssad"
-	// }
-	genre: "asdasd",
+	genre: {
+		// _type: "URL",
+		_value: undefined //this is allowed if you really want to.
+	}
+	// genre: "asdasd",
 };
 
 //We can use schema globally now
@@ -381,8 +400,10 @@ if (!obj._type) {
 	throw new Error("_type should be defined on toplevel");
 }
 
-transformObject(obj);
-validate(obj);
+//does a transform in place, so can skip _cloneDeep + assignment if not needed to keep orig
+var objTransformed = transformObject(_.cloneDeep(obj), true, []);
+console.log(objTransformed);
+validate(objTransformed);
 
 
 //infer type from value when fieldtype has ambiguous range.
@@ -428,22 +449,4 @@ function validate(obj) {
 	//- single/multivalued
 	//- field-level sanitization  / coercing -> async-validate transform()
 	//
-}
-
-//transform obj so all values are expanded into objects. 
-//E.g.: "some value" is expanded to {"_value": "some value"}
-function transformObject(obj) {
-
-	_.each(obj, function(v, k) {
-		var fieldType =
-			if (k === "_type" || k === "_value") return;
-		if (_.isObject(v)) {
-			obj[k] = transformObject(v);
-		} else {
-			obj[k] = {
-				_value: v
-			};
-		}
-	});
-	return obj;
 }
