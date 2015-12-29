@@ -1,79 +1,3 @@
-//PERSON
-// {
-//   "Person.additionalName": "Text",
-//   "Person.address": {
-//     "PostalAddress": {
-//       "addressCountry": "Country",
-//       "addressLocality": "Text",
-//       "addressRegion": "Text",
-//       "postOfficeBoxNumber": "Text",
-//       "postalCode": "Text",
-//       "streetAddress": "Text",
-//       "contactType": "Text",
-//       "email": "Text",
-//       "faxNumber": "Text",
-//       "telephone": "Text"
-//     }
-//   },
-//   "Person.birthDate": "Date",
-//   "Person.deathDate": "Date",
-//   "Person.familyName": "Text",
-//   "Person.gender": "Text",
-//   "Person.givenName": "Text",
-//   "Person.honorificPrefix": "Text",
-//   "Person.honorificSuffix": "Text",
-//   "Person.jobTitle": "Text",
-//   "Person.memberOf": "Organization",
-//   "Person.nationality": "Country",
-//   "Person.name": "Text",
-//   "Person.url": "URL",
-//   "Person.description": "Text",
-//   "Person.alternateName": "Text",
-//   "Person.sameAs": "URL"
-// }
-
-
-//PLACE
-// {
-//   "Place.aggregateRating": {
-//     "AggregateRating": {
-//       "ratingTotal": "Number",
-//       "ratingCount": "Integer",
-//       "ratingValue": "Text"
-//     }
-//   },
-//   "Place.address": {
-//     "PostalAddress": {
-//       "addressCountry": "Country",
-//       "addressLocality": "Text",
-//       "addressRegion": "Text",
-//       "postOfficeBoxNumber": "Text",
-//       "postalCode": "Text",
-//       "streetAddress": "Text",
-//       "contactType": "Text",
-//       "email": "Text",
-//       "faxNumber": "Text",
-//       "telephone": "Text"
-//     }
-//   },
-//   "Place.branchCode": "Text",
-//   "Place.containedInPlace": "Place",
-//   "Place.containsPlace": "Place",
-//   "Place.geo": {
-//     "GeoCoordinates": {
-//       "elevation": "Number",
-//       "latitude": "Number",
-//       "longitude": "Number"
-//     }
-//   },
-//   "Place.logo": "URL,ImageObject",
-//   "Place.name": "Text",
-//   "Place.url": "URL",
-//   "Place.description": "Text",
-//   "Place.alternateName": "Text",
-//   "Place.sameAs": "URL"
-// }
-
 var argv = require('yargs').argv;
 var _ = require("lodash");
 var Schema = require('async-validate');
@@ -85,6 +9,7 @@ var generatedSchemas = require("../../createDomainSchemas.js")({
 });
 
 var Rule = require("async-validate").Rule;
+var urlRegex = require('url-regex');
 
 Schema.plugin([
 	require('async-validate/plugin/object'),
@@ -96,20 +21,307 @@ Schema.plugin([
 ]);
 
 
+var datatypesEnum = ["Boolean", "Date", "DateTime", "Number", "Float", "Integer", "Text", "Time", "URL"];
 
-function isSimpleRange(p) {
-	if (p.ranges.length > 1) {
-		return false;
-	} else {
-		return !generatedSchemas.types[p.ranges[0]];
+var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName) {
+	//TODO: isMulti stuff 
+	//aliasOf
+	//p.validate -> array of object guaranteed to exist
+	//p.transform  -> array of object guaranteed to exist
+
+	agg[tName] = {
+		type: "object",
+		fields: _.reduce(type.properties, function(fields, prop, pName) {
+			var fn = passInTypeClosure(tName);
+			fn.required = prop.required; //oeehh, setting props on a function
+			fn.validate = prop.validate;
+			fields[pName] = fn;
+			return fields;
+		}, {})
+	};
+	return agg;
+}, {});
+
+
+// var obj = {
+// 	_type: "Place",
+// 	name: "Home sweet home",
+// 	address: {
+// 		// _type: "PostalAddress", //optional since can be inferred
+// 		addressLocality: "Tilburg",
+// 		postalCode: "5021 GW",
+// 		streetAddress: "stuivesantplein 7",
+// 		email: "gbrits@gmail.com"
+// 	},
+// 	geo: {
+// 		// _type: "GeoCoordinates", //optional since can be inferred
+// 		latitude: 43.123123,
+// 		longitude: 12.123213,
+// 		elevation: 1,
+// 		// test: 43.123123,
+// 	}
+// };
+
+
+var obj = {
+	_type: "CreativeWork",
+	name: "Home sweet home",
+	genre: {
+		// _type: "URL",
+		_value: undefined //this is allowed if you really want to.
+	},
+	about: "bnla"
+		// about: {
+		// 	_type: "Place",
+		// 	name: "bnla"
+		// }
+		// genre: "asdasd",
+};
+
+//We can use schema globally now
+var schema = new Schema(passInTypeClosure(null));
+
+if (!obj._type) {
+	throw new Error("_type should be defined on toplevel");
+}
+
+//does a transform in place, so can skip _cloneDeep + assignment if not needed to keep orig
+var objTransformed = transformObject(_.cloneDeep(obj), true, []);
+console.log(objTransformed);
+validate(objTransformed);
+
+
+function passInTypeClosure(parentName) {
+
+	// var parentType = generatedSchemas.types[parentName];
+
+	var fn = function passInSchema(rule, value) {
+
+		var fieldName = rule.field;
+		var fieldtype = generatedSchemas.properties[fieldName];
+		var typeName = value._type;
+		var isToplevel = !parentName;
+
+		//fetch type or datatype. This is guaranteed to exist since we run all sorts of prechecks
+		var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName];
+
+		if (type.isDataType) {
+			//STATE: type is a DATATYPE
+
+			//field specific validator
+			//TODO: add validation for fieldname
+			return generateDataTypeValidator({
+				ranges: [typeName]
+			});
+
+		} else {
+			//STATE: type is a TYPE not a DATATYPE
+
+			if (type.isValueObject || isToplevel) {
+
+				//SOLUTION: type-object should be included by EMBEDDING.
+
+				var validatorObj = _.omit(typeValidators[typeName], "fields");
+
+				//Prune fields to only leave required or available fields. 
+				//This makes sure recursion doesn't fail on empty results.
+				validatorObj.fields = _.reduce(typeValidators[typeName].fields, function(agg, obj, k) {
+					if (obj.required || value[k]) {
+						agg[k] = obj;
+					}
+					return agg;
+				}, {});
+
+				return validatorObj;
+			}
+
+			//STATE: type is Entity. because it: 
+			//- is a type
+			//- is not a ValueObject
+			//- can not be Abstract, since otherwise an error would have been raised during schema creation
+
+			//SOLUTION: type-object should be included by referencing
+
+			var uuidValidator = generateDataTypeValidator({
+				ranges: ["Text"]
+			}, true);
+
+			//TODO: add UUID validate 
+
+			return uuidValidator;
+		}
+	};
+
+	fn.isSchemaFunction = true;
+	return fn;
+}
+
+//1. transform obj so all values are expanded into objects. 
+//E.g.: "some value" is expanded to {"_value": "some value"}
+//2. 
+function transformObject(obj, isTopLevel, ancestors) {
+
+	if (!_.isObject(obj)) {
+		throw new Error("SANITY CHECK: `obj` passed to transformObject should be an object");
+	}
+
+	var typeName = obj._type;
+	var typeNameIsExplicit = !!typeName;
+	var fieldName;
+	var fieldtype;
+
+	if (!isTopLevel) {
+		//State: no toplevel: 
+		//- ancestors.length > 0
+		//- fieldtype is guaranteed to exist
+		fieldName = ancestors[ancestors.length - 1];
+		fieldtype = generatedSchemas.properties[fieldName];
+	}
+
+	if (!typeName) {
+
+		//State: No typeName defined explicitly. Let's get it implicitly. 
+		if (isTopLevel) {
+			throw new Error("toplevel element should define `_type`.");
+		}
+
+		//STATE: fieldtype guaranteed to exist.
+		if (!fieldtype.isAmbiguous) {
+			typeName = fieldtype.ranges[0];
+		} else {
+			if (fieldtype.ambiguitySolvedBy.type === "explicitType") {
+				throw new Error("_type should be explicitly defined for (ambiguous field, value) " + fieldName + " - " + JSON.stringify(obj, null, 2));
+			}
+			typeName = inferTypeForAmbiguousRange(fieldtype, obj);
+			if (!typeName) {
+				throw new Error("ambiguous resolver couldn't resolve type (fieldName, value) " + fieldName + " - " + JSON.stringify(obj, null, 2));
+			}
+		}
+		//pass in found type
+		obj._type = typeName;
+	}
+
+	//State: typeName = obj._type = defined
+	var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName];
+
+	if (!type) {
+		throw new Error("type not found: " + typeName);
+	}
+
+	if (typeNameIsExplicit) {
+		//_type explicitly passed. Let's make sure it's an allowed type
+		if (!isTopLevel && !isTypeAllowedForRange(type, fieldtype)) {
+			throw new Error("type not allowed for fieldname, type: " + ancestors.join(".") + " - " + typeName);
+		}
+	}
+
+	//check that only allowed properties are passed
+	var allowedProps = ["_type", "_value", "_isBogusType"].concat(_.keys(type.properties) || []),
+		suppliedProps = _.keys(obj),
+		nonAllowedProps = _.difference(suppliedProps, allowedProps);
+
+	if (nonAllowedProps.length) {
+		throw new Error("non-allowed properties found (field, non-allowed props): " + ancestors.join(".") +
+			" - " + nonAllowedProps.join(","));
+	}
+
+	//walk properties and: 
+	//1. if value isn't object -> make it object
+	//6. recurse
+	_.each(obj, function(v, k) {
+
+		if (k === "_type" || k === "_value" || k === "_isBogusType") return;
+
+		var fieldtype = generatedSchemas.properties[k]; //guaranteed to exist
+
+		if (!_.isObject(v)) {
+			v = {
+				_value: v
+			};
+		}
+		obj[k] = transformObject(v, undefined, ancestors.concat([k]));
+
+	});
+	return obj;
+}
+
+
+//infer type from value when fieldtype has ambiguous range.
+//NOTE: validity of ambiguity solver for fieldtype is already checked
+//Also: type !== explicitType. This is already checked.
+function inferTypeForAmbiguousRange(fieldtype, obj) {
+	switch (fieldtype.ambiguitySolvedBy.type) {
+		case "urlVsSomething":
+			if (urlRegex({
+					exact: true
+				}).test(obj._value)) {
+				return "URL";
+			} else {
+				//return the other thing. We know that there's exactly 2 elements, so...
+				return _.filter(fieldtype.ranges, function(t) {
+					return t !== "URL";
+				})[0];
+			}
+			break;
+		case "implicitType":
+			//just assign the first type. It's guaranteed to be value by reference so we don't store
+			//the (bogus) assigned type. 
+			//This however, allows us to easily fake our way through the rest of the validation 
+			//checks, which we can because they don't matter for this particular code-path.
+			obj._isBogusType = true;
+			return fieldtype.ranges[0];
+		default:
+			throw new Error("Ambiguous solver not implemented: " + fieldtype.ambiguitySolvedBy.type);
 	}
 }
 
-var datatypesEnum = ["Boolean", "Date", "DateTime", "Number", "Float", "Integer", "Text", "Time", "URL"];
 
-function generateDataTypeValidator(prop) {
+function validate(obj) {
 
+	schema.validate(obj, function(err, res) {
+		if (err) {
+			throw err;
+		} else if (res) {
+			// validation failed, res.errors is an array of all errors
+			// res.fields is a map keyed by field unique id (eg: `address.name`)
+			// assigned an array of errors per field
+			return console.dir(res.errors);
+		}
+		console.log("ALL FINE");
+		// validation passed
+	});
+
+	//TODO: 
+	//- non-described fields are forbidden
+	//- polymorhpic types -> https://github.com/freeformsystems/async-validate/issues/56
+	//- single/multivalued
+	//- field-level sanitization  / coercing -> async-validate transform()
+	//
+}
+
+
+//Calc if type is allowed in range. 
+function isTypeAllowedForRange(typeOrTypeName, fieldtype) {
+
+	//Calculated by taking the intersection of the type (including it's ancestors) 
+	//and the range and checking for non-empty.
+	//We take the ancestors as well since type may be a subtype of any of the types defined in range.
+
+	var type = _.isString(typeOrTypeName) ?
+		generatedSchemas.types[typeOrTypeName] || generatedSchemas.datatypes[typeOrTypeName] :
+		typeOrTypeName;
+
+	var ancestorsAndSelf = _.uniq(type.ancestors.concat(type.id));
+	return _.intersection(ancestorsAndSelf, fieldtype.ranges).length;
+}
+
+
+function generateDataTypeValidator(prop, isRequired) {
+
+	//in a preprocess tasks we've already pruned the optional and empty values
+	//so setting required = tru
 	var validateObj = {};
+
 	var dt = prop.ranges[0]; //guaranteed range.length=1 and contents = datatype
 	if (!~datatypesEnum.indexOf(dt)) {
 		throw new Error("should not have 0 datatypes (propName) " + prop.id + " -> " + dt);
@@ -148,235 +360,12 @@ function generateDataTypeValidator(prop) {
 			throw new Error("dattype not supported " + dt); //forgot something?
 	}
 
-	if (prop.required) {
-		validateObj.required = prop.required;
-	}
-	return validateObj;
-}
-
-var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName) {
-
-	var typeValidator = {};
-	typeValidator.type = "object";
-
-	//TODO: type.required -> set prop.required
-	//TODO set type of properties (datatypes)
-	//TODO: isMulti stuff 
-	//aliasOf
-	//p.validate -> array of object guaranteed to exist
-	//p.transform  -> array of object guaranteed to exist
-	//TODO: error when other fields are found then those specified.
-	typeValidator.fields = _.reduce(type.properties, function(fields, prop, pName) {
-		// if (isSimpleRange(prop)) {
-
-		// 	//guaranteed: range of 1 + datatype instead of type
-		// 	fields[pName] = [generateDataTypeValidator(prop)].concat(prop.validate);
-
-		// } else {
-
-		// 	var fn = passInTypeClosure(tName);
-		// 	if (prop.required) {
-		// 		fn.required = prop.required; //we can just set props on functions remember...
-		// 	}
-		// 	fields[pName] = fn;
-		// }
-		var fn = passInTypeClosure(tName);
-		fn.required = prop.required; //we can just set props on functions remember...
-		fn.validate = prop.validate;
-
-		fields[pName] = fn;
-
-		return fields;
-	}, {});
-
-	agg[tName] = typeValidator;
-	return agg;
-}, {});
-
-// console.log(JSON.stringify(typeValidators, null, 2));
-
-// console.log(typeValidators);
-//schema passed in if: 
-//- range is multivalued OR 
-//- range contains a type instead of datatype
-//- object passed in 
-function passInTypeClosure(parentName) {
-
-	var parentType = generatedSchemas.types[parentName];
-
-	var fn = function passInSchema(rule, value) {
-
-		var fieldName = rule.field;
-		var fieldtype = generatedSchemas.properties[fieldName];
-		var rangeTypeName = value._type;
-
-
-		//Q: is type defined explicitly?
-		// if (rangeTypeName) {
-		// 	//A: type is defined explicitly
-		// 	console.
-
-		// }else{
-		// 	//A: type is NOT defined explicitly
-		// }
-
-		if (!rangeTypeName) {
-
-			if (!fieldtype.isAmbiguous) {
-
-			}
-
-			//TYPE NOT DEFINED EXPLICITLY
-			//LETS TRY TO DERIVE IT ANYHOW
-
-			//lookup fieldname
-			//this gives ranges + ambiguityRule for ambiguous range
-			//This allows us to find type and this validator
-			//If we fail -> pass object that will cause an error
-
-
-			//rangeTypeName = ...
-
-			//_type not supplied and couldn't be inferred. 
-			if (!rangeTypeName) {
-				return {
-					type: 'object',
-					fields: {
-						_type: {
-							type: "string",
-							required: true
-						}
-					}
-				};
-			}
-		} else if (parentType && !~parentType.properties[fieldName].ranges.indexOf(rangeTypeName)) {
-			//wrong explicitly defined type
-			//TODO: return some object as above that fails with correct message
-			throw new Error("wrong type for (prop) should be (range) (prop, range) " +
-				fieldName + ", (" + parentType.properties[fieldName].ranges.join(",") + ")");
+	return {
+		type: 'object',
+		fields: {
+			_value: _.extend(validateObj, {
+				required: isRequired || !!prop.required
+			})
 		}
-
-		//POST: EXPLICIT AND CORRECT TYPE SPECIFIED
-		//Not clear yet if: 
-		//- datatype (with explicitly passed _type)
-		//- type
-
-		var datatype = generatedSchemas.datatypes[rangeTypeName];
-		if (datatype) { //supplied _type is a datatype
-
-			//value is of format: {
-			//	_type: "String", //or other datatype
-			//  _value: "blaa" //this should always exist in this case
-			//}
-			var valueFieldValidator = generateDataTypeValidator({
-				ranges: [rangeTypeName]
-			});
-
-			//_values required as per above
-			valueFieldValidator.required = true;
-
-			return {
-				type: 'object',
-				fields: {
-					_value: valueFieldValidator
-				}
-			};
-		}
-
-		//POST: _TYPE IS EXPLCIT AND CORREC CLASSTYPE SPECIFIED
-		var staticInputForType = typeValidators[rangeTypeName];
-		if (!staticInputForType) {
-			throw new Error("validator object not found in typeValidators: " + staticInputForType);
-		}
-
-		var valObject = _.omit(staticInputForType, "fields");
-
-		//Implement 'optional' by removing non-required fields on schema if not supplied on value 
-		//cloning doesn't seem to work since field-functions are transformed into objects. 
-		//Therefore we 'clone' like this
-		valObject.fields = _.reduce(staticInputForType.fields, function(agg, obj, k) {
-			//only not include in schema if optional + value not provided
-			if (obj.required || value[k]) {
-				agg[k] = obj;
-			}
-			return agg;
-		}, {});
-
-		return valObject;
 	};
-
-	fn.isSchemaFunction = true;
-	return fn;
-}
-
-// var obj = {
-// 	_type: "Place",
-// 	name: "Home sweet home",
-// 	address: {
-// 		_type: "PostalAddress",
-// 		addressLocality: "Tilburg",
-// 		postalCode: "5021 GW",
-// 		streetAddress: "stuivesantplein 7",
-// 		email: "gbrits@gmail.com"
-// 	},
-// 	geo: {
-// 		_type: "GeoCoordinates",
-// 		latitude: 43.123123,
-// 		longitude: 12.123213,
-// 		elevation: 1,
-// 		test: 43.123123,
-// 	}
-// };
-
-
-var obj = {
-	_type: "CreativeWork",
-	// name: {
-	// 	_type: "Text",
-	// 	_value: "Home sweet home",
-	// },
-	name: "Home sweet home",
-	genre: {
-		_type: "URL",
-		_value: "adssad"
-	}
-	// genre: "Text"
-};
-
-validate(obj);
-
-function validate(obj) {
-
-	if (!obj._type) {
-		throw new Error("to be validated root object doesn't have _type: " + JSON.stringify(obj.null, 2));
-	}
-
-	var schemaFunction = passInTypeClosure(null);
-	if (!schemaFunction) {
-		throw new Error("SANITY CHECK: validationOBJ not found for type: '" + obj._type +
-			"'. Possible values: " + _.values(validatorFnObj).jon(","));
-	}
-
-	var schema = new Schema(schemaFunction);
-
-	schema.validate(obj, function(err, res) {
-		if (err) {
-			throw err;
-		} else if (res) {
-			// validation failed, res.errors is an array of all errors
-			// res.fields is a map keyed by field unique id (eg: `address.name`)
-			// assigned an array of errors per field
-			return console.dir(res.errors);
-		}
-		console.log("ALL FINE");
-		// validation passed
-	});
-
-
-	//TODO: 
-	//- non-described fields are forbidden
-	//- polymorhpic types -> https://github.com/freeformsystems/async-validate/issues/56
-	//- single/multivalued
-	//- field-level sanitization  / coercing -> async-validate transform()
-	//
 }
