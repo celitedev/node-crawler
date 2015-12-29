@@ -88,17 +88,28 @@ if (!obj._type) {
 //does a transform in place, so can skip _cloneDeep + assignment if not needed to keep orig
 var objTransformed = transformObject(_.cloneDeep(obj), true, []);
 console.log(objTransformed);
-validate(objTransformed);
+schema.validate(objTransformed, function(err, res) {
+	if (err) {
+		throw err;
+	} else if (res) {
+		// validation failed, res.errors is an array of all errors
+		// res.fields is a map keyed by field unique id (eg: `address.name`)
+		// assigned an array of errors per field
+		return console.dir(res.errors);
+	}
+	console.log("ALL FINE");
+	// STATE: validation passed
+});
 
 
 function passInTypeClosure(parentName) {
 
-	// var parentType = generatedSchemas.types[parentName];
+	// var parentType = generatedSchemas.types[parentName]; //not needed for now
 
 	var fn = function passInSchema(rule, value) {
 
-		var fieldName = rule.field;
-		var fieldtype = generatedSchemas.properties[fieldName];
+		// var fieldName = rule.field;
+		// var fieldtype = generatedSchemas.properties[fieldName];
 		var typeName = value._type;
 		var isToplevel = !parentName;
 
@@ -106,6 +117,7 @@ function passInTypeClosure(parentName) {
 		var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName];
 
 		if (type.isDataType) {
+
 			//STATE: type is a DATATYPE
 
 			//field specific validator
@@ -115,6 +127,7 @@ function passInTypeClosure(parentName) {
 			});
 
 		} else {
+
 			//STATE: type is a TYPE not a DATATYPE
 
 			if (type.isValueObject || isToplevel) {
@@ -133,22 +146,25 @@ function passInTypeClosure(parentName) {
 				}, {});
 
 				return validatorObj;
+
+			} else {
+
+				//STATE: type is Entity. because it: 
+				//- is a type
+				//- is not a ValueObject
+				//- can not be Abstract, since otherwise an error would have been raised during schema creation
+
+				//SOLUTION: type-object should be included by referencing
+
+				var uuidValidator = generateDataTypeValidator({
+					ranges: ["Text"]
+				}, true);
+
+				//TODO: add UUID validate 
+
+				return uuidValidator;
+
 			}
-
-			//STATE: type is Entity. because it: 
-			//- is a type
-			//- is not a ValueObject
-			//- can not be Abstract, since otherwise an error would have been raised during schema creation
-
-			//SOLUTION: type-object should be included by REFERENCING
-
-			var uuidValidator = generateDataTypeValidator({
-				ranges: ["Text"]
-			}, true);
-
-			//TODO: add UUID validate 
-
-			return uuidValidator;
 		}
 	};
 
@@ -273,30 +289,6 @@ function inferTypeForAmbiguousRange(fieldtype, obj) {
 		default:
 			throw new Error("Ambiguous solver not implemented: " + fieldtype.ambiguitySolvedBy.type);
 	}
-}
-
-
-function validate(obj) {
-
-	schema.validate(obj, function(err, res) {
-		if (err) {
-			throw err;
-		} else if (res) {
-			// validation failed, res.errors is an array of all errors
-			// res.fields is a map keyed by field unique id (eg: `address.name`)
-			// assigned an array of errors per field
-			return console.dir(res.errors);
-		}
-		console.log("ALL FINE");
-		// validation passed
-	});
-
-	//TODO: 
-	//- non-described fields are forbidden
-	//- polymorhpic types -> https://github.com/freeformsystems/async-validate/issues/56
-	//- single/multivalued
-	//- field-level sanitization  / coercing -> async-validate transform()
-	//
 }
 
 
