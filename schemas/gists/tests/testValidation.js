@@ -17,14 +17,16 @@ Schema.plugin([
 	require('async-validate/plugin/float'),
 	require('async-validate/plugin/integer'),
 	require('async-validate/plugin/number'),
-	require('async-validate/plugin/util')
+	require('async-validate/plugin/util'),
+	require('async-validate/plugin/array')
 ]);
 
 
 var datatypesEnum = ["Boolean", "Date", "DateTime", "Number", "Float", "Integer", "Text", "Time", "URL"];
 
 var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName) {
-	//TODO: isMulti stuff 
+
+	//TODO:
 	//aliasOf
 	//p.validate -> array of object guaranteed to exist
 	//p.transform  -> array of object guaranteed to exist
@@ -32,10 +34,24 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 	agg[tName] = {
 		type: "object",
 		fields: _.reduce(type.properties, function(fields, prop, pName) {
+
 			var fn = passInTypeClosure(tName);
-			fn.required = prop.required; //oeehh, setting props on a function
-			fn.validate = prop.validate;
-			fields[pName] = fn;
+			fn.validate = prop.validate; //seting on fn, which is potentially contained in object
+
+			var fieldValidatorObj;
+			if (!prop.isMulti) {
+				fieldValidatorObj = fn;
+			} else {
+				fieldValidatorObj = {
+					type: "array",
+					values: fn
+				};
+			}
+
+			fieldValidatorObj.required = prop.required; //setting on returned object
+
+			fields[pName] = fieldValidatorObj;
+
 			return fields;
 		}, {})
 	};
@@ -66,10 +82,11 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 var obj = {
 	_type: "CreativeWork",
 	name: "Home sweet home",
-	genre: {
-		// _type: "URL",
-		_value: undefined //this is allowed if you really want to.
-	},
+	// genre: {
+	// 	// _type: "URL",
+	// 	_value: "asdas" //this is allowed if you really want to.
+	// },
+	genre: ["joo", "asd", "sadas"],
 	about: "bnla"
 		// about: {
 		// 	_type: "Place",
@@ -104,12 +121,13 @@ schema.validate(objTransformed, function(err, res) {
 
 function passInTypeClosure(parentName) {
 
-	// var parentType = generatedSchemas.types[parentName]; //not needed for now
+	var parentType = generatedSchemas.types[parentName]; //not needed for now
 
 	var fn = function passInSchema(rule, value) {
 
 		// var fieldName = rule.field;
-		// var fieldtype = generatedSchemas.properties[fieldName];
+		// var fieldtype = generatedSchemas.properties[fieldName]; //NOTE: if needed switch to type.properties
+
 		var typeName = value._type;
 		var isToplevel = !parentName;
 
@@ -138,6 +156,7 @@ function passInTypeClosure(parentName) {
 
 				//Prune fields to only leave required or available fields. 
 				//This makes sure recursion doesn't fail on empty results.
+				//tech: copy properties (being functions) directly, instead of cloning, since this fails..
 				validatorObj.fields = _.reduce(typeValidators[typeName].fields, function(agg, obj, k) {
 					if (obj.required || value[k]) {
 						agg[k] = obj;
@@ -243,20 +262,48 @@ function transformObject(obj, isTopLevel, ancestors) {
 
 	//walk properties and: 
 	//1. if value isn't object -> make it object
+	//2. error out if value is array but fieldtype is singleValued. 
+	//3. make value multivalued by doing v -> [v], if field is multivalued, and not already array
 	//6. recurse
 	_.each(obj, function(v, k) {
 
 		if (k === "_type" || k === "_value" || k === "_isBogusType") return;
 
-		var fieldtype = generatedSchemas.properties[k]; //guaranteed to exist
+		var fieldtype = type.properties[k]; //guaranteed to exist
 
-		if (!_.isObject(v)) {
-			v = {
-				_value: v
-			};
+		//throw error if fieldtype is singlevalued but actual value is multivalued (i.e.: an array)
+		if (_.isArray(v) && !fieldtype.isMulti) {
+			throw new Error("array found for singlevalue field: (fieldtype, value) " +
+				fieldtype.id + " - " + JSON.stringify(v, null, 2));
 		}
-		obj[k] = transformObject(v, undefined, ancestors.concat([k]));
 
+		//separate code paths for multivalued and singlevalued. 
+		if (fieldtype.isMulti) {
+
+			v = _.isArray(v) ? v : [v]; //make singlevalued value into array
+
+			obj[k] = _.map(v, function(singleVal) {
+
+				if (!_.isObject(singleVal)) {
+					singleVal = {
+						_value: singleVal
+					};
+				}
+
+				return transformObject(singleVal, undefined, ancestors.concat([k]));
+			});
+
+		} else {
+			//singlevalued
+
+			if (!_.isObject(v)) {
+				v = {
+					_value: v
+				};
+			}
+
+			obj[k] = transformObject(v, undefined, ancestors.concat([k]));
+		}
 	});
 	return obj;
 }
