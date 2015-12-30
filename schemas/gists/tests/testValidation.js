@@ -38,17 +38,12 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 			var fn = passInTypeClosure(tName);
 			fn.validate = prop.validate; //seting on fn, which is potentially contained in object
 
-			var fieldValidatorObj;
-			if (!prop.isMulti) {
-				fieldValidatorObj = fn;
-			} else {
-				fieldValidatorObj = {
-					type: "array",
-					values: fn
-				};
-			}
-
-			fieldValidatorObj.required = prop.required; //setting on returned object
+			var fieldValidatorObj = _.extend(!prop.isMulti ? fn : {
+				type: "array",
+				values: fn
+			}, {
+				required: prop.required //setting on returned object
+			});
 
 			fields[pName] = fieldValidatorObj;
 
@@ -82,17 +77,8 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 var obj = {
 	_type: "CreativeWork",
 	name: "Home sweet home",
-	// genre: {
-	// 	// _type: "URL",
-	// 	_value: "asdas" //this is allowed if you really want to.
-	// },
-	genre: ["joo", "asd", "sadas"],
+	genre: ["joo", "asdas", "sadas"],
 	about: "bnla"
-		// about: {
-		// 	_type: "Place",
-		// 	name: "bnla"
-		// }
-		// genre: "asdasd",
 };
 
 //We can use schema globally now
@@ -121,7 +107,7 @@ schema.validate(objTransformed, function(err, res) {
 
 function passInTypeClosure(parentName) {
 
-	var parentType = generatedSchemas.types[parentName]; //not needed for now
+	// var parentType = generatedSchemas.types[parentName]; //not needed for now
 
 	var fn = function passInSchema(rule, value) {
 
@@ -130,6 +116,14 @@ function passInTypeClosure(parentName) {
 
 		var typeName = value._type;
 		var isToplevel = !parentName;
+
+		//we explicitly allow an array value to come through here so we can properly raise a 
+		//validation error. 
+		if (_.isArray(value)) {
+			return generateDataTypeValidator({
+				ranges: ["Text"] //just specifiy a bogus range. This will not influence the error message
+			});
+		}
 
 		//fetch type or datatype. This is guaranteed to exist since we run all sorts of prechecks
 		var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName];
@@ -189,6 +183,15 @@ function passInTypeClosure(parentName) {
 
 	fn.isSchemaFunction = true;
 	return fn;
+}
+
+function transformSingleObject(ancestors, k, val) {
+	if (!_.isObject(val)) {
+		val = {
+			_value: val
+		};
+	}
+	return transformObject(val, undefined, ancestors.concat([k]));
 }
 
 //1. transform obj so all values are expanded into objects. 
@@ -271,40 +274,26 @@ function transformObject(obj, isTopLevel, ancestors) {
 
 		var fieldtype = type.properties[k]; //guaranteed to exist
 
-		//throw error if fieldtype is singlevalued but actual value is multivalued (i.e.: an array)
-		if (_.isArray(v) && !fieldtype.isMulti) {
-			throw new Error("array found for singlevalue field: (fieldtype, value) " +
-				fieldtype.id + " - " + JSON.stringify(v, null, 2));
+		if (v === undefined) {
+			delete obj[k]; //lets nip this in the balls
+			return;
 		}
 
-		//separate code paths for multivalued and singlevalued. 
+		//create array if fieldtype isMulti
 		if (fieldtype.isMulti) {
-
-			v = _.isArray(v) ? v : [v]; //make singlevalued value into array
-
-			obj[k] = _.map(v, function(singleVal) {
-
-				if (!_.isObject(singleVal)) {
-					singleVal = {
-						_value: singleVal
-					};
-				}
-
-				return transformObject(singleVal, undefined, ancestors.concat([k]));
-			});
-
-		} else {
-			//singlevalued
-
-			if (!_.isObject(v)) {
-				v = {
-					_value: v
-				};
+			v = _.isArray(v) ? v : [v];
+			if (!v.length) {
+				delete obj[k]; //nip this bastard as well
+				return;
 			}
-
-			obj[k] = transformObject(v, undefined, ancestors.concat([k]));
 		}
-	});
+
+		//bit weird: we allow an array value for isMulti=false. 
+		//This so we can catch this validation error properly later in the validation code
+		obj[k] = !_.isArray(v) ? transformSingleObject(ancestors, k, v) : _.map(v, _.partial(transformSingleObject, ancestors, k));
+
+	}); //end each
+
 	return obj;
 }
 
