@@ -36,7 +36,6 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 		fields: _.reduce(type.properties, function(fields, prop, pName) {
 
 			var fn = passInTypeClosure(tName);
-			fn.validate = prop.validate; //seting on fn
 
 			var fieldValidatorObj = !prop.isMulti ? fn : {
 				type: "array",
@@ -78,7 +77,7 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 var obj = {
 	_type: "CreativeWork",
 	name: "Home sweet home",
-	genre: [], //["joo", "asdas", "sadas"],
+	// genre: [], //["joo", "asdas", "sadas"],
 	about: "bnla"
 };
 
@@ -112,8 +111,7 @@ function passInTypeClosure(parentName) {
 
 	var fn = function passInSchema(rule, value) {
 
-		// var fieldName = rule.field;
-		// var fieldtype = generatedSchemas.properties[fieldName]; //NOTE: if needed switch to type.properties
+		var fieldtype = generatedSchemas.properties[rule.field]; //NOTE: ok to use instead of generatedSchemas.properties
 
 		var typeName = value._type;
 		var isToplevel = !parentName;
@@ -134,10 +132,12 @@ function passInTypeClosure(parentName) {
 			//STATE: type is a DATATYPE
 
 			//field specific validator
-			//TODO: add validation for fieldname
 			return generateDataTypeValidator({
-				ranges: [typeName]
+				fieldName: rule.field,
+				ranges: [typeName],
+				validate: fieldtype ? fieldtype.validate : undefined
 			});
+
 
 		} else {
 
@@ -170,13 +170,11 @@ function passInTypeClosure(parentName) {
 
 				//SOLUTION: type-object should be included by referencing
 
-				var uuidValidator = generateDataTypeValidator({
-					ranges: ["Text"]
-				}, true);
-
-				//TODO: add UUID validate 
-
-				return uuidValidator;
+				return generateDataTypeValidator({
+					ranges: ["Text"],
+					required: true,
+					validate: "isUUID"
+				});
 
 			}
 		}
@@ -345,11 +343,15 @@ function isTypeAllowedForRange(typeOrTypeName, fieldtype) {
 }
 
 
-function generateDataTypeValidator(prop, isRequired) {
+//NOTE: 'required' is managed upstream
+function generateDataTypeValidator(prop) {
 
 	//in a preprocess tasks we've already pruned the optional and empty values
 	//so setting required = tru
-	var validateObj = {};
+	var validateObj = {
+		required: !!prop.required
+	};
+
 
 	var dt = prop.ranges[0]; //guaranteed range.length=1 and contents = datatype
 	if (!~datatypesEnum.indexOf(dt)) {
@@ -386,13 +388,28 @@ function generateDataTypeValidator(prop, isRequired) {
 			//TODO:  format: "URL"
 			break;
 		default:
-			throw new Error("dattype not supported " + dt); //forgot something?
+			throw new Error("dattype not supported " + dt);
+	}
+
+	var arr = [validateObj];
+
+	//TODO: add transform. Do we do this here or in our own transformer? Probably the latter
+
+	//add validation
+	if (prop.validate) {
+		arr.push(function(cb) {
+			var validateArr = _.isArray(prop.validate) ? prop.validate : [prop.validate];
+
+			//TODO: run these in series, with async wrapper
+			// console.log("VALIDATOR", prop);
+			cb();
+		});
 	}
 
 	return {
 		type: 'object',
 		fields: {
-			_value: validateObj
+			_value: arr
 		}
 	};
 }

@@ -267,7 +267,6 @@ module.exports = {
 		ambiguitySolvedBy: {
 			type: "urlVsSomething"
 		},
-		required: true,
 		isMulti: true
 	},
 	hasPart: {
