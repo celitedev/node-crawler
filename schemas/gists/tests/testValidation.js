@@ -1,7 +1,7 @@
 var argv = require('yargs').argv;
 var _ = require("lodash");
 var Schema = require('async-validate');
-
+var async = require("async");
 var utils = require("../../utils");
 var config = require("../../config");
 var generatedSchemas = require("../../createDomainSchemas.js")({
@@ -399,10 +399,10 @@ function generateDataTypeValidator(prop) {
 	if (prop.validate) {
 		arr.push(function(cb) {
 			var validateArr = _.isArray(prop.validate) ? prop.validate : [prop.validate];
+			async.eachSeries(validateArr, function iterator(validateObj, itemCb) {
 
-			//TODO: run these in series, with async wrapper
-			// console.log("VALIDATOR", prop);
-			cb();
+				itemCb();
+			}, cb);
 		});
 	}
 
