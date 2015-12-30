@@ -2,14 +2,18 @@ var argv = require('yargs').argv;
 var _ = require("lodash");
 var Schema = require('async-validate');
 var async = require("async");
+var validator = require("validator");
+
+var Rule = require("async-validate").Rule;
+var urlRegex = require('url-regex');
+var hogan = require("hogan");
+
 var utils = require("../../utils");
 var config = require("../../config");
 var generatedSchemas = require("../../createDomainSchemas.js")({
 	checkSoundness: true
 });
 
-var Rule = require("async-validate").Rule;
-var urlRegex = require('url-regex');
 
 Schema.plugin([
 	require('async-validate/plugin/object'),
@@ -76,9 +80,10 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 
 var obj = {
 	_type: "CreativeWork",
-	name: "Home sweet home",
+	name: "Home asdasdasd",
+	url: "http://www.google.com",
 	// genre: [], //["joo", "asdas", "sadas"],
-	about: "bnla"
+	about: "de305d54-75b4-431b-adb2-eb6b9e546014"
 };
 
 //We can use schema globally now
@@ -342,9 +347,23 @@ function isTypeAllowedForRange(typeOrTypeName, fieldtype) {
 	return _.intersection(ancestorsAndSelf, fieldtype.ranges).length;
 }
 
+function addCannedValidator(validateRulesArr, name) {
+	validateRulesArr.push(function(cb) {
+		var cannedValidator = validator[name];
+		if (!cannedValidator) {
+			return cb(new Error("canned validator not found: " + name));
+		}
+		if (!cannedValidator(this.value)) {
+			this.raise(this.value + ' is not a valid ' + name);
+		}
+		return cb();
+	});
+}
+
 
 //NOTE: 'required' is managed upstream
 function generateDataTypeValidator(prop) {
+
 
 	//in a preprocess tasks we've already pruned the optional and empty values
 	//so setting required = tru
@@ -352,6 +371,7 @@ function generateDataTypeValidator(prop) {
 		required: !!prop.required
 	};
 
+	var validateRulesArr = [validateObj];
 
 	var dt = prop.ranges[0]; //guaranteed range.length=1 and contents = datatype
 	if (!~datatypesEnum.indexOf(dt)) {
@@ -385,31 +405,76 @@ function generateDataTypeValidator(prop) {
 			break;
 		case "URL":
 			validateObj.type = "string";
-			//TODO:  format: "URL"
+			addCannedValidator(validateRulesArr, "isURL");
 			break;
 		default:
 			throw new Error("dattype not supported " + dt);
 	}
 
-	var arr = [validateObj];
-
-	//TODO: add transform. Do we do this here or in our own transformer? Probably the latter
-
-	//add validation
+	//add custom validation
 	if (prop.validate) {
-		arr.push(function(cb) {
-			var validateArr = _.isArray(prop.validate) ? prop.validate : [prop.validate];
-			async.eachSeries(validateArr, function iterator(validateObj, itemCb) {
+		var customValidationArr = _.isArray(prop.validate) ? prop.validate : [prop.validate];
+		validateRulesArr = validateRulesArr.concat(_.map(customValidationArr, function(validateObj) {
+			return function(cb) {
 
-				itemCb();
-			}, cb);
-		});
+				//allow shorthand notation
+				if (_.isFunction(validateObj) || _.isString(validateObj)) {
+					validateObj = {
+						type: validateObj
+					};
+				}
+
+				if (_.isString(validateObj.type)) {
+					var cannedValidator = validator[validateObj.type];
+					if (!cannedValidator) {
+						return cb(new Error("canned validator not found: " + validateObj.type));
+					}
+					var isValid;
+					if (_.isArray(validateObj.options)) {
+						isValid = _.partial(cannedValidator, this.value).apply(null, validateObj.options);
+					} else {
+						isValid = cannedValidator(this.value, validateObj.options);
+					}
+
+					if (!isValid) {
+
+						var msg;
+
+						//if `errorMessage` defined on validateObj choose this
+						//It's a hogan/mustache template. The only variable to be used is `val`
+						//
+						//e.g.: "{{val}} isn't a correct URL"
+						if (validateObj.errorMessage) {
+							msg = hogan.compile(validateObj.errorMessage).render({
+								val: this.value
+							});
+						} else {
+
+							//for error message from, say, 'isURL' -> 'URL'
+							var errorName = validateObj.type;
+							if (errorName.substring(0, 2) === "is") {
+								errorName = errorName.substring(2);
+							}
+							msg = this.value + ' is not a valid ' + errorName;
+						}
+
+						//raise validation error.
+						this.raise(msg);
+					}
+					return cb();
+				} else if (_.isFunction(validateObj.type)) {
+					return cb(new Error("custom validation functions not implemented yet"));
+				} else {
+					return cb(new Error("validator.type should be either string or function: " + JSON.stringify(validateObj, null, 2)));
+				}
+			};
+		}));
 	}
 
 	return {
 		type: 'object',
 		fields: {
-			_value: arr
+			_value: validateRulesArr
 		}
 	};
 }
