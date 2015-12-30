@@ -47,6 +47,7 @@ var types = require("./domain").types;
 var utils = require("./utils");
 var config = require("./config");
 var roots = config.domain.roots;
+var validator = require("validator");
 
 module.exports = function(configObj) {
 	configObj = configObj || {};
@@ -194,6 +195,12 @@ module.exports = function(configObj) {
 				if (!p.id) {
 					throw new Error("id-attrib not supported on (probably isCustom) property: " + k);
 				}
+
+				//TODO: https://github.com/Kwhen/crawltest/issues/88
+				//might just want to check if ranges consists of only datatypes, otherwise error out.
+				p.transform = _.isArray(p.transform) ? p.transform : [p.transform];
+				p.fieldTransformers = _.size(p.transform) ? createFieldTransformPipeline(p.transform) : undefined;
+
 
 				//check all types defined in `property.ranges` exist
 				//also check for isCustom=false that ranges is compatible with underlying schema.org property.
@@ -403,7 +410,7 @@ module.exports = function(configObj) {
 					label: k
 				});
 
-				//inherit remainder from aliased property, e.g.: ambiguitySolvedBy
+				//inherit remainder from aliased property, e.g.: ambiguitySolvedBy, fieldTransformers
 				_.defaults(p, _.omit(alias, ["comment", "comment_plain", "url"]));
 			});
 		}
@@ -425,7 +432,8 @@ module.exports = function(configObj) {
 			"isAmbiguitySolved",
 			"isMulti",
 			"validate",
-			"transform"
+			"transform",
+			"fieldTransformers"
 		];
 
 		_.each(types, function(t, k) {
@@ -584,3 +592,44 @@ module.exports = function(configObj) {
 		types: types
 	};
 };
+
+
+
+function createFieldTransformPipeline(transformArr) {
+	return function(val) {
+		return _.reduce(transformArr, function(val, transObj) {
+
+			var valueOut;
+
+			//allow shorthand notation
+			if (_.isFunction(transObj) || _.isString(transObj)) {
+				transObj = {
+					type: transObj
+				};
+			}
+
+			if (_.isString(transObj.type)) {
+
+				//node-validator has sanitization rules. We can easily add to this.
+				//https://github.com/chriso/validator.js#sanitizers
+				var cannedTransformer = validator[transObj.type];
+				if (!cannedTransformer) {
+					throw new Error("canned transformer not found: " + transObj.type);
+				}
+				if (_.isArray(transObj.options)) {
+					valueOut = _.partial(cannedTransformer, val).apply(null, transObj.options);
+				} else {
+					valueOut = cannedTransformer(val, transObj.options);
+				}
+
+			} else if (_.isFunction(transObj.type)) {
+				throw new Error("custom validation functions not implemented yet");
+			} else {
+				throw new Error("validator.type should be either string or function: " + JSON.stringify(transObj, null, 2));
+			}
+
+			return valueOut;
+
+		}, val); //start with input `val`
+	};
+}

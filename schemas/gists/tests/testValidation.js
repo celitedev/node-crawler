@@ -58,33 +58,33 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 }, {});
 
 
-// var obj = {
-// 	_type: "Place",
-// 	name: "Home sweet home",
-// 	address: {
-// 		// _type: "PostalAddress", //optional since can be inferred
-// 		addressLocality: "Tilburg",
-// 		postalCode: "5021 GW",
-// 		streetAddress: "stuivesantplein 7",
-// 		email: "gbrits@gmail.com"
-// 	},
-// 	geo: {
-// 		// _type: "GeoCoordinates", //optional since can be inferred
-// 		latitude: 43.123123,
-// 		longitude: 12.123213,
-// 		elevation: 1,
-// 		test: 43.123123,
-// 	}
-// };
-
-
 var obj = {
-	_type: "CreativeWork",
-	name: "Home asdasdasd",
-	url: "http://www.google.com",
-	// genre: [], //["joo", "asdas", "sadas"],
-	about: "de305d54-75b4-431b-adb2-eb6b9e546014"
+	_type: "LocalBusiness",
+	name: "Home sweet home",
+	address: {
+		// _type: "PostalAddress", //optional since can be inferred
+		addressLocality: "Tilburg",
+		postalCode: "5021 GW",
+		streetAddress: "stuivesantplein 7",
+		email: "GBRITS@ASDASD.COM"
+	},
+	geo: {
+		// _type: "GeoCoordinates", //optional since can be inferred
+		latitude: 43.123123,
+		longitude: 12.123213,
+		elevation: 1,
+		// test: 43.123123,
+	}
 };
+
+
+// var obj = {
+// 	_type: "CreativeWork",
+// 	name: "Home asdasdasd",
+// 	url: "http://www.google.com",
+// 	// genre: [], //["joo", "asdas", "sadas"],
+// 	about: "de305d54-75b4-431b-adb2-eb6b9e546014"
+// };
 
 //We can use schema globally now
 var schema = new Schema(passInTypeClosure(null));
@@ -257,6 +257,8 @@ function transformObject(obj, isTopLevel, ancestors) {
 		}
 	}
 
+
+
 	//check that only allowed properties are passed
 	var allowedProps = ["_type", "_value", "_isBogusType"].concat(_.keys(type.properties) || []),
 		suppliedProps = _.keys(obj),
@@ -286,10 +288,11 @@ function transformObject(obj, isTopLevel, ancestors) {
 		//create array if fieldtype isMulti
 		if (fieldtype.isMulti) {
 			v = _.isArray(v) ? v : [v];
-			if (!v.length) {
-				// delete obj[k]; //nip this bastard as well
-				return;
-			}
+		}
+
+		//transform input
+		if (fieldtype.fieldTransformers) {
+			v = !_.isArray(v) ? fieldtype.fieldTransformers(v) : _.map(v, fieldtype.fieldTransformers);
 		}
 
 		//bit weird: we allow an array value for isMulti=false. 
