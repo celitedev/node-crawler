@@ -7,7 +7,7 @@ module.exports = {
 	name: {
 		required: true,
 
-		//just some test
+		//just for show...woot
 		validate: {
 			type: "isLength",
 
@@ -18,7 +18,8 @@ module.exports = {
 
 			//custom errorMessage which is mustache-expanded
 			errorMessage: "'{{val}}' doesn't satisfy length >= 5",
-		}
+		},
+
 	},
 	description: {},
 	alternateName: {
@@ -81,7 +82,18 @@ module.exports = {
 	//http://schema.org/ContactPoint //
 	///////////////////////////////////
 	contactType: {},
-	email: {},
+	email: {
+		validate: "isEmail", //short notation
+		transform: "normalizeEmail" //short notation
+
+		//short notation:  "normalizeEmail"
+		//is the same as: 
+		//{
+		//	type: "normalizeEmail", 
+		//	options: {}
+		//}, 
+		//of course you can do more stuff (hint: add options) with the latter
+	},
 	faxNumber: {},
 	telephone: {},
 
