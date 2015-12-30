@@ -38,13 +38,17 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 			var fn = passInTypeClosure(tName);
 			fn.validate = prop.validate; //seting on fn, which is potentially contained in object
 
-			var fieldValidatorObj = _.extend(!prop.isMulti ? fn : {
-				type: "array",
-				values: fn
-			}, {
-				required: prop.required //setting on returned object
-			});
-
+			var fieldValidatorObj;
+			if (!prop.isMulti) {
+				fieldValidatorObj = fn;
+			} else {
+				fieldValidatorObj = {
+					type: "array",
+					values: fn,
+					min: 1 //if array defined it must have minLength of 1. (or otherwise don't supply)
+				};
+			}
+			fieldValidatorObj.required = prop.required; //setting on returned object
 			fields[pName] = fieldValidatorObj;
 
 			return fields;
@@ -69,7 +73,7 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 // 		latitude: 43.123123,
 // 		longitude: 12.123213,
 // 		elevation: 1,
-// 		// test: 43.123123,
+// 		test: 43.123123,
 // 	}
 // };
 
@@ -77,7 +81,7 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 var obj = {
 	_type: "CreativeWork",
 	name: "Home sweet home",
-	genre: ["joo", "asdas", "sadas"],
+	genre: [], //["joo", "asdas", "sadas"],
 	about: "bnla"
 };
 
@@ -283,7 +287,7 @@ function transformObject(obj, isTopLevel, ancestors) {
 		if (fieldtype.isMulti) {
 			v = _.isArray(v) ? v : [v];
 			if (!v.length) {
-				delete obj[k]; //nip this bastard as well
+				// delete obj[k]; //nip this bastard as well
 				return;
 			}
 		}
@@ -391,9 +395,7 @@ function generateDataTypeValidator(prop, isRequired) {
 	return {
 		type: 'object',
 		fields: {
-			_value: _.extend(validateObj, {
-				required: isRequired || !!prop.required
-			})
+			_value: validateObj
 		}
 	};
 }
