@@ -36,22 +36,19 @@ var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName)
 		fields: _.reduce(type.properties, function(fields, prop, pName) {
 
 			var fn = passInTypeClosure(tName);
-			fn.validate = prop.validate; //seting on fn, which is potentially contained in object
+			fn.validate = prop.validate; //seting on fn
 
-			var fieldValidatorObj;
-			if (!prop.isMulti) {
-				fieldValidatorObj = fn;
-			} else {
-				fieldValidatorObj = {
-					type: "array",
-					values: fn,
-					min: 1 //if array defined it must have minLength of 1. (or otherwise don't supply)
-				};
-			}
+			var fieldValidatorObj = !prop.isMulti ? fn : {
+				type: "array",
+				values: fn,
+				min: 1 //if array defined it must have minLength of 1. (or otherwise don't supply)
+			};
+
 			fieldValidatorObj.required = prop.required; //setting on returned object
 			fields[pName] = fieldValidatorObj;
 
 			return fields;
+
 		}, {})
 	};
 	return agg;
