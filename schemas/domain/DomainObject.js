@@ -204,6 +204,17 @@ function _transformProperties(obj, isTopLevel, ancestors) {
 		}
 	}); //end each
 
+
+	//add aliasOf properties which weren't set. 
+	//e.g.: set a if b is set in a.aliasOf(b)
+	if (!type.isDataType) {
+		_.each(type.properties, function(prop, k) {
+			if (prop.aliasOf && obj[k] === undefined) {
+				obj[k] = obj[prop.aliasOf];
+			}
+		});
+	}
+
 	return obj;
 }
 
