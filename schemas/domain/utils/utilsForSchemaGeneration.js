@@ -1,7 +1,5 @@
-var _ = require('lodash');
-
-var module = module.exports = {
-
+var _ = require("lodash");
+var mod = module.exports = {
 	//Generate DAG (directed acyclic graph) of schemas
 	//correctly errors out on cycle
 	//if fromRoot is supplied, constrain hierarchy + order to subgraph starting with optionalRootTypeName
@@ -73,7 +71,7 @@ var module = module.exports = {
 		};
 	},
 	printHierarchy: function(inputTypes, fromRoot) {
-		module._printHierarchy(module.generateDAG(inputTypes, fromRoot).hierarchy);
+		mod._printHierarchy(mod.generateDAG(inputTypes, fromRoot).hierarchy);
 	},
 
 	_printHierarchy: function(hier, prefix) {
@@ -81,7 +79,7 @@ var module = module.exports = {
 
 			var name = !prefix ? k : prefix + " -> " + k;
 			console.log(name);
-			module._printHierarchy(innerHier, name);
+			mod._printHierarchy(innerHier, name);
 		});
 	},
 
@@ -90,7 +88,6 @@ var module = module.exports = {
 	//
 	//Tech: return a breadth-first search soluation over the DAG.
 	getTypesInDAGOrder: function(inputTypes, optionalRootTypeName) {
-		return module.generateDAG(inputTypes, optionalRootTypeName).order;
+		return mod.generateDAG(inputTypes, optionalRootTypeName).order;
 	}
-
 };
