@@ -254,10 +254,10 @@ AbstractDomainObject.prototype.toDataObject = function(props) {
 	  "about": "de305d54-75b4-431b-adb2-eb6b9e546014"
 	}
  */
-AbstractDomainObject.prototype.toSimple = function() {
+AbstractDomainObject.prototype.toSimple = function(props) {
 	return _.extend({
 		_type: this._type
-	}, _toSimple(this._props));
+	}, _toSimple(props || this._props));
 };
 
 
