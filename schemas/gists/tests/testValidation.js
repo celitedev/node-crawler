@@ -25,8 +25,8 @@ var DomainObject = require("../../domain/DomainObject");
 
 var obj = {
 	_type: "Review",
-	itemReviewed: "de305d54-75b4-431b-adb2-eb6b9e546014",
-	about: "de305d54-75b4-431b-adb2-eb6b9e546014",
+	// itemReviewed: "de305d54-75b4-431b-adb2-eb6b9e546014",
+	// about: "de305d54-75b4-431b-adb2-eb6b9e546014",
 	reviewBody: "bla",
 	// about: "de305d54-75b4-431b-adb2-eb6b9e546014",
 };
@@ -41,19 +41,19 @@ var obj = {
 
 var domainObject = new DomainObject(obj);
 
-domainObject.validate(function(err, res) {
+domainObject.validate(function(err) {
 	if (err) {
 		throw err;
-	} else if (res) {
+	} else if (!domainObject._validation.isValid) {
 		// validation failed, res.errors is an array of all errors
 		// res.fields is a map keyed by field unique id (eg: `address.name`)
 		// assigned an array of errors per field
-		return console.dir(res.errors);
+		return console.dir(domainObject._validation.errors);
 	}
 
 	console.log(JSON.stringify(domainObject, null, 2));
-	console.log(JSON.stringify(domainObject.toDataObject(), null, 2));
-	console.log(JSON.stringify(domainObject.toSimple(), null, 2));
+	// console.log(JSON.stringify(domainObject.toDataObject(), null, 2));
+	// console.log(JSON.stringify(domainObject.toSimple(), null, 2));
 	// var dto = new DataObject(domainObject);
 
 	// console.log("DTO", JSON.stringify(dto, null, 2));

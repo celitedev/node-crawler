@@ -43,14 +43,30 @@ function DomainObject(objMutable) {
 
 	this._props = _transformProperties(_.cloneDeep(objMutable), true);
 	this._type = objMutable._type;
-
+	this._validation = {
+		isValidated: false
+	};
 	var type = generatedSchemas.types[this._type]; //guaranteed to exist
 	this._subtypes = type.ancestors.concat([this._type]);
 }
 
 
 DomainObject.prototype.validate = function(cb) {
-	validator.createSchema().validate(this._props, cb);
+	var self = this;
+	validator.createSchema().validate(this._props, function(err, res) {
+		if (err) {
+			return cb(err);
+		}
+		var validObj = self._validation;
+		validObj.isValidated = true;
+		if (res) {
+			validObj.errors = res.errors;
+			validObj.isValid = false;
+		} else {
+			validObj.isValid = true;
+		}
+		return cb();
+	});
 };
 
 
