@@ -193,21 +193,31 @@ function _transformProperties(obj, isTopLevel, ancestors) {
 		//This so we can catch this validation error properly later in the validation code
 		obj[k] = !_.isArray(v) ? _transformSingleObject(ancestors, k, v) : _.map(v, _.partial(_transformSingleObject, ancestors, k));
 
-		//populate target of aliasOf. 
-		//e.g.: populate b in a.aliasOf(b)
-		//error out when value already set on b (either by itself or by some other property that aliases to b as well)
-		if (fieldtype.aliasOf) {
-			if (obj[fieldtype.aliasOf] !== undefined) {
-				throw new Error("aliasOf target already contains value prop, aliasOf: " + k + ", " + fieldtype.aliasOf);
-			}
-			obj[fieldtype.aliasOf] = obj[k]; //already transformed
-		}
 	}); //end each
 
 
-	//add aliasOf properties which weren't set. 
-	//e.g.: set a if b is set in a.aliasOf(b)
+
 	if (!type.isDataType) {
+
+		//populate target of aliasOf. 
+		//e.g.: populate b if a is set in a.aliasOf(b)
+		//error out when DIFFERENT value already set on b (either by itself or by some other property that aliases to b as well)
+		_.each(obj, function(v, k) {
+
+			if (k === "_type" || k === "_value" || k === "_isBogusType") return;
+
+			var fieldtype = type.properties[k]; //guaranteed to exist
+
+			if (fieldtype.aliasOf) {
+				if (obj[fieldtype.aliasOf] !== undefined && !_.isEqual(obj[k], obj[fieldtype.aliasOf])) {
+					throw new Error("aliasOf target already contains value prop, aliasOf: " + k + ", " + fieldtype.aliasOf);
+				}
+				obj[fieldtype.aliasOf] = obj[k]; //already transformed
+			}
+		});
+
+		//add aliasOf properties which weren't set. 
+		//e.g.: populate a if b is set in a.aliasOf(b)
 		_.each(type.properties, function(prop, k) {
 			if (prop.aliasOf && obj[k] === undefined) {
 				obj[k] = obj[prop.aliasOf];
