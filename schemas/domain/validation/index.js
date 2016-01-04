@@ -252,21 +252,12 @@ module.exports = function(generatedSchemas) {
 		return agg;
 	}, {});
 
-	var validateFN = function(obj, cb) {
-
-		var schema = new Schema(passInTypeClosure(null));
-
-		if (!obj._type) {
-			cb(new Error("_type should be defined on toplevel"));
-		}
-
-		schema.validate(obj, cb);
-	};
-
 	return {
 		datatypesEnum: datatypesEnum,
 		typeValidators: typeValidators,
-		passInTypeClosure: passInTypeClosure,
-		validate: validateFN
+		// passInTypeClosure: passInTypeClosure,
+		createSchema: function() {
+			return new Schema(passInTypeClosure(null));
+		}
 	};
 };
