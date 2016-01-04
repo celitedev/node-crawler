@@ -1,12 +1,13 @@
 var _ = require("lodash");
-
+var util = require("util");
 var domainUtils = require("./utils");
 var generatedSchemas = require("./createDomainSchemas.js")({
 	checkSoundness: true
 });
 
-var validator = require("./validation")(generatedSchemas);
 
+var validator = require("./validation")(generatedSchemas);
+var excludePropertyKeys = ["_type", "_value", "_isBogusType"];
 
 /**
  * Example: 
@@ -35,39 +36,184 @@ var validator = require("./validation")(generatedSchemas);
 	  ]
 	}
  */
-function DomainObject(objMutable) {
+function AbstractDomainObject(state) {
 
-	if (!objMutable._type) {
-		throw new Error("_type should be defined on toplevel");
+	if (!this._kind) {
+		throw new Error("AbstractDomainObject should be called by subtype");
+	}
+	if (!state) {
+		throw new Error("'state' should be defined on DomainObject creation");
 	}
 
-	this._props = _transformProperties(_.cloneDeep(objMutable), true);
-	this._type = objMutable._type;
-	this._validation = {
-		isValidated: false
-	};
-	var type = generatedSchemas.types[this._type]; //guaranteed to exist
+	var typeName = state.type;
+
+	if (!typeName) {
+		throw new Error("'state.type' should be defined on DomainObject creation");
+	}
+
+	var type = generatedSchemas.types[typeName];
+
+	if (!type) {
+		throw new Error("type doesn't exist as defined by _type: " + typeName);
+	}
+
+	this._type = typeName;
 	this._subtypes = type.ancestors.concat([this._type]);
+
+	this._propsDirty = {
+		_type: typeName
+	};
+
+	this._state = {
+		isValidated: false, //signals if validate has been called or is implicit based on db load
+		// isValid: false, //signals if validate succeeded or is implicit based on db load
+		// isDirty: false //signals if props have changed since last call to validate
+		recommitCount: 0
+	};
 }
 
 
-DomainObject.prototype.validate = function(cb) {
+AbstractDomainObject.prototype.isValidated = function() {
+	return !!this._state.isValidated;
+};
+
+AbstractDomainObject.prototype.isValidOrUnchecked = function() {
+	return !!this._state.isValid;
+};
+
+AbstractDomainObject.prototype.isDirty = function() {
+	return !!this._state.isDirty;
+};
+
+AbstractDomainObject.prototype.set = function(objMutable, doOverwrite) {
+	if (!objMutable) {
+		throw new Error("objMutable should be provided to create domain object");
+	}
+
+	if (objMutable._type) {
+		throw new Error("type should NOT be defined on toplevel but on `state.type` during DomainObject creation");
+	}
+
+	//delta is supplied delta + _type as included from domainObject. 
+	//This guarantees _type cannot not overwritten.
+	var delta = _.extend(
+		_.cloneDeep(objMutable), //This *might* be needed depending on calling client. For now just be safe.
+		{
+			_type: this._type
+		}
+	);
+
+	var combined = _transformProperties(doOverwrite ? delta : _.extend({}, this._propsDirty, delta), true);
+
+	//if combined isn't the same as _propsDirty -> reset isValidated & isValid 
+	if (!_.eq(combined, this._propsDirty)) {
+		this._state.isValidated = false;
+		this._state.isValid = false;
+	}
+
+	//TECH: propsDirty becomes a NEW object. 
+	//This means we can safely set props <- propsDirty on commit
+	this._propsDirty = combined;
+
+	//if _propsDirty isn't the same as _props -> set isDirty = true, otherwise set to false
+	this._state.isDirty = !_.eq(this._propsDirty, this._props);
+};
+
+
+AbstractDomainObject.prototype.validate = function(cb) {
 	var self = this;
-	validator.createSchema().validate(this._props, function(err, res) {
+
+	if (self.isValidated()) {
+		//if already validated and `_propsDirty` didn't change => validation outcome doesn't change
+		return cb();
+	}
+
+	validator.createSchema().validate(this._propsDirty, function(err, res) {
 		if (err) {
 			return cb(err);
 		}
-		var validObj = self._validation;
+		var validObj = self._state;
 		validObj.isValidated = true;
 		if (res) {
 			validObj.errors = res.errors;
 			validObj.isValid = false;
-		} else {
-			validObj.isValid = true;
+			return cb();
 		}
+
+		validObj.isValid = true;
+
 		return cb();
 	});
 };
+
+
+AbstractDomainObject.prototype.commit = function(cb) {
+
+	// if (!this.isDirty()) return cb(); //commented-out: too much magic
+
+	var self = this;
+	this.validate(function(err) {
+		if (err) {
+			return cb(err);
+		}
+		if (!self.isValidOrUnchecked()) {
+			throw new Error("Cannot commit because of validation errors");
+		}
+
+		var props = _.cloneDeep(self._propsDirty); //freeze propsDirty to persist
+
+		setTimeout(function fakeDbCommit() {
+
+			///////////////////////////
+			//FOR NOW: Latest wins. 
+			//
+			//NOTE: THERE'S NO CODE TO UPDATE PROCESS WITH ENTITY UPDATED OUT-OF-PROCESS.
+			//THIS SHOULDN'T HAPPEN FOR NOW.
+			//
+			//PERHAPS LATER: Rethinkdb returns optimisticVersion, this should be set and used when doing update
+			//On optimisticLockIssue we should reload data from DB (returning latest version) and 
+			//see if diff works out. 
+			/////////////////////////////
+
+			//on success -> set props = propsDirty
+			self._props = props;
+
+			//in meantime _propsDirty may have changed..
+			self._state.isDirty = !_.eq(self._propsDirty, self._props);
+
+			if (!self._state.isDirty) {
+				self._state.recommitCount = 0;
+				return cb();
+			}
+
+			if (++self._state.recommitCount >= 3) {
+				//we don't anticpiate this error yet. Seeing this is trouble...
+				return cb(new Error("recommitCount reached for item! Can only happen on REAL high congestion"));
+			}
+
+			//do a re-commit, until success.
+			self.commit(cb);
+
+		}, 100);
+
+
+	});
+};
+
+
+
+function CanonicalObject(state) {
+	this._kind = domainUtils.enums.kind.CANONICAL;
+	CanonicalObject.super_.call(this, state);
+}
+
+util.inherits(CanonicalObject, AbstractDomainObject);
+
+// CanonicalObject.prototype.set = _.wrap(AbstractDomainObject.prototype.set, function(superFN, objMutable) {
+// 	superFN.call(this, objMutable);
+// 	this._props = _transformProperties(_.cloneDeep(objMutable), true);
+// });
+
 
 
 /**
@@ -84,7 +230,7 @@ DomainObject.prototype.validate = function(cb) {
 	  }
 	}
  */
-DomainObject.prototype.toDataObject = function() {
+AbstractDomainObject.prototype.toDataObject = function() {
 	var type = generatedSchemas.types[this._type]; //guaranteed
 	return {
 		_index: type.rootName,
@@ -103,7 +249,7 @@ DomainObject.prototype.toDataObject = function() {
 	  "about": "de305d54-75b4-431b-adb2-eb6b9e546014"
 	}
  */
-DomainObject.prototype.toSimple = function() {
+AbstractDomainObject.prototype.toSimple = function() {
 	return _.extend({
 		_type: this._type
 	}, _toSimple(this._props));
@@ -162,13 +308,13 @@ function _transformProperties(obj, isTopLevel, ancestors) {
 
 	if (typeNameIsExplicit) {
 		//_type explicitly passed. Let's make sure it's an allowed type
-		if (!isTopLevel && !isTypeAllowedForRange(type, fieldtype)) {
+		if (!isTopLevel && !domainUtils.isTypeAllowedForRange(type, fieldtype)) {
 			throw new Error("type not allowed for fieldname, type: " + ancestors.join(".") + " - " + typeName);
 		}
 	}
 
 	//check that only allowed properties are passed
-	var allowedProps = ["_type", "_value", "_isBogusType"].concat(_.keys(type.properties) || []),
+	var allowedProps = excludePropertyKeys.concat(_.keys(type.properties) || []),
 		suppliedProps = _.keys(obj),
 		nonAllowedProps = _.difference(suppliedProps, allowedProps);
 
@@ -186,7 +332,7 @@ function _transformProperties(obj, isTopLevel, ancestors) {
 	//6. recurse
 	_.each(obj, function(v, k) {
 
-		if (k === "_type" || k === "_value" || k === "_isBogusType") return;
+		if (excludePropertyKeys.indexOf(k) !== -1) return;
 
 		if (v === undefined) {
 			delete obj[k]; //lets nip this in the balls
@@ -220,7 +366,7 @@ function _transformProperties(obj, isTopLevel, ancestors) {
 		//error out when DIFFERENT value already set on b (either by itself or by some other property that aliases to b as well)
 		_.each(obj, function(v, k) {
 
-			if (k === "_type" || k === "_value" || k === "_isBogusType") return;
+			if (excludePropertyKeys.indexOf(k) !== -1) return;
 
 			var fieldtype = type.properties[k]; //guaranteed to exist
 
@@ -283,7 +429,7 @@ function _transformSingleObject(ancestors, k, val) {
 function _toDataObjectRecursive(properties) {
 
 	var dto = _.reduce(_.clone(properties), function(agg, v, k) {
-		if (k === "_type" || k === "_value" || k === "_isBogusType") return agg;
+		if (excludePropertyKeys.indexOf(k) !== -1) return agg;
 
 		var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
@@ -310,7 +456,7 @@ function _toDataObjectRecursive(properties) {
 function _toSimple(properties) {
 
 	var dto = _.reduce(_.clone(properties), function(agg, v, k) {
-		if (k === "_type" || k === "_value" || k === "_isBogusType") return agg;
+		if (excludePropertyKeys.indexOf(k) !== -1) return agg;
 
 		var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
@@ -328,4 +474,6 @@ function _toSimple(properties) {
 	return dto;
 }
 
-module.exports = DomainObject;
+module.exports = {
+	CanonicalObject: CanonicalObject
+};

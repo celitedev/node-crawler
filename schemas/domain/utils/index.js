@@ -44,4 +44,13 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 		return _.intersection(ancestorsAndSelf, fieldtype.ranges).length;
 	},
 
+	enums: {
+		//kind of entity: 
+		//- Canonical: our own caonical representation
+		//- Source: 3rd party source representation
+		kind: {
+			"CANONICAL": "canonical",
+			"SOURCE": "source"
+		}
+	}
 });
