@@ -25,7 +25,7 @@ var DomainObject = require("../../domain/DomainObject");
 
 var obj = {
 	_type: "Review",
-	itemReviewed: "de305d54-75b4-431b-adb2-eb6b9e546014",
+	about: "de305d54-75b4-431b-adb2-eb6b9e546014",
 	reviewBody: "bla",
 	// about: "de305d54-75b4-431b-adb2-eb6b9e546014",
 };
