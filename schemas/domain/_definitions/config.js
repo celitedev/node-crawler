@@ -15,5 +15,5 @@ module.exports = {
 			"Rating"
 			//NOTE: aggregateRating is separated from Rating and is contained as valueObject in other entities
 		]
-	}
+	},
 };
