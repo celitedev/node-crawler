@@ -30,7 +30,7 @@ var excludePropertyKeys = ["_type", "_value", "_isBogusType"];
 	    }
 	  },
 	  "_type": "Review",
-	  "_subtypes": [
+	  "_typechain": [
 	    "Thing",
 	    "Review"
 	  ]
@@ -58,7 +58,7 @@ function AbstractDomainObject(state) {
 	}
 
 	this._type = typeName;
-	this._subtypes = type.ancestors.concat([this._type]);
+	this._typechain = type.ancestors.concat([this._type]);
 
 	this._propsDirty = {
 		_type: typeName
@@ -162,6 +162,10 @@ AbstractDomainObject.prototype.commit = function(cb) {
 
 		var props = _.cloneDeep(self._propsDirty); //freeze propsDirty to persist
 
+		//NOTE: toDataObject should NOT be passed to Rethink. 
+		//Instead this should be passed to Elasticsearch by rethink2ES-feeder 
+		console.log(JSON.stringify(self.toDataObject(props), null, 2));
+
 		setTimeout(function fakeDbCommit() {
 
 			///////////////////////////
@@ -230,12 +234,13 @@ util.inherits(CanonicalObject, AbstractDomainObject);
 	  }
 	}
  */
-AbstractDomainObject.prototype.toDataObject = function() {
+AbstractDomainObject.prototype.toDataObject = function(props) {
 	var type = generatedSchemas.types[this._type]; //guaranteed
+
 	return {
 		_index: type.rootName,
-		_subtypes: this._subtypes,
-		_props: _toDataObjectRecursive(this._props)
+		_subtypes: this._typechain.slice(this._typechain.indexOf(type.rootName) + 1),
+		_props: _toDataObjectRecursive(props || this._props)
 	};
 };
 
