@@ -5,7 +5,7 @@ module.exports = {
 	////////////////////////////
 
 	name: {
-		required: true,
+		// required: true,
 
 		//just for show...woot
 		validate: {
@@ -56,14 +56,7 @@ module.exports = {
 	// },
 
 	itemReviewed: {
-		aliasOf: "about", //alias althought not really needed, but to get the alias stuff in
-		ranges: [
-			"Place",
-			"Event",
-			"PlaceWithOpeninghours",
-			"OrganizationAndPerson",
-			"CreativeWork"
-		],
+		aliasOf: "about"
 	},
 
 
@@ -74,9 +67,11 @@ module.exports = {
 	ratingTotal: { //keep tally of total. Allows for calculating ratingValue
 		id: "ratingTotal",
 		isCustom: true,
-		ranges: ["Number"]
+		ranges: ["Integer"]
 	},
-	ratingCount: {},
+	ratingCount: {
+		ranges: ["Integer"]
+	},
 
 	///////////////////////////////////
 	//http://schema.org/ContactPoint //

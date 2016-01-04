@@ -41,11 +41,12 @@
 var _ = require("lodash");
 var colors = require("colors");
 
-var schemaOrgDef = require("./domain/schemaOrgDef");
-var properties = require("./domain").properties;
-var types = require("./domain").types;
+var schemaOrgDef = require("./_definitions/schemaOrgDef");
+var properties = require("./_definitions").properties;
+var types = require("./_definitions").types;
+var config = require("./_definitions/config");
+
 var utils = require("./utils");
-var config = require("./config");
 var roots = config.domain.roots;
 var validator = require("validator");
 
@@ -431,6 +432,7 @@ module.exports = function(configObj) {
 			"isAmbiguous",
 			"isAmbiguitySolved",
 			"isMulti",
+			"aliasOf",
 			"validate",
 			"transform",
 			"fieldTransformers"
