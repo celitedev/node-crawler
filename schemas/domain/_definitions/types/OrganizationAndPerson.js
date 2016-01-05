@@ -1,4 +1,5 @@
 module.exports = {
 	isCustom: true,
-	supertypes: ["Thing"]
+	supertypes: ["Thing"],
+	required: ["name"],
 };

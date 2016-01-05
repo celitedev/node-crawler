@@ -36,7 +36,7 @@ var domainUtils = require("../../domain/utils");
 // };
 
 var domainObject = new SourceObject({
-	type: "Review",
+	type: "Restaurant",
 	sourceType: "eventful",
 	sourceUrl: "url of entity as known at source", //required
 	sourceId: "id of entity as known at source" //optional
@@ -48,8 +48,21 @@ var domainObject = new SourceObject({
 //
 
 domainObject.set({
-	about: "someSourceId",
-	reviewBody: "bla",
+	address: {
+		streetAddress: "test",
+		addressCountry: "sourceSpecific"
+	},
+	name: "testasd",
+	menu: {
+		_raw: "italian"
+	},
+	alternateName: [{
+		_raw: {
+			bla: "sada"
+		}
+	}, {
+		_raw: "asd"
+	}]
 });
 
 domainObject.commit(function(err) {
@@ -60,6 +73,8 @@ domainObject.commit(function(err) {
 	}
 	//POST: isDirty = false
 	console.log(JSON.stringify(domainObject, null, 2));
+	console.log(JSON.stringify(domainObject.toDataObject(), null, 2));
+	console.log(JSON.stringify(domainObject.toSimple(), null, 2));
 });
 
 

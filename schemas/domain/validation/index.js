@@ -44,6 +44,20 @@ module.exports = function(generatedSchemas) {
 
 				//STATE: type is a DATATYPE
 
+
+				//special _isRaw flow
+				if (value._isRaw) {
+					return {
+						type: 'object',
+						fields: {
+							_value: {
+								type: "object",
+								required: true
+							}
+						}
+					};
+				}
+
 				//field specific validator
 				return _generateDataTypeValidator({
 					fieldName: rule.field,
@@ -127,9 +141,9 @@ module.exports = function(generatedSchemas) {
 	function _generateDataTypeValidator(prop) {
 
 		//in a preprocess tasks we've already pruned the optional and empty values
-		//so setting required = tru
+		//so setting required = true
 		var validateObj = {
-			required: !!prop.required
+			required: true
 		};
 
 		var validateRulesArr = [validateObj];
@@ -236,7 +250,7 @@ module.exports = function(generatedSchemas) {
 			type: 'object',
 			fields: {
 				_value: validateRulesArr
-			}
+			},
 		};
 	}
 

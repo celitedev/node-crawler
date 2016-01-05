@@ -10,6 +10,7 @@ module.exports = {
 		postalCode: {},
 		streetAddress: {},
 	},
+	required: ["streetAddress"],
 	removeProperties: [
 		"name", "url", "description", "alternateName", "sameAs"
 	]

@@ -7,7 +7,7 @@ var generatedSchemas = require("./createDomainSchemas.js")({
 
 
 var validator = require("./validation")(generatedSchemas);
-var excludePropertyKeys = ["_type", "_value", "_isBogusType"];
+var excludePropertyKeys = ["_type", "_value", "_isBogusType", "_raw", "_isRaw"];
 
 /**
  * Example: 
@@ -208,16 +208,17 @@ AbstractDomainObject.prototype.commit = function(cb) {
 
 function CanonicalObject(state) {
 	this._kind = domainUtils.enums.kind.CANONICAL;
-	this._validationSchema = validator.createSchema();
 	CanonicalObject.super_.call(this, state);
 }
 
+
 function SourceObject(state) {
 	this._kind = domainUtils.enums.kind.SOURCE;
-	this._validationSchema = validator.createSchemaSourceObject();
 	SourceObject.super_.call(this, state);
 }
 
+CanonicalObject.prototype._validationSchema = validator.createSchema();
+SourceObject.prototype._validationSchema = validator.createSchemaSourceObject();
 
 
 util.inherits(CanonicalObject, AbstractDomainObject);
@@ -339,13 +340,32 @@ function _transformProperties(obj, isTopLevel, ancestors) {
 	}
 
 
+	//lookup directive stuff
+	if (obj._raw) {
+		if (obj._value) {
+			throw new Error("_raw and _value not allowed at the same object: " + JSON.stringify(obj, null, 2));
+		}
+		obj._value = obj._raw;
+		if (!_.isObject(obj._value)) {
+			obj._value = {
+				_value: obj._value
+			};
+		}
+		obj._value._isRaw = true; //for code-path during actual persist
+		obj._isRaw = true; //for selecting special code-path in validation
+		delete obj._raw;
+	}
+
+
 	//walk properties and: 
 	//1. if value isn't object -> make it object
 	//2. make value multivalued by doing v -> [v], if field is multivalued, and not already array
 	//   NOTE: multivalued value on singlevalued is caught later in validator.
 	//3. copy to aliasOf-target if not already populated. If it is -> error out 
 	//6. recurse
+
 	_.each(obj, function(v, k) {
+
 
 		if (excludePropertyKeys.indexOf(k) !== -1) return;
 
@@ -446,21 +466,24 @@ function _toDataObjectRecursive(properties) {
 	var dto = _.reduce(_.clone(properties), function(agg, v, k) {
 		if (excludePropertyKeys.indexOf(k) !== -1) return agg;
 
-		var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
+		function transformSingleItem(v) {
+			var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
-		//remove aliasOf properties. 
-		//By now these are already validated and copied to the aliasOf-target
-		if (generatedSchemas.properties[k].aliasOf) {
-			return agg;
+			//remove aliasOf properties. 
+			//By now these are already validated and copied to the aliasOf-target
+			if (generatedSchemas.properties[k].aliasOf) {
+				return agg;
+			}
+
+			if (propType.isValueObject) {
+				v = _toDataObjectRecursive(v); //recurse non-datatypes
+			} else {
+				v = v._value; //simplify all datatypes and object-references to their value
+			}
+			return v;
 		}
 
-		if (propType.isValueObject) {
-			v = _toDataObjectRecursive(v); //recurse non-datatypes
-		} else {
-			v = v._value; //simplify all datatypes and object-references to their value
-		}
-
-		agg[k] = v;
+		agg[k] = _.isArray(v) ? _.map(v, transformSingleItem) : transformSingleItem(v);
 		return agg;
 	}, {});
 
@@ -473,15 +496,18 @@ function _toSimpleRecursive(properties) {
 	var dto = _.reduce(_.clone(properties), function(agg, v, k) {
 		if (excludePropertyKeys.indexOf(k) !== -1) return agg;
 
-		var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
+		function transformSingleItem(v) {
+			var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
-		if (propType.isValueObject) {
-			v = _toSimpleRecursive(v); //recurse non-datatypes
-		} else {
-			v = v._value; //simplify all datatypes and object-references to their value
+			if (propType.isValueObject) {
+				v = _toSimpleRecursive(v); //recurse non-datatypes
+			} else {
+				v = v._value; //simplify all datatypes and object-references to their value
+			}
+			return v;
 		}
 
-		agg[k] = v;
+		agg[k] = _.isArray(v) ? _.map(v, transformSingleItem) : transformSingleItem(v);
 		return agg;
 	}, {});
 

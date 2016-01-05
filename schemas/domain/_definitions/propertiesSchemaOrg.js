@@ -97,26 +97,14 @@ module.exports = {
 	//http://schema.org/PostalAddress //
 	////////////////////////////////////
 	addressCountry: {
-		ranges: ["Country"],
-		//linkByLookup WIP: #70: open q: should this be on domain or more on outside?
-		linkByLookup: {
-			fields: {
-				name: "addressCountry"
-			}
-		}
+		ranges: ["Text"]
 	},
 	// addressCity: {
 	// 	"id": "addressCity",
 	// 	"ranges": [
-	// 		"City"
+	// 		"Text"
 	// 	],
 	// 	isCustom: true, //defined ourselves!
-	// 	//WIP: #70: open q: should this be on domain or more on outside?
-	// 	linkByLookup: {
-	// 		fields: {
-	// 			name: "addressCity"
-	// 		}
-	// 	}
 	// },
 	addressLocality: {},
 	addressRegion: {},
