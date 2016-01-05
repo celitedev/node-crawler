@@ -451,13 +451,7 @@ module.exports = function(configObj) {
 
 				_.extend(propTypeSpecific, _.pick(propGlobal, propertyDirectivesToInherit)); //extend some
 
-				// required is OR'ed 
-				propTypeSpecific.required = !!(propGlobal.required || propTypeSpecific.required || ~t.required.indexOf(propK));
-
-				// DO NOT ALLOW CONCAT. THIS COMPLCIATES DATAMODEL FOR NO GAIN. //validate is concatted
-				// propTypeSpecific.validate = (propTypeSpecific.validate || []);
-				// propTypeSpecific.validate = propGlobal.validate.concat(_.isArray(propTypeSpecific.validate) ? propTypeSpecific.validate : [propTypeSpecific.validate]);
-
+				//NOTE: required is calculated later on
 			});
 			if (undefinedPropsOwn.length) {
 				throw new Error("some properties not defined on our own properties definition (type, undefinedProps): " + k +
@@ -512,7 +506,12 @@ module.exports = function(configObj) {
 				t.removeProperties = t.removeProperties.concat(supertype.removeProperties);
 				t.required = t.required.concat(supertype.required);
 			});
+			t.required = _.uniq(t.required);
 			t.properties = _.omit(t.properties, t.removeProperties);
+
+			_.each(t.properties, function(propTypeSpecific, propK) {
+				propTypeSpecific.required = !!(properties[propK].required || propTypeSpecific.required || ~t.required.indexOf(propK));
+			});
 		});
 	}());
 

@@ -13,7 +13,7 @@ module.exports = {
 		//photo: //TODO ? There's already an image
 		// review: {}, //stored separately
 	},
-	required: ["address"],
+	required: ["address", "name"],
 	//properties added on JSON-LD schema.org generation
 	out_properties: {
 		faxNumber: {

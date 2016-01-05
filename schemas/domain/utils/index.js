@@ -1,4 +1,5 @@
 var _ = require('lodash');
+var urlRegex = require('url-regex');
 
 module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 	//infer type from value when fieldtype has ambiguous range.

@@ -16,6 +16,7 @@ module.exports = {
 		},
 		nationality: {},
 	},
+	required: ["name"],
 	//properties added on JSON-LD schema.org generation
 	out_properties: {
 		email: {
