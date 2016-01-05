@@ -128,7 +128,7 @@ AbstractDomainObject.prototype.validate = function(cb) {
 		return cb();
 	}
 
-	validator.createSchema().validate(this._propsDirty, function(err, res) {
+	this._validationSchema.validate(this._propsDirty, function(err, res) {
 		if (err) {
 			return cb(err);
 		}
@@ -157,7 +157,7 @@ AbstractDomainObject.prototype.commit = function(cb) {
 			return cb(err);
 		}
 		if (!self.isValidOrUnchecked()) {
-			throw new Error("Cannot commit because of validation errors");
+			return cb(new Error("Cannot commit because of validation errors"));
 		}
 
 		var props = _.cloneDeep(self._propsDirty); //freeze propsDirty to persist
@@ -208,10 +208,20 @@ AbstractDomainObject.prototype.commit = function(cb) {
 
 function CanonicalObject(state) {
 	this._kind = domainUtils.enums.kind.CANONICAL;
+	this._validationSchema = validator.createSchema();
 	CanonicalObject.super_.call(this, state);
 }
 
+function SourceObject(state) {
+	this._kind = domainUtils.enums.kind.SOURCE;
+	this._validationSchema = validator.createSchemaSourceObject();
+	SourceObject.super_.call(this, state);
+}
+
+
+
 util.inherits(CanonicalObject, AbstractDomainObject);
+util.inherits(SourceObject, AbstractDomainObject);
 
 // CanonicalObject.prototype.set = _.wrap(AbstractDomainObject.prototype.set, function(superFN, objMutable) {
 // 	superFN.call(this, objMutable);
@@ -257,7 +267,7 @@ AbstractDomainObject.prototype.toDataObject = function(props) {
 AbstractDomainObject.prototype.toSimple = function(props) {
 	return _.extend({
 		_type: this._type
-	}, _toSimple(props || this._props));
+	}, _toSimpleRecursive(props || this._props));
 };
 
 
@@ -458,7 +468,7 @@ function _toDataObjectRecursive(properties) {
 	return dto;
 }
 
-function _toSimple(properties) {
+function _toSimpleRecursive(properties) {
 
 	var dto = _.reduce(_.clone(properties), function(agg, v, k) {
 		if (excludePropertyKeys.indexOf(k) !== -1) return agg;
@@ -466,7 +476,7 @@ function _toSimple(properties) {
 		var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
 		if (propType.isValueObject) {
-			v = _toDataObjectRecursive(v); //recurse non-datatypes
+			v = _toSimpleRecursive(v); //recurse non-datatypes
 		} else {
 			v = v._value; //simplify all datatypes and object-references to their value
 		}
@@ -480,5 +490,6 @@ function _toSimple(properties) {
 }
 
 module.exports = {
-	CanonicalObject: CanonicalObject
+	CanonicalObject: CanonicalObject,
+	SourceObject: SourceObject
 };

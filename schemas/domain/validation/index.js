@@ -3,6 +3,7 @@ var validator = require("validator");
 // var Rule = require("async-validate").Rule;
 var hogan = require("hogan");
 var Schema = require('async-validate');
+var domainUtils = require("../utils");
 
 Schema.plugin([
 	require('async-validate/plugin/object'),
@@ -17,7 +18,7 @@ Schema.plugin([
 
 module.exports = function(generatedSchemas) {
 
-	function passInTypeClosure(parentName) {
+	function passInTypeClosure(kindOfEntity, parentName) {
 
 		// var parentType = generatedSchemas.types[parentName]; //not needed for now
 
@@ -58,13 +59,12 @@ module.exports = function(generatedSchemas) {
 				if (type.isValueObject || isToplevel) {
 
 					//SOLUTION: type-object should be included by EMBEDDING.
-
-					var validatorObj = _.omit(typeValidators[typeName], "fields");
+					var validatorObj = _.omit(typeValidators[kindOfEntity][typeName], "fields");
 
 					//Prune fields to only leave required or available fields. 
 					//This makes sure recursion doesn't fail on empty results.
 					//tech: copy properties (being functions) directly, instead of cloning, since this fails..
-					validatorObj.fields = _.reduce(typeValidators[typeName].fields, function(agg, obj, k) {
+					validatorObj.fields = _.reduce(typeValidators[kindOfEntity][typeName].fields, function(agg, obj, k) {
 						if (obj.required || value[k]) {
 							agg[k] = obj;
 						}
@@ -80,13 +80,27 @@ module.exports = function(generatedSchemas) {
 					//- is not a ValueObject
 					//- can not be Abstract, since otherwise an error would have been raised during schema creation
 
-					//SOLUTION: type-object should be included by referencing
+					//SOLUTION: type-object should be included by referencing. 
 
-					return _generateDataTypeValidator({
+					//For a CANONICAL object we require this reference to be a proper uuidv4. 
+					//
+					// For a SOURCE object this may contain either a 
+					// - URL which will be checked against `sourceUrl` of available source entities.
+					// - Text which will be checked against `sourceId` of available source entities.
+					// Regardless, this is just represented as a Text string here without further validation. 
+					// Note that a source object may fail to be saved when it's referenced source-entities aren't found 
+					// within our db.
+
+					var referenceValidatorObj = {
 						ranges: ["Text"],
 						required: true,
-						validate: "isUUID"
-					});
+					};
+
+					if (kindOfEntity === domainUtils.enums.kind.CANONICAL) {
+						referenceValidatorObj.validate = "isUUID";
+					}
+
+					return _generateDataTypeValidator(referenceValidatorObj);
 
 				}
 			}
@@ -228,36 +242,45 @@ module.exports = function(generatedSchemas) {
 
 	var datatypesEnum = ["Boolean", "Date", "DateTime", "Number", "Float", "Integer", "Text", "Time", "URL"];
 
-	var typeValidators = _.reduce(generatedSchemas.types, function(agg, type, tName) {
 
-		agg[tName] = {
-			type: "object",
-			fields: _.reduce(type.properties, function(fields, prop, pName) {
+	function _createTypeValidators(kindOfEntity) {
 
-				var fn = passInTypeClosure(tName);
+		return _.reduce(generatedSchemas.types, function(agg, type, tName) {
 
-				var fieldValidatorObj = !prop.isMulti ? fn : {
-					type: "array",
-					values: fn,
-					min: 1 //if array defined it must have minLength of 1. (or otherwise don't supply)
-				};
+			agg[tName] = {
+				type: "object",
+				fields: _.reduce(type.properties, function(fields, prop, pName) {
 
-				fieldValidatorObj.required = prop.required; //setting on returned object
-				fields[pName] = fieldValidatorObj;
+					//butt-ugly: need to pass typeValidators, which we're just creating...
+					var fn = passInTypeClosure(kindOfEntity, tName);
 
-				return fields;
+					var fieldValidatorObj = !prop.isMulti ? fn : {
+						type: "array",
+						values: fn,
+						min: 1 //if array defined it must have minLength of 1. (or otherwise don't supply)
+					};
 
-			}, {})
-		};
-		return agg;
-	}, {});
+					fieldValidatorObj.required = prop.required; //setting on returned object
+					fields[pName] = fieldValidatorObj;
+
+					return fields;
+
+				}, {})
+			};
+			return agg;
+		}, {});
+	}
+
+	var typeValidators = {};
+	typeValidators[domainUtils.enums.kind.CANONICAL] = _createTypeValidators(domainUtils.enums.kind.CANONICAL);
+	typeValidators[domainUtils.enums.kind.SOURCE] = _createTypeValidators(domainUtils.enums.kind.SOURCE);
 
 	return {
-		datatypesEnum: datatypesEnum,
-		typeValidators: typeValidators,
-		// passInTypeClosure: passInTypeClosure,
 		createSchema: function() {
-			return new Schema(passInTypeClosure(null));
+			return new Schema(passInTypeClosure(domainUtils.enums.kind.CANONICAL, null));
+		},
+		createSchemaSourceObject: function() {
+			return new Schema(passInTypeClosure(domainUtils.enums.kind.SOURCE, null));
 		}
 	};
 };
