@@ -77,7 +77,7 @@ domainObject.validate(function(err) {
 				throw err;
 			}
 			//POST: isDirty = false
-			// console.log(JSON.stringify(domainObject, null, 2));
+			console.log(JSON.stringify(domainObject, null, 2));
 		});
 	}
 	// console.log(JSON.stringify(domainObject, null, 2));

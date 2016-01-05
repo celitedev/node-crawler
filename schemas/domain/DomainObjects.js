@@ -164,7 +164,7 @@ AbstractDomainObject.prototype.commit = function(cb) {
 
 		//NOTE: toDataObject should NOT be passed to Rethink. 
 		//Instead this should be passed to Elasticsearch by rethink2ES-feeder 
-		console.log(JSON.stringify(self.toDataObject(props), null, 2));
+		// console.log(JSON.stringify(self.toDataObject(props), null, 2));
 
 		setTimeout(function fakeDbCommit() {
 
