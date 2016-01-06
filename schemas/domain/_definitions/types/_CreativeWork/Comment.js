@@ -1,12 +1,12 @@
 module.exports = {
 	supertypes: ["Thing"], //not CreativeWork
 	properties: {
-		about: {},
-		author: {},
-		text: {}
-		//NOT NOW
-		//upvoteCount
-		//downvoteCount
+		about: false,
+		author: false,
+		text: false
+			//NOT NOW
+			//upvoteCount
+			//downvoteCount
 	},
 	removeProperties: ["sameAs", "alternateName", "description"]
 };

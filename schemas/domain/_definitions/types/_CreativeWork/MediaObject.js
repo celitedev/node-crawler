@@ -2,16 +2,16 @@ module.exports = {
 	// isAbstract: true,
 	supertypes: ["Thing"], //not CreativeWork
 	properties: {
-		bitrate: {},
-		contentSize: {},
-		contentUrl: {},
-		duration: {},
-		uploadDate: {},
-		about: {},
-		author: {}, //from creativeWOrk
-		genre: {}, //from creativeWOrk
-		keywords: {}, //from creativeWOrk
-		license: {}, //from creativeWOrk
+		bitrate: false,
+		contentSize: false,
+		contentUrl: false,
+		duration: false,
+		uploadDate: false,
+		about: false,
+		author: false, //from creativeWOrk
+		genre: false, //from creativeWOrk
+		keywords: false, //from creativeWOrk
+		license: false, //from creativeWOrk
 	},
 	removeProperties: ["sameAs", "alternateName", "description"]
 };

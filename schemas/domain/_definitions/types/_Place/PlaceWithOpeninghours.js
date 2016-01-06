@@ -5,7 +5,7 @@ module.exports = {
 	isCustom: true,
 	supertypes: ["Place"],
 	properties: {
-		openingHours: {},
-		openingHoursSpecification: {}
+		openingHours: false,
+		openingHoursSpecification: false
 	}
 };

@@ -1,7 +1,7 @@
 module.exports = {
 	properties: {
 		//album //MusicAlbum
-		genre: {},
+		genre: false,
 		// track: {} //itemlist || musicRecording
 	}
 };

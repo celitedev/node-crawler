@@ -1,27 +1,15 @@
 //CreativeWorkSeries dedicated to TV broadcast and associated online delivery.
 module.exports = {
 	properties: {
-		actor: {
-
-		},
-		containsSeason: { //ref to CreativeWorkSeason 
-
-		},
-		countryOfOrigin: {},
-		director: {
-
-		},
-		episode: {
-
-		},
-		musicBy: {
-
-		},
-		numberOfEpisodes: {},
-		numberOfSeasons: {},
-		productionCompany: {},
-		trailer: {
-
-		},
+		actor: false,
+		containsSeason: false,
+		countryOfOrigin: false,
+		director: false,
+		episode: false,
+		musicBy: false,
+		numberOfEpisodes: false,
+		numberOfSeasons: false,
+		productionCompany: false,
+		trailer: false,
 	}
 };

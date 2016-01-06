@@ -1,7 +1,7 @@
 module.exports = {
 	properties: {
-		subtitleLanguage: {},
-		videoFormat: {},
-		workPresented: {},
+		subtitleLanguage: false,
+		videoFormat: false,
+		workPresented: false,
 	}
 };

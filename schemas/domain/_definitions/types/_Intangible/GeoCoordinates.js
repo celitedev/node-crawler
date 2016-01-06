@@ -5,9 +5,9 @@ module.exports = {
 	//Since Place has a property PostalAddress which contains addres, addressCountry, etc. 
 	//there's absolutely zero need to have these properties on GeoCoordinates
 	properties: {
-		elevation: {},
-		latitude: {},
-		longitude: {}
+		elevation: false,
+		latitude: false,
+		longitude: false
 	},
 	removeProperties: [
 		"name", "url", "description", "alternateName", "sameAs"

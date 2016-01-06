@@ -1,9 +1,9 @@
 module.exports = {
 	properties: {
-		closes: {},
-		dayOfWeek: {},
-		opens: {},
-		validFrom: {},
-		validThrough: {}
+		closes: false,
+		dayOfWeek: false,
+		opens: false,
+		validFrom: false,
+		validThrough: false
 	}
 };

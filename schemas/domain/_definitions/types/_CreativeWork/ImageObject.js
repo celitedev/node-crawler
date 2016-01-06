@@ -1,6 +1,6 @@
 module.exports = {
 	properties: {
-		caption: {},
+		caption: false,
 	},
 	removeProperties: ["bitrate", "duration"]
 };

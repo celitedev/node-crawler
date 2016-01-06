@@ -1,7 +1,7 @@
 module.exports = {
 	properties: {
-		illustrator: {},
-		isbn: {},
-		numberOfPages: {}
+		illustrator: false,
+		isbn: false,
+		numberOfPages: false
 	}
 };
