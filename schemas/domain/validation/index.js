@@ -16,6 +16,16 @@ Schema.plugin([
 ]);
 
 
+var customValidators = {
+	RefObjectNonEmpty: function(obj, err) {
+		var sizeOk = _.size(obj);
+		if (!sizeOk) {
+			err.msg = "_ref object is empty";
+		}
+		return sizeOk;
+	}
+};
+
 module.exports = function(generatedSchemas) {
 
 	function passInTypeClosure(kindOfEntity, parentName) {
@@ -43,20 +53,6 @@ module.exports = function(generatedSchemas) {
 			if (type.isDataType) {
 
 				//STATE: type is a DATATYPE
-
-
-				//special _isRaw flow
-				if (value._isRaw) {
-					return {
-						type: 'object',
-						fields: {
-							_value: {
-								type: "object",
-								required: true
-							}
-						}
-					};
-				}
 
 				//field specific validator
 				return _generateDataTypeValidator({
@@ -96,25 +92,42 @@ module.exports = function(generatedSchemas) {
 
 					//SOLUTION: type-object should be included by referencing. 
 
-					//For a CANONICAL object we require this reference to be a proper uuidv4. 
+
+					//A SOURCE as well as CANONICAL object may contain a ref-object. 
 					//
-					// For a SOURCE object this may contain either a 
-					// - URL which will be checked against `sourceUrl` of available source entities.
-					// - Text which will be checked against `sourceId` of available source entities.
-					// Regardless, this is just represented as a Text string here without further validation. 
-					// Note that a source object may fail to be saved when it's referenced source-entities aren't found 
-					// within our db.
+					//For SOURCE this is always the case. 
+					//For CANONICAL this is the case if reference hasn't been resolved yet. 
+					//
+					//Format of this ref-object: 
+					//
+					//{
+					//	_ref: {
+					//		<custom>
+					//	}
+					//}
+					//
+					//Moreover, CANONICAL contains a string of type UUID if ref IS resolved. 
 
-					var referenceValidatorObj = {
-						ranges: ["Text"],
-						required: true,
-					};
 
-					if (kindOfEntity === domainUtils.enums.kind.CANONICAL) {
-						referenceValidatorObj.validate = "isUUID";
+					if (_.isString(value._value) && kindOfEntity === domainUtils.enums.kind.CANONICAL) {
+						return _generateDataTypeValidator({
+							ranges: ["Text"],
+							required: true,
+							validate: "isUUID"
+						});
 					}
 
-					return _generateDataTypeValidator(referenceValidatorObj);
+					var refRules = [{
+						type: "object",
+						required: true
+					}];
+
+					return {
+						type: 'object',
+						fields: {
+							_ref: _addCannedValidator(refRules, "RefObjectNonEmpty")
+						},
+					};
 
 				}
 			}
@@ -126,15 +139,18 @@ module.exports = function(generatedSchemas) {
 
 	function _addCannedValidator(validateRulesArr, name) {
 		validateRulesArr.push(function(cb) {
-			var cannedValidator = validator[name];
+			var cannedValidator = customValidators[name] || validator[name];
 			if (!cannedValidator) {
 				return cb(new Error("canned validator not found: " + name));
 			}
-			if (!cannedValidator(this.value)) {
-				this.raise(this.value + ' is not a valid ' + name);
+			var err = {};
+			if (!cannedValidator(this.value, err)) {
+				this.raise(err.msg || this.value + ' is not a valid ' + name);
 			}
 			return cb();
 		});
+
+		return validateRulesArr;
 	}
 
 	//NOTE: 'required' is managed upstream
@@ -200,7 +216,7 @@ module.exports = function(generatedSchemas) {
 					}
 
 					if (_.isString(validateObj.type)) {
-						var cannedValidator = validator[validateObj.type];
+						var cannedValidator = customValidators[validateObj.type] || validator[validateObj.type];
 						if (!cannedValidator) {
 							return cb(new Error("canned validator not found: " + validateObj.type));
 						}

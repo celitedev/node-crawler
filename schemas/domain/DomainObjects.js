@@ -5,7 +5,7 @@ var domainUtils = require("./utils");
 module.exports = function(generatedSchemas) {
 
 	var validator = require("./validation")(generatedSchemas);
-	var excludePropertyKeys = ["_type", "_value", "_isBogusType", "_raw", "_isRaw"];
+	var excludePropertyKeys = ["_type", "_value", "_isBogusType", "_ref"];
 
 	/**
 	 * Example: 
@@ -46,7 +46,7 @@ module.exports = function(generatedSchemas) {
 		var typeName = state.type;
 
 		if (!typeName) {
-			throw new Error("'state.type' should be defined on DomainObject creation");
+			throw new Error("'state.type' should be defined on DomainObject");
 		}
 
 		var type = generatedSchemas.types[typeName];
@@ -213,6 +213,13 @@ module.exports = function(generatedSchemas) {
 	function SourceObject(state) {
 		this._kind = domainUtils.enums.kind.SOURCE;
 		SourceObject.super_.call(this, state);
+		if (!state.sourceType) {
+			throw new Error("'state.sourceType' should be defined on SourceObject");
+		}
+		if (!state.sourceUrl) {
+			throw new Error("'state.sourceUrl' should be defined on SourceObject");
+		}
+
 	}
 
 	CanonicalObject.prototype._validationSchema = validator.createSchema();
@@ -338,23 +345,6 @@ module.exports = function(generatedSchemas) {
 		}
 
 
-		//lookup directive stuff
-		if (obj._raw) {
-			if (obj._value) {
-				throw new Error("_raw and _value not allowed at the same object: " + JSON.stringify(obj, null, 2));
-			}
-			obj._value = obj._raw;
-			if (!_.isObject(obj._value)) {
-				obj._value = {
-					_value: obj._value
-				};
-			}
-			obj._value._isRaw = true; //for code-path during actual persist
-			obj._isRaw = true; //for selecting special code-path in validation
-			delete obj._raw;
-		}
-
-
 		//walk properties and: 
 		//1. if value isn't object -> make it object
 		//2. make value multivalued by doing v -> [v], if field is multivalued, and not already array
@@ -363,7 +353,6 @@ module.exports = function(generatedSchemas) {
 		//6. recurse
 
 		_.each(obj, function(v, k) {
-
 
 			if (excludePropertyKeys.indexOf(k) !== -1) return;
 
@@ -475,6 +464,8 @@ module.exports = function(generatedSchemas) {
 
 				if (propType.isValueObject) {
 					v = _toDataObjectRecursive(v); //recurse non-datatypes
+				} else if (v._ref) {
+					v = _.pick(v, ["_ref"]); //no change
 				} else {
 					v = v._value; //simplify all datatypes and object-references to their value
 				}
@@ -499,6 +490,8 @@ module.exports = function(generatedSchemas) {
 
 				if (propType.isValueObject) {
 					v = _toSimpleRecursive(v); //recurse non-datatypes
+				} else if (v._ref) {
+					v = _.pick(v, ["_ref"]); //no change
 				} else {
 					v = v._value; //simplify all datatypes and object-references to their value
 				}
