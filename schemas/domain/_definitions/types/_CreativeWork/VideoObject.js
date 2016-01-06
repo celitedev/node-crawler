@@ -1,7 +1,7 @@
 module.exports = {
 	properties: {
-		caption: {},
-		videoFrameSize: {},
-		videoQuality: {}
+		caption: false,
+		videoFrameSize: false,
+		videoQuality: false
 	}
 };

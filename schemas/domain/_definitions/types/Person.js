@@ -1,23 +1,19 @@
 module.exports = {
 	supertypes: ["OrganizationAndPerson"],
 	properties: {
-		additionalName: {}, //used for a middle name
-		address: {},
-		birthDate: {},
-		deathDate: {},
-		familyName: {},
-		gender: {},
-		givenName: {}, //use along side familyName. More specific than 'name'
-		honorificPrefix: {},
-		honorificSuffix: {},
-		jobTitle: {},
-		memberOf: {
-
-		},
-		nationality: {},
-		name: {
-			required: true
-		}
+		additionalName: false, //used for a middle name
+		address: false,
+		birthDate: false,
+		deathDate: false,
+		familyName: false,
+		gender: false,
+		givenName: false, //use along side familyName. More specific than 'name'
+		honorificPrefix: false,
+		honorificSuffix: false,
+		jobTitle: false,
+		memberOf: false,
+		nationality: false,
+		name: true
 	},
 	//properties added on JSON-LD schema.org generation
 	out_properties: {

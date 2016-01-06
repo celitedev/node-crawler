@@ -5,30 +5,20 @@
 
 module.exports = {
 	properties: {
-		aggregateRating: {},
-		doorTime: {},
-		duration: {},
-		endDate: {},
-		location: {},
+		aggregateRating: false,
+		doorTime: false,
+		duration: false,
+		endDate: false,
+		location: false,
 		// offers: //offers -> NOTE: shouldn't this be 'offer' 
-		organizer: {
-
-		},
-		performer: {
-
-		},
-		recordedIn: {},
-		// review: {}, //reviews are kept separately
-		startDate: {},
-		subEvent: {
-
-		},
-		superEvent: {},
-		workFeatured: {
-
-		},
-		workPerformed: {
-
-		}
+		organizer: false,
+		performer: false,
+		recordedIn: false,
+		// review: false, //reviews are kept separately
+		startDate: false,
+		subEvent: false,
+		superEvent: false,
+		workFeatured: false,
+		workPerformed: false
 	}
 };
