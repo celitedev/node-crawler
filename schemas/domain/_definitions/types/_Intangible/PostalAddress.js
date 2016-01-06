@@ -8,9 +8,10 @@ module.exports = {
 		addressRegion: {},
 		postOfficeBoxNumber: {},
 		postalCode: {},
-		streetAddress: {},
+		streetAddress: {
+			required: true
+		},
 	},
-	required: ["streetAddress"],
 	removeProperties: [
 		"name", "url", "description", "alternateName", "sameAs"
 	]
