@@ -37,16 +37,8 @@ var domainUtils = require("../../domain/utils");
 
 
 
-// var obj = {
-// 	_type: "CreativeWork",
-// 	name: "Home asdasdasd",
-// 	url: "http://www.google.com",
-// 	// genre: [], //["joo", "asdas", "sadas"],
-// 	about: "de305d54-75b4-431b-adb2-eb6b9e546014"
-// };
-
-var domainObject = new SourceObject({
-	type: "Restaurant",
+var domainObject = new CanonicalObject({
+	type: "CreativeWork",
 	sourceType: "eventful",
 	sourceUrl: "url of entity as known at source", //required
 	sourceId: "id of entity as known at source" //optional
@@ -56,23 +48,26 @@ var domainObject = new SourceObject({
 //TODO: 
 //SourceObject.canonicalId is set by Canonical.match(source)
 //
+// domainObject.set({
+// 	address: {
+// 		streetAddress: "test",
+// 		addressCountry: "sourceSpecific"
+// 	},
+// 	name: "testasd",
+// 	menu: "italian",
+// 	alternateName: ["asd", "asd"],
+// 	place: "asdasd"
+// });
+
 
 domainObject.set({
-	address: {
-		streetAddress: "test",
-		addressCountry: "sourceSpecific"
-	},
-	name: "testasd",
-	menu: {
-		_raw: "italian"
-	},
-	alternateName: [{
-		_raw: {
-			bla: "sada"
+	name: "Home asdasdasd",
+	url: "http://www.google.com",
+	about: {
+		"_ref": {
+			bla: "ASda"
 		}
-	}, {
-		_raw: "asd"
-	}]
+	}
 });
 
 domainObject.commit(function(err) {
