@@ -34,19 +34,10 @@ var types = {
 		isCustom: true,
 		isAbstract: true,
 		properties: {
-			name: {
-				required: true
-			},
-			nameRequired: {
-				//test this this does NOT work, since already required on global
-				required: false
-			},
-			nameB: {
-				required: true
-			},
-			nameC: {
-				required: false
-			},
+			name: true,
+			nameRequired: false,
+			nameB: true,
+			nameC: false,
 		},
 		supertypes: [],
 	},
@@ -54,14 +45,10 @@ var types = {
 		isCustom: true,
 		supertypes: ["Thing"],
 		properties: {
-			name: {
-				//test this this does NOT work, since already required on super
-				required: false
-			},
-			nameC: {
-				//test this works on property already defined on super
-				required: true
-			},
+			//test this this does NOT work, since already required on super
+			name: false,
+			//test this works on property already defined on super
+			nameC: true,
 		},
 	},
 
@@ -69,8 +56,8 @@ var types = {
 		isCustom: true,
 		supertypes: ["Thing"],
 		properties: {
-			logo: {},
-			logoRequired: {}
+			logo: false,
+			logoRequired: false
 		},
 	},
 
@@ -89,8 +76,8 @@ var types = {
 		isCustom: true,
 		supertypes: ["Thing"],
 		properties: {
-			logo: {},
-			logoRequired: {}
+			logo: false,
+			logoRequired: false
 		},
 	},
 
