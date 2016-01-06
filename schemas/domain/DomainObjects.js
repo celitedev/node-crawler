@@ -389,23 +389,6 @@ module.exports = function(generatedSchemas) {
 
 		}); //end each
 
-		function expandToRef(v) {
-			if (!_.isObject(v)) {
-
-				var objExpanded = {
-					_ref: {}
-				};
-
-				var key = urlRegex({
-					exact: true
-				}).test(v) ? "sourceUrl" : "sourceId";
-
-				objExpanded._ref[key] = v;
-				v = objExpanded;
-			}
-			return v;
-		}
-
 		if (!type.isDataType) {
 
 			//populate target of aliasOf. 
@@ -446,7 +429,48 @@ module.exports = function(generatedSchemas) {
 		return _transformProperties(val, undefined, ancestors.concat([k]), kind);
 	}
 
+	//When shortcut _ref given expand to _ref object. 
+	//This is done for entity-references within an SourceObject
+	//
+	//Example:
+	//
+	//{
+	//	_ref: {
+	//		sourceId: "bla"
+	//	}
+	//}
+	//
+	//or
+	//
+	//	//{
+	//	_ref: {
+	//		sourceUrl: "https://en.wikipedia.org/wiki/Quentin_Tarantino"
+	//	}
+	//}
+	//
+	//Already expanded _ref-objects are left untouched. e.g.: 
+	//
+	//{
+	//	_ref: {
+	//		name: "Quentin Tarantino"
+	//	}
+	//}
+	function expandToRef(v) {
+		if (!_.isObject(v)) {
 
+			var objExpanded = {
+				_ref: {}
+			};
+
+			var key = urlRegex({
+				exact: true
+			}).test(v) ? "sourceUrl" : "sourceId";
+
+			objExpanded._ref[key] = v;
+			v = objExpanded;
+		}
+		return v;
+	}
 
 	//Now that the object has been validated and it's guaranteed it can be saved
 	//prepare a DTO of the object that is actually passed to the datalayer for saving. 
