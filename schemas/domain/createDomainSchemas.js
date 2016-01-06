@@ -41,16 +41,19 @@
 var _ = require("lodash");
 var colors = require("colors");
 
-var schemaOrgDef = require("./_definitions/schemaOrgDef");
-var properties = require("./_definitions").properties;
-var types = require("./_definitions").types;
-var config = require("./_definitions/config");
-
 var utils = require("./utils");
-var roots = config.domain.roots;
 var validator = require("validator");
 
 module.exports = function(configObj) {
+
+	var schemaOrgDef = configObj.schemaOrgDef;
+	var properties = configObj.properties;
+	var types = configObj.types;
+	var config = configObj.config;
+
+
+	var roots = config.domain.roots;
+
 	configObj = configObj || {};
 	var checkSoundness = configObj.checkSoundness;
 
@@ -156,6 +159,8 @@ module.exports = function(configObj) {
 
 			_.each(properties, function(p, k) {
 
+				p.id = p.id || k;
+
 				if (p.aliasOf) { //don't process aliased properties yet
 					return;
 				}
@@ -192,9 +197,6 @@ module.exports = function(configObj) {
 				//missing attribute checks
 				if (!p.ranges) {
 					throw new Error("ranges-attrib not supported on (probably isCustom) property: " + k);
-				}
-				if (!p.id) {
-					throw new Error("id-attrib not supported on (probably isCustom) property: " + k);
 				}
 
 				//TODO: https://github.com/Kwhen/crawltest/issues/88

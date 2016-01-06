@@ -1,8 +1,18 @@
 var argv = require('yargs').argv;
 var _ = require("lodash");
 
-var CanonicalObject = require("../../domain/DomainObjects").CanonicalObject;
-var SourceObject = require("../../domain/DomainObjects").SourceObject;
+
+var generatedSchemas = require("../../domain/createDomainSchemas.js")({
+	checkSoundness: true,
+	config: require("../../domain/_definitions/config"),
+	properties: require("../../domain/_definitions").properties,
+	types: require("../../domain/_definitions").types,
+	schemaOrgDef: require("../../domain/_definitions/schemaOrgDef")
+});
+
+var domainObjects = require("../../domain/DomainObjects")(generatedSchemas);
+var CanonicalObject = domainObjects.CanonicalObject;
+var SourceObject = domainObjects.SourceObject;
 
 var domainUtils = require("../../domain/utils");
 
