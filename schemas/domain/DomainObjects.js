@@ -1,6 +1,7 @@
 var _ = require("lodash");
 var util = require("util");
 var domainUtils = require("./utils");
+var urlRegex = require('url-regex');
 
 module.exports = function(generatedSchemas) {
 
@@ -101,7 +102,7 @@ module.exports = function(generatedSchemas) {
 			}
 		);
 
-		var combined = _transformProperties(doOverwrite ? delta : _.extend({}, this._propsDirty, delta), true);
+		var combined = _transformProperties(doOverwrite ? delta : _.extend({}, this._propsDirty, delta), true, [], this._kind);
 
 		//if combined isn't the same as _propsDirty -> reset isValidated & isValid 
 		if (!_.eq(combined, this._propsDirty)) {
@@ -229,12 +230,6 @@ module.exports = function(generatedSchemas) {
 	util.inherits(CanonicalObject, AbstractDomainObject);
 	util.inherits(SourceObject, AbstractDomainObject);
 
-	// CanonicalObject.prototype.set = _.wrap(AbstractDomainObject.prototype.set, function(superFN, objMutable) {
-	// 	superFN.call(this, objMutable);
-	// 	this._props = _transformProperties(_.cloneDeep(objMutable), true);
-	// });
-
-
 
 	/**
 	 * Example:
@@ -281,9 +276,7 @@ module.exports = function(generatedSchemas) {
 	//1. transform obj so all values are expanded into objects. 
 	//E.g.: "some value" is expanded to {"_value": "some value"}
 	//2. 
-	function _transformProperties(obj, isTopLevel, ancestors) {
-
-		ancestors = ancestors || [];
+	function _transformProperties(obj, isTopLevel, ancestors, kind) {
 
 		if (!_.isObject(obj)) {
 			throw new Error("SANITY CHECK: `obj` passed to _transformProperties should be an object");
@@ -375,11 +368,43 @@ module.exports = function(generatedSchemas) {
 
 			//bit weird: we allow an array value for isMulti=false. 
 			//This so we can catch this validation error properly later in the validation code
-			obj[k] = !_.isArray(v) ? _transformSingleObject(ancestors, k, v) : _.map(v, _.partial(_transformSingleObject, ancestors, k));
+
+			// //if we're processing a SOURCEOBJECT instead of a CANONICAL OBJECT 
+			// //AND we're referencing an entity -> expand shortcut ref to fullblown ref-structure. 
+			// //
+			// //E.g.: "some source id" -> 
+			// //{
+			// //	_ref: {
+			// //		sourceId: "some source id"
+			// //	}
+
+			//TODO: soundness check #107 so we know (if first el = Type <=> all type of range is Type)
+			var rangeType = generatedSchemas.types[fieldtype.ranges[0]];
+			if (kind === domainUtils.enums.kind.SOURCE && rangeType && rangeType.isEntity) {
+				//we've got an entity reference which is to be expanded to a _ref-object.
+				v = !_.isArray(v) ? expandToRef(v) : _.map(v, expandToRef);
+			}
+
+			obj[k] = !_.isArray(v) ? _transformSingleObject(ancestors, k, kind, v) : _.map(v, _.partial(_transformSingleObject, ancestors, k, kind));
 
 		}); //end each
 
+		function expandToRef(v) {
+			if (!_.isObject(v)) {
 
+				var objExpanded = {
+					_ref: {}
+				};
+
+				var key = urlRegex({
+					exact: true
+				}).test(v) ? "sourceUrl" : "sourceId";
+
+				objExpanded._ref[key] = v;
+				v = objExpanded;
+			}
+			return v;
+		}
 
 		if (!type.isDataType) {
 
@@ -412,13 +437,13 @@ module.exports = function(generatedSchemas) {
 		return obj;
 	}
 
-	function _transformSingleObject(ancestors, k, val) {
+	function _transformSingleObject(ancestors, k, kind, val) {
 		if (!_.isObject(val)) {
 			val = {
 				_value: val
 			};
 		}
-		return _transformProperties(val, undefined, ancestors.concat([k]));
+		return _transformProperties(val, undefined, ancestors.concat([k]), kind);
 	}
 
 
