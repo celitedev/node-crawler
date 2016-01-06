@@ -63,12 +63,14 @@ module.exports = function(configObj) {
 		console.log(("NOT CHECKING FOR SOUNDNESS").red);
 	}
 
+	//test-covered
 	(function enrichDatatypes() {
 		_.each(schemaOrgDef.datatypes, function(t) {
 			t.isDataType = true;
 		});
 	}());
 
+	//test-covered
 	(function extendTypes() {
 
 		_.each(types, function(t, k) {
@@ -88,8 +90,7 @@ module.exports = function(configObj) {
 				overwrites: k,
 				properties: {},
 				supertypes: _.clone(overwrites.supertypes),
-				removeProperties: [],
-				required: []
+				removeProperties: []
 			});
 
 			if (!t.supertypes) {
@@ -102,6 +103,7 @@ module.exports = function(configObj) {
 	}());
 
 
+	//test-covered
 	(function calcTypeHierarchy() {
 
 		//Recalc ancestors from supertypes. 
@@ -391,8 +393,8 @@ module.exports = function(configObj) {
 				}
 
 				//check no attributes defined on prop-definition (except isCustom)
-				if (_.size(_.omit(p, ["aliasOf", "isCustom", "ranges"]))) {
-					throw new Error("property containing `aliasOf` may only contain prop (aliasOf, isCustom, ranges): " + k);
+				if (_.size(_.omit(p, ["aliasOf", "isCustom", "required", "id"]))) {
+					throw new Error("property containing `aliasOf` may only contain properties: (aliasOf, isCustom, required, id): " + k + " -> " + JSON.stringify(_.keys(p)));
 				}
 
 				//if !isCustom - > check ranges the same.
@@ -481,7 +483,7 @@ module.exports = function(configObj) {
 			var t = types[tName];
 			_.each(properties, function(p, pName) {
 				if (!t.properties[pName]) return;
-				if (!_.intersection(p.domains, t.ancestors).length) { //type not covered yet by ancestor
+				if (!_.intersection(p.domains, t.ancestors).length) { //only if type not covered yet by ancestor
 					p.domains.push(tName);
 				}
 			});
@@ -497,23 +499,48 @@ module.exports = function(configObj) {
 		//type directives to inherit
 		var typeDirectivesToInherit = ["isValueObject"];
 
+		//NOTE: this is hopelessly inefficient, but gets the job done
+		//Better would be to process types in Dag-order and apply down. This is linear instead of quadratic. 
 		_.each(types, function(t, k) {
+
 			_.each(_.clone(t.ancestors).reverse(), function(supertypeName) { //reverse: travel up chain instead of down
 				var supertype = types[supertypeName];
 				if (!supertype) {
 					throw new Error("supertype not defined in Kwhen config (Supertype, refDirect, refTrans) " + supertypeName + ", " + appliedType.id);
 				}
 				_.defaults(t, _.pick(supertype, typeDirectivesToInherit));
-				_.defaults(t.properties, supertype.specific_properties);
-				t.removeProperties = t.removeProperties.concat(supertype.removeProperties);
-				t.required = t.required.concat(supertype.required);
-			});
-			t.required = _.uniq(t.required);
-			t.properties = _.omit(t.properties, t.removeProperties);
 
-			_.each(t.properties, function(propTypeSpecific, propK) {
-				propTypeSpecific.required = !!(properties[propK].required || propTypeSpecific.required || ~t.required.indexOf(propK));
+				//inherit properties from super that don't exist on type.
+				_.defaults(t.properties, supertype.specific_properties);
+
+				//for all properties that exist on type as well as super do a boolean OR on `required`
+				_.each(t.properties, function(prop, k) {
+					var superProp = supertype.specific_properties[k];
+					prop.required = prop.required || (superProp && superProp.required);
+				});
+
+				t.removeProperties = t.removeProperties.concat(supertype.removeProperties);
 			});
+
+			//for each of the  properties we've already added required=true if anywhere along the typechain required = true. Only thing left is add globalProp.required.
+			_.each(t.properties, function(propTypeSpecific, propK) {
+				propTypeSpecific.required = !!(properties[propK].required || propTypeSpecific.required);
+			});
+
+			//prune properties my removing the build `removeProperties` from properties.
+			//Required properties cannot be removed and result in an error being thrown directly
+
+			t.properties = _.omit(t.properties, function(v, k) {
+				var doRemove = t.removeProperties.indexOf(k) !== -1;
+				if (v.required && doRemove) {
+					throw new Error("property may not be removed since it's requried");
+				}
+				return doRemove;
+			});
+
+			// t.properties = _.omit(t.properties, t.removeProperties);
+
+
 		});
 	}());
 

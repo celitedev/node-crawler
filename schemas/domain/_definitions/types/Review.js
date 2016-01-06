@@ -3,10 +3,13 @@ module.exports = {
 	properties: {
 		about: {}, //from creativeWOrk
 		author: {}, //from creativeWOrk
-		itemReviewed: {},
-		reviewBody: {},
+		itemReviewed: {
+			required: true
+		},
+		reviewBody: {
+			required: true
+		},
 		reviewRating: {},
 	},
-	required: ["itemReviewed", "reviewBody"],
 	removeProperties: ["sameAs", "image", "alternateName", "description"]
 };

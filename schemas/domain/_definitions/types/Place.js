@@ -1,7 +1,12 @@
 module.exports = {
 	properties: {
 		aggregateRating: {},
-		address: {},
+		address: {
+			required: true
+		},
+		name: {
+			required: true
+		},
 		branchCode: {},
 		containedInPlace: {
 			// TBD: not sure want entire hierarchy displayed?
@@ -13,7 +18,6 @@ module.exports = {
 		//photo: //TODO ? There's already an image
 		// review: {}, //stored separately
 	},
-	required: ["address", "name"],
 	//properties added on JSON-LD schema.org generation
 	out_properties: {
 		faxNumber: {

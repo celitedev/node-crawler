@@ -286,12 +286,6 @@ module.exports = {
 	},
 	keywords: {
 		"isMulti": true,
-
-		//Format from Kwhen domain -> schema.org
-		//Here: we represent as array while schemaOrg insists on comma-delimited
-		toSchemaOrg: function(keywordsArr, domainModel) {
-			return keywordsArr.join(","); //from arr -> comma-delimited
-		}
 	},
 	license: {
 		ranges: ["URL"]
