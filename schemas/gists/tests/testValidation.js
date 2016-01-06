@@ -37,7 +37,7 @@ var domainUtils = require("../../domain/utils");
 
 
 
-var domainObject = new CanonicalObject({
+var domainObject = new SourceObject({
 	type: "CreativeWork",
 	sourceType: "eventful",
 	sourceUrl: "url of entity as known at source", //required
@@ -63,11 +63,15 @@ var domainObject = new CanonicalObject({
 domainObject.set({
 	name: "Home asdasdasd",
 	url: "http://www.google.com",
-	about: {
-		"_ref": {
-			bla: "ASda"
-		}
-	}
+
+	//correclty transformed to
+	//{
+	//	_ref: {
+	//		soruceId: val
+	//	}
+	//}
+	about: "some id",
+	producer: "https://en.wikipedia.org/wiki/Quentin_Tarantino"
 });
 
 domainObject.commit(function(err) {
@@ -78,8 +82,8 @@ domainObject.commit(function(err) {
 	}
 	//POST: isDirty = false
 	console.log(JSON.stringify(domainObject, null, 2));
-	console.log(JSON.stringify(domainObject.toDataObject(), null, 2));
-	console.log(JSON.stringify(domainObject.toSimple(), null, 2));
+	// console.log(JSON.stringify(domainObject.toDataObject(), null, 2));
+	// console.log(JSON.stringify(domainObject.toSimple(), null, 2));
 });
 
 
