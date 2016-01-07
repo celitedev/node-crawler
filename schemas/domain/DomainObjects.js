@@ -78,7 +78,6 @@ module.exports = function(generatedSchemas) {
 
 
 		this._type = typeName;
-		// this._typechain = type.ancestors.concat([this._type]);
 
 		this._propsDirty = {
 			_type: typeName
@@ -267,12 +266,25 @@ module.exports = function(generatedSchemas) {
 		}
 	 */
 	AbstractDomainObject.prototype.toDataObject = function(props) {
-		throw new Error("need to implement multivalued _type");
-		var type = generatedSchemas.types[this._type]; //guaranteed
+
+		//NOTE: temp restriction in place that requires all entities to be of same root (#101)
+		//We therefore can infer _index by fetching rootName from *any* type since it will be the same
+		//LATER: this may result in multiple objects: 1 for each index.
+
+		var _index = generatedSchemas.types[this._type[0]].rootName;
 
 		return {
-			_index: type.rootName,
-			_subtypes: this._typechain.slice(this._typechain.indexOf(type.rootName) + 1),
+			_index: _index,
+
+			//subtypes is the unique union 
+			//of all subtypes (starting at _index and walking down the typechain)
+			//over all types
+			_subtypes: _.uniq(_.reduce(this._type, function(arr, typeName) {
+				var type = generatedSchemas.types[typeName];
+				var ancestorsAndSelf = type.ancestors.concat([typeName]);
+				return arr.concat(ancestorsAndSelf.slice(ancestorsAndSelf.indexOf(_index) + 1));
+			}, [])),
+
 			_props: _toDataObjectRecursive(props || this._props)
 		};
 	};
@@ -288,7 +300,6 @@ module.exports = function(generatedSchemas) {
 		}
 	 */
 	AbstractDomainObject.prototype.toSimple = function(props) {
-		throw new Error("need to implement multivalued _type");
 		return _.extend({
 			_type: this._type
 		}, _toSimpleRecursive(props || this._props));
@@ -455,7 +466,7 @@ module.exports = function(generatedSchemas) {
 			//add aliasOf properties which weren't set. 
 			//e.g.: populate a if b is set in a.aliasOf(b)
 			_.each(generatedSchemas.properties, function(prop, k) {
-				if (prop.aliasOf && obj[k] === undefined) {
+				if (prop.aliasOf && obj[k] === undefined && obj[prop.aliasOf] !== undefined) {
 					obj[k] = obj[prop.aliasOf];
 				}
 			});
@@ -546,6 +557,7 @@ module.exports = function(generatedSchemas) {
 		var dto = _.reduce(_.clone(properties), function(agg, v, k) {
 			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
 
+			//NOTE: at this point _type is guaranteed NOT an array anymore. That was only at toplevel
 			function transformSingleItem(v) {
 				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
@@ -578,7 +590,10 @@ module.exports = function(generatedSchemas) {
 		var dto = _.reduce(_.clone(properties), function(agg, v, k) {
 			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
 
+
 			function transformSingleItem(v) {
+
+				//NOTE: at this point _type is guaranteed NOT an array anymore. That was only at toplevel
 				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
 				if (propType.isValueObject) {

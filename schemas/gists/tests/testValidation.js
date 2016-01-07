@@ -16,56 +16,49 @@ var SourceObject = domainObjects.SourceObject;
 
 var domainUtils = require("../../domain/utils");
 
-// var obj = {
-// 	_type: "LocalBusiness",
-// 	name: "Home sweet home",
-// 	address: {
-// 		// _type: "PostalAddress", //optional since can be inferred
-// 		addressLocality: "Tilburg",
-// 		postalCode: "5021 GW",
-// 		streetAddress: "stuivesantplein 7",
-// 		email: "GBRITS@ASDASD.COM"
-// 	},
-// 	geo: {
-// 		// _type: "GeoCoordinates", //optional since can be inferred
-// 		latitude: 43.123123,
-// 		longitude: 12.123213,
-// 		elevation: 1,
-// 		// test: 43.123123,
-// 	}
-// };
+
+// var domainObject = new SourceObject({
+// 	type: ["CreativeWork"],
+// 	sourceType: "eventful",
+// 	sourceUrl: "url of entity as known at source", //required
+// 	sourceId: "id of entity as known at source" //optional
+// });
+
+// domainObject.set({
+// 	name: "Home asdasdasd",
+// 	url: "http://www.google.com",
+// 	about: "some id", //transformed to _ref.sourceId
+// 	producer: "https://en.wikipedia.org/wiki/Quentin_Tarantino" //transformed to _ref.sourceUrl
+// });
 
 
 
 var domainObject = new SourceObject({
-	type: ["CreativeWork"],
+	type: ["Restaurant", "BarOrPub"],
 	sourceType: "eventful",
 	sourceUrl: "url of entity as known at source", //required
 	sourceId: "id of entity as known at source" //optional
 });
 
-
-//TODO: 
-//SourceObject.canonicalId is set by Canonical.match(source)
-//
-// domainObject.set({
-// 	address: {
-// 		streetAddress: "test",
-// 		addressCountry: "sourceSpecific"
-// 	},
-// 	name: "testasd",
-// 	menu: "italian",
-// 	alternateName: ["asd", "asd"],
-// 	place: "asdasd"
-// });
-
-
 domainObject.set({
-	name: "Home asdasdasd",
-	url: "http://www.google.com",
-	about: "some id", //transformed to _ref.sourceId
-	producer: "https://en.wikipedia.org/wiki/Quentin_Tarantino" //transformed to _ref.sourceUrl
+	address: {
+		addressLocality: "Tilburg",
+		postalCode: "5021 GW",
+		streetAddress: "stuivesantplein 7",
+		email: "GBRITS@ASDASD.COM"
+	},
+	geo: {
+		latitude: 43.123123,
+		longitude: 12.123213,
+		elevation: 1,
+		// test: 43.123123,
+	},
+	name: "testasd",
+	menu: "italian",
+	alternateName: ["asd", "asd"],
 });
+
+
 
 domainObject.commit(function(err) {
 	if (err) {
@@ -74,8 +67,8 @@ domainObject.commit(function(err) {
 		throw err;
 	}
 	//POST: isDirty = false
-	console.log(JSON.stringify(domainObject, null, 2));
-	// console.log(JSON.stringify(domainObject.toDataObject(), null, 2));
+	// console.log(JSON.stringify(domainObject, null, 2));
+	console.log(JSON.stringify(domainObject.toDataObject(), null, 2));
 	// console.log(JSON.stringify(domainObject.toSimple(), null, 2));
 });
 
