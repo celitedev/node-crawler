@@ -51,8 +51,6 @@ module.exports = function(generatedSchemas) {
 				});
 			}
 
-			//TODO: _type = array on toplevel and non-array on non-toplevel
-
 			if (!isToplevel) {
 
 				//single type because not-toplevel
@@ -73,7 +71,9 @@ module.exports = function(generatedSchemas) {
 				}
 			}
 
-			//STATE: non-datetype, toplevel OR non-toplevel
+			//////////////////////////////////////////////////
+			//STATE: non-datetype, toplevel OR non-toplevel //
+			//////////////////////////////////////////////////
 			var typenames = isToplevel ? value._type : [value._type];
 
 			if (!_.isArray(typenames)) {
@@ -92,7 +92,6 @@ module.exports = function(generatedSchemas) {
 				return type;
 			});
 
-			//STATE: type is a TYPE not a DATATYPE
 			if (isToplevel || types[0].isValueObject) { //bit magic but: if not toplevel, there's exactly 1 element
 
 				//list the required properties by Or'ing over all type.properties
@@ -131,7 +130,7 @@ module.exports = function(generatedSchemas) {
 			} else {
 
 				//STATE: type is Entity. because it: 
-				//- is a type
+				//- is a type, since datatype already handled for non-toplevel and toplevel may not be a datatype
 				//- is not a ValueObject
 				//- can not be Abstract, since otherwise an error would have been raised during schema creation
 
