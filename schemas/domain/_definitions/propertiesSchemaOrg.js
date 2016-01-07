@@ -116,6 +116,7 @@ module.exports = {
 	//http://schema.org/Enumeration //
 	//////////////////////////////////
 	supersededBy: {
+
 		//TODO: what does supersededBy mean? 
 		ranges: ["Enumeration"]
 	},
