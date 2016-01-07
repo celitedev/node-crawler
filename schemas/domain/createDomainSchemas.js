@@ -600,6 +600,24 @@ module.exports = function(configObj) {
 					}
 				});
 			}());
+
+			//add soundness check that entity and non-entity don't occur in same range
+			//#107
+			(function checkEntitiesAndNonEntitiesArentCombinedInRange() {
+				_.each(properties, function(p, propName) {
+					var entityFound = false,
+						nonEntityFound = false;
+					_.each(p.ranges, function(typeName) {
+						var type = types[typeName] || schemaOrgDef.datatypes[typeName];
+						if (type.isEntity) entityFound = true;
+						else nonEntityFound = true;
+					});
+					if (entityFound && nonEntityFound) {
+						throw new Error("Soundness fail property combines entity and non-entity in range: " + propName);
+					}
+				});
+			}());
+
 		}
 	}());
 
