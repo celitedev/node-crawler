@@ -28,16 +28,20 @@ var customValidators = {
 
 module.exports = function(generatedSchemas) {
 
-	function passInTypeClosure(kindOfEntity, parentName) {
+	function passInTypeClosure(kindOfEntity, parentTypeNames) {
 
-		// var parentType = generatedSchemas.types[parentName]; //not needed for now
+		//parentTypeNames is an array of types or null: 
+		//if null -> currently we're at toplevel
+		//if 1 level below toplevel -> array containts 1 or more items
+		//if below that -> array contains exactly 1 item. 
+		//
+		// var parentType = generatedSchemas.types[parentTypeNames[0]]; //not needed for now
 
 		var fn = function passInSchema(rule, value) {
 
 			var fieldtype = generatedSchemas.properties[rule.field]; //NOTE: ok to use instead of generatedSchemas.properties
 
-			var typeName = value._type;
-			var isToplevel = !parentName;
+			var isToplevel = !parentTypeNames;
 
 			//we explicitly allow an array value to come through here so we can properly raise a 
 			//validation error. 
@@ -47,89 +51,129 @@ module.exports = function(generatedSchemas) {
 				});
 			}
 
-			//fetch type or datatype. This is guaranteed to exist since we run all sorts of prechecks
-			var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName];
+			//TODO: _type = array on toplevel and non-array on non-toplevel
 
-			if (type.isDataType) {
+			if (!isToplevel) {
 
-				//STATE: type is a DATATYPE
+				//single type because not-toplevel
+				var typeName = value._type;
+				var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName]; //guaranteed
 
-				//field specific validator
-				return _generateDataTypeValidator({
-					fieldName: rule.field,
-					ranges: [typeName],
-					validate: fieldtype ? fieldtype.validate : undefined
-				});
+				//type may be a datatype only iff non-toplevel
+				if (type.isDataType) {
 
+					//STATE: type is a DATATYPE
+
+					//field specific validator
+					return _generateDataTypeValidator({
+						fieldName: rule.field,
+						ranges: [typeName],
+						validate: fieldtype ? fieldtype.validate : undefined
+					});
+				}
+			}
+
+			//STATE: non-datetype, toplevel OR non-toplevel
+			var typenames = isToplevel ? value._type : [value._type];
+
+			if (!_.isArray(typenames)) {
+				throw new Error("Sanity check: typenames should be an array but isn't: " + typenames);
+			}
+
+			if (!typenames.length) {
+				throw new Error("Sanity check: typenames should have at least 1 element!");
+			}
+
+			var types = _.map(typenames, function(typeName) {
+				var type = generatedSchemas.types[typeName];
+				if (!type) {
+					throw new Error("SANITY CHECK: type should exist since we've prechecked already: " + typeName);
+				}
+				return type;
+			});
+
+			//STATE: type is a TYPE not a DATATYPE
+			if (isToplevel || types[0].isValueObject) { //bit magic but: if not toplevel, there's exactly 1 element
+
+				//list the required properties by Or'ing over all type.properties
+				var propsRequired = _.uniq(_.reduce(types, function(propNames, t) {
+					return propNames.concat(_.pluck(_.filter(t.properties, {
+						required: true
+					}), "id"));
+				}, []));
+
+				//the properties to validate are the following: 
+				//- all properties on the object 
+				//- minus the properties such as _type, _value
+				//- plus all required properties as calculated over all supplied types.
+				var propsToValidate = _.difference(_.keys(value).concat(propsRequired), domainUtils.excludePropertyKeys);
+
+				return {
+					type: "object",
+					fields: _.reduce(propsToValidate, function(fields, pName) {
+
+						var prop = generatedSchemas.properties[pName];
+						var fn = passInTypeClosure(kindOfEntity, typenames);
+
+						var fieldValidatorObj = !prop.isMulti ? fn : {
+							type: "array",
+							values: fn,
+							min: 1 //if array defined it must have minLength of 1. (or otherwise don't supply)
+						};
+
+						fieldValidatorObj.required = !!~propsRequired.indexOf(pName);
+						fields[pName] = fieldValidatorObj;
+
+						return fields;
+					}, {})
+				};
 
 			} else {
 
-				//STATE: type is a TYPE not a DATATYPE
+				//STATE: type is Entity. because it: 
+				//- is a type
+				//- is not a ValueObject
+				//- can not be Abstract, since otherwise an error would have been raised during schema creation
 
-				if (type.isValueObject || isToplevel) {
-
-					//SOLUTION: type-object should be included by EMBEDDING.
-					var validatorObj = _.omit(typeValidators[kindOfEntity][typeName], "fields");
-
-					//Prune fields to only leave required or available fields. 
-					//This makes sure recursion doesn't fail on empty results.
-					//tech: copy properties (being functions) directly, instead of cloning, since this fails..
-					validatorObj.fields = _.reduce(typeValidators[kindOfEntity][typeName].fields, function(agg, obj, k) {
-						if (obj.required || value[k]) {
-							agg[k] = obj;
-						}
-						return agg;
-					}, {});
-
-					return validatorObj;
-
-				} else {
-
-					//STATE: type is Entity. because it: 
-					//- is a type
-					//- is not a ValueObject
-					//- can not be Abstract, since otherwise an error would have been raised during schema creation
-
-					//SOLUTION: type-object should be included by referencing. 
+				//SOLUTION: type-object should be included by referencing. 
 
 
-					//A SOURCE as well as CANONICAL object may contain a ref-object. 
-					//
-					//For SOURCE this is always the case. 
-					//For CANONICAL this is the case if reference hasn't been resolved yet. 
-					//
-					//Format of this ref-object: 
-					//
-					//{
-					//	_ref: {
-					//		<custom>
-					//	}
-					//}
-					//
-					//Moreover, CANONICAL contains a string of type UUID if ref IS resolved. 
+				//A SOURCE as well as CANONICAL object may contain a ref-object. 
+				//
+				//For SOURCE this is always the case. 
+				//For CANONICAL this is the case if reference hasn't been resolved yet. 
+				//
+				//Format of this ref-object: 
+				//
+				//{
+				//	_ref: {
+				//		<custom>
+				//	}
+				//}
+				//
+				//Moreover, CANONICAL contains a string of type UUID if ref IS resolved. 
 
 
-					if (_.isString(value._value) && kindOfEntity === domainUtils.enums.kind.CANONICAL) {
-						return _generateDataTypeValidator({
-							ranges: ["Text"],
-							required: true,
-							validate: "isUUID"
-						});
-					}
-
-					var refRules = [{
-						type: "object",
-						required: true
-					}];
-
-					return {
-						type: 'object',
-						fields: {
-							_ref: _addCannedValidator(refRules, "RefObjectNonEmpty")
-						},
-					};
-
+				if (_.isString(value._value) && kindOfEntity === domainUtils.enums.kind.CANONICAL) {
+					return _generateDataTypeValidator({
+						ranges: ["Text"],
+						required: true,
+						validate: "isUUID"
+					});
 				}
+
+				var refRules = [{
+					type: "object",
+					required: true
+				}];
+
+				return {
+					type: 'object',
+					fields: {
+						_ref: _addCannedValidator(refRules, "RefObjectNonEmpty")
+					},
+				};
+
 			}
 		};
 
@@ -273,37 +317,37 @@ module.exports = function(generatedSchemas) {
 	var datatypesEnum = ["Boolean", "Date", "DateTime", "Number", "Float", "Integer", "Text", "Time", "URL"];
 
 
-	function _createTypeValidators(kindOfEntity) {
+	// function _createTypeValidators(kindOfEntity) {
 
-		return _.reduce(generatedSchemas.types, function(agg, type, tName) {
+	// 	return _.reduce(generatedSchemas.types, function(agg, type, tName) {
 
-			agg[tName] = {
-				type: "object",
-				fields: _.reduce(type.properties, function(fields, prop, pName) {
+	// 		agg[tName] = {
+	// 			type: "object",
+	// 			fields: _.reduce(type.properties, function(fields, prop, pName) {
 
-					//butt-ugly: need to pass typeValidators, which we're just creating...
-					var fn = passInTypeClosure(kindOfEntity, tName);
+	// 				//butt-ugly: need to pass typeValidators, which we're just creating...
+	// 				var fn = passInTypeClosure(kindOfEntity, tName);
 
-					var fieldValidatorObj = !prop.isMulti ? fn : {
-						type: "array",
-						values: fn,
-						min: 1 //if array defined it must have minLength of 1. (or otherwise don't supply)
-					};
+	// 				var fieldValidatorObj = !prop.isMulti ? fn : {
+	// 					type: "array",
+	// 					values: fn,
+	// 					min: 1 //if array defined it must have minLength of 1. (or otherwise don't supply)
+	// 				};
 
-					fieldValidatorObj.required = prop.required; //setting on returned object
-					fields[pName] = fieldValidatorObj;
+	// 				fieldValidatorObj.required = prop.required; //setting on returned object
+	// 				fields[pName] = fieldValidatorObj;
 
-					return fields;
+	// 				return fields;
 
-				}, {})
-			};
-			return agg;
-		}, {});
-	}
+	// 			}, {})
+	// 		};
+	// 		return agg;
+	// 	}, {});
+	// }
 
-	var typeValidators = {};
-	typeValidators[domainUtils.enums.kind.CANONICAL] = _createTypeValidators(domainUtils.enums.kind.CANONICAL);
-	typeValidators[domainUtils.enums.kind.SOURCE] = _createTypeValidators(domainUtils.enums.kind.SOURCE);
+	// var typeValidators = {};
+	// typeValidators[domainUtils.enums.kind.CANONICAL] = _createTypeValidators(domainUtils.enums.kind.CANONICAL);
+	// typeValidators[domainUtils.enums.kind.SOURCE] = _createTypeValidators(domainUtils.enums.kind.SOURCE);
 
 	return {
 		createSchema: function() {

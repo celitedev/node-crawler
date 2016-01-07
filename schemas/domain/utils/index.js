@@ -52,6 +52,8 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 		kind: {
 			"CANONICAL": "canonical",
 			"SOURCE": "source"
-		}
-	}
+		},
+	},
+	excludePropertyKeys: ["_type", "_value", "_isBogusType", "_ref"]
+
 });

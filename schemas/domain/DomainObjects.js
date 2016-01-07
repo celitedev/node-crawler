@@ -3,10 +3,11 @@ var util = require("util");
 var domainUtils = require("./utils");
 var urlRegex = require('url-regex');
 
+var excludePropertyKeys = domainUtils.excludePropertyKeys;
+
 module.exports = function(generatedSchemas) {
 
 	var validator = require("./validation")(generatedSchemas);
-	var excludePropertyKeys = ["_type", "_value", "_isBogusType", "_ref"];
 
 	/**
 	 * Example: 
@@ -50,14 +51,34 @@ module.exports = function(generatedSchemas) {
 			throw new Error("'state.type' should be defined on DomainObject");
 		}
 
-		var type = generatedSchemas.types[typeName];
+		typeName = _.isArray(typeName) ? typeName : [typeName];
 
-		if (!type) {
-			throw new Error("type doesn't exist as defined by _type: " + typeName);
-		}
+		_.each(typeName, function(typeNameSingle) {
+			var type = generatedSchemas.types[typeNameSingle];
+
+			if (!type) {
+				throw new Error("type doesn't exist as defined by _type: " + typeNameSingle);
+			}
+			if (!type.isEntity) {
+				throw new Error("type should be an entity but isn't: " + typeNameSingle);
+			}
+		});
+
+		//TEMPORARY: check that multiple types are in same root: #101
+		(function temporaryCheck() {
+			var roots = _.uniq(_.map(typeName, function(typeNameSingle) {
+				var type = generatedSchemas.types[typeNameSingle];
+				return type.rootName;
+			}));
+			if (roots.length > 1) {
+				throw new Error("TEMPORARY CONSTRAINT: we require all types " +
+					"of single DomainObject to belong to save root. Not the case here: " + roots.join(","));
+			}
+		}());
+
 
 		this._type = typeName;
-		this._typechain = type.ancestors.concat([this._type]);
+		// this._typechain = type.ancestors.concat([this._type]);
 
 		this._propsDirty = {
 			_type: typeName
@@ -246,6 +267,7 @@ module.exports = function(generatedSchemas) {
 		}
 	 */
 	AbstractDomainObject.prototype.toDataObject = function(props) {
+		throw new Error("need to implement multivalued _type");
 		var type = generatedSchemas.types[this._type]; //guaranteed
 
 		return {
@@ -266,6 +288,7 @@ module.exports = function(generatedSchemas) {
 		}
 	 */
 	AbstractDomainObject.prototype.toSimple = function(props) {
+		throw new Error("need to implement multivalued _type");
 		return _.extend({
 			_type: this._type
 		}, _toSimpleRecursive(props || this._props));
@@ -282,10 +305,11 @@ module.exports = function(generatedSchemas) {
 			throw new Error("SANITY CHECK: `obj` passed to _transformProperties should be an object");
 		}
 
-		var typeName = obj._type;
-		var typeNameIsExplicit = !!typeName;
 		var fieldName;
 		var fieldtype;
+		var typeNonToplevel; //non-toplevel
+		var typesToplevel; //toplevel
+		var types; //generic combi of the 2 above
 
 		if (!isTopLevel) {
 			//State: no toplevel: 
@@ -293,43 +317,63 @@ module.exports = function(generatedSchemas) {
 			//- fieldtype is guaranteed to exist
 			fieldName = ancestors[ancestors.length - 1];
 			fieldtype = generatedSchemas.properties[fieldName];
-		}
 
-		if (!typeName) {
+			var typeName = obj._type;
+			var typeNameIsExplicit = !!typeName;
 
-			//STATE: fieldtype guaranteed to exist.
-			if (!fieldtype.isAmbiguous) {
-				typeName = fieldtype.ranges[0];
-			} else {
-				if (fieldtype.ambiguitySolvedBy.type === "explicitType") {
-					throw new Error("_type should be explicitly defined for (ambiguous field, value) " + fieldName + " - " + JSON.stringify(obj, null, 2));
+			if (!typeName) {
+
+				//STATE: fieldtype guaranteed to exist.
+				if (!fieldtype.isAmbiguous) {
+					typeName = fieldtype.ranges[0];
+				} else {
+					if (fieldtype.ambiguitySolvedBy.type === "explicitType") {
+						throw new Error("_type should be explicitly defined for (ambiguous field, value) " + fieldName + " - " + JSON.stringify(obj, null, 2));
+					}
+					typeName = domainUtils.inferTypeForAmbiguousRange(fieldtype, obj);
+					if (!typeName) {
+						throw new Error("ambiguous resolver couldn't resolve type (fieldName, value) " + fieldName + " - " + JSON.stringify(obj, null, 2));
+					}
 				}
-				typeName = domainUtils.inferTypeForAmbiguousRange(fieldtype, obj);
-				if (!typeName) {
-					throw new Error("ambiguous resolver couldn't resolve type (fieldName, value) " + fieldName + " - " + JSON.stringify(obj, null, 2));
+				//pass in found type
+				obj._type = typeName;
+			}
+
+			//State: typeName = obj._type = defined
+			typeNonToplevel = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName];
+
+			if (!typeNonToplevel) {
+				throw new Error("type not found: " + typeName);
+			}
+
+			if (typeNameIsExplicit) {
+				//_type explicitly passed. Let's make sure it's an allowed type
+				if (!domainUtils.isTypeAllowedForRange(type, fieldtype)) {
+					throw new Error("type not allowed for fieldname, type: " + ancestors.join(".") + " - " + typeName);
 				}
 			}
-			//pass in found type
-			obj._type = typeName;
+
+			types = [typeNonToplevel];
+
+		} else {
+			//toplevel has _type as an array
+			//moreover, explicit type is required on toplevel, so we can skip all the ambiguous checks
+
+			types = _.map(obj._type, function(tName) {
+				var type = generatedSchemas.types[tName];
+				if (!type) {
+					throw new Error("type not found on top level: " + tName);
+				}
+				return type;
+			});
 		}
 
-		//State: typeName = obj._type = defined
-		var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName];
-
-		if (!type) {
-			throw new Error("type not found: " + typeName);
-		}
-
-		if (typeNameIsExplicit) {
-			//_type explicitly passed. Let's make sure it's an allowed type
-			if (!isTopLevel && !domainUtils.isTypeAllowedForRange(type, fieldtype)) {
-				throw new Error("type not allowed for fieldname, type: " + ancestors.join(".") + " - " + typeName);
-			}
-		}
+		var allowedProps = _.uniq(_.reduce(types, function(props, t) {
+			return props.concat(_.keys(t.properties));
+		}, [])).concat(excludePropertyKeys);
 
 		//check that only allowed properties are passed
-		var allowedProps = excludePropertyKeys.concat(_.keys(type.properties) || []),
-			suppliedProps = _.keys(obj),
+		var suppliedProps = _.keys(obj),
 			nonAllowedProps = _.difference(suppliedProps, allowedProps);
 
 		if (nonAllowedProps.length) {
@@ -354,7 +398,7 @@ module.exports = function(generatedSchemas) {
 				return;
 			}
 
-			var fieldtype = type.properties[k]; //guaranteed to exist
+			var fieldtype = generatedSchemas.properties[k]; //guaranteed to exist
 
 			//create array if fieldtype isMulti
 			if (fieldtype.isMulti) {
@@ -389,7 +433,7 @@ module.exports = function(generatedSchemas) {
 
 		}); //end each
 
-		if (!type.isDataType) {
+		if (isTopLevel || !types[0].isDataType) {
 
 			//populate target of aliasOf. 
 			//e.g.: populate b if a is set in a.aliasOf(b)
@@ -398,7 +442,7 @@ module.exports = function(generatedSchemas) {
 
 				if (excludePropertyKeys.indexOf(k) !== -1) return;
 
-				var fieldtype = type.properties[k]; //guaranteed to exist
+				var fieldtype = generatedSchemas.properties[k]; //guaranteed to exist
 
 				if (fieldtype.aliasOf) {
 					if (obj[fieldtype.aliasOf] !== undefined && !_.isEqual(obj[k], obj[fieldtype.aliasOf])) {
@@ -410,7 +454,7 @@ module.exports = function(generatedSchemas) {
 
 			//add aliasOf properties which weren't set. 
 			//e.g.: populate a if b is set in a.aliasOf(b)
-			_.each(type.properties, function(prop, k) {
+			_.each(generatedSchemas.properties, function(prop, k) {
 				if (prop.aliasOf && obj[k] === undefined) {
 					obj[k] = obj[prop.aliasOf];
 				}
@@ -557,7 +601,7 @@ module.exports = function(generatedSchemas) {
 
 	return {
 		CanonicalObject: CanonicalObject,
-		SourceObject: SourceObject
+		SourceObject: SourceObject,
 	};
 
 };

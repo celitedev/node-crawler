@@ -38,7 +38,7 @@ var domainUtils = require("../../domain/utils");
 
 
 var domainObject = new SourceObject({
-	type: "CreativeWork",
+	type: ["CreativeWork"],
 	sourceType: "eventful",
 	sourceUrl: "url of entity as known at source", //required
 	sourceId: "id of entity as known at source" //optional
@@ -63,15 +63,8 @@ var domainObject = new SourceObject({
 domainObject.set({
 	name: "Home asdasdasd",
 	url: "http://www.google.com",
-
-	//correclty transformed to
-	//{
-	//	_ref: {
-	//		soruceId: val
-	//	}
-	//}
-	about: "some id",
-	producer: "https://en.wikipedia.org/wiki/Quentin_Tarantino"
+	about: "some id", //transformed to _ref.sourceId
+	producer: "https://en.wikipedia.org/wiki/Quentin_Tarantino" //transformed to _ref.sourceUrl
 });
 
 domainObject.commit(function(err) {
