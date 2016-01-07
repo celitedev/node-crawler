@@ -113,7 +113,11 @@ module.exports = function(configObj) {
 
 			//reverse + uniq + reverse solves order in case of multiple supertypes
 			//remember: most right one is lowest root.
-			t.ancestors = _.uniq(recalcAncestorsRec(t).reverse()).reverse();
+			// t.ancestors = _.uniq(recalcAncestorsRec(t).reverse()).reverse();
+			//
+			//NOTE: Reversed because of #108
+			//THINGS SEEM TO WORK NOW
+			t.ancestors = _.uniq(recalcAncestorsRec(t));
 
 			var ancestorsAndSelf = _.uniq(t.ancestors.concat(t.id));
 			var rootsForType = _.intersection(ancestorsAndSelf, roots); //guarantees sort order first arr
@@ -126,9 +130,12 @@ module.exports = function(configObj) {
 
 		//Bottom up recursion. Top down isn't possible because of multiple supertypes
 		function recalcAncestorsRec(t) {
-			return _.reduce(t.supertypes, function(arr, superName) {
+
+			var ancestors = _.reduce(t.supertypes, function(arr, superName) {
 				return arr.concat(recalcAncestorsRec(types[superName]));
 			}, []).concat(t.supertypes || []);
+
+			return ancestors;
 		}
 	}());
 
