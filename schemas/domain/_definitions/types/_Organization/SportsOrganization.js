@@ -1,5 +1,5 @@
 module.exports = {
 	properties: {
-		sport: {}
+		sport: false
 	}
 };

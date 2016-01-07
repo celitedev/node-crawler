@@ -13,8 +13,14 @@ if (!command || commands.indexOf(command) === -1) {
 }
 
 var generatedSchemas = require("../../domain/createDomainSchemas.js")({
-	checkSoundness: argv.soundness
+	checkSoundness: argv.soundness,
+	config: require("../../domain/_definitions/config"),
+	properties: require("../../domain/_definitions").properties,
+	types: require("../../domain/_definitions").types,
+	schemaOrgDef: require("../../domain/_definitions/schemaOrgDef")
 });
+
+
 
 switch (command) {
 	case "typeHierarchy":

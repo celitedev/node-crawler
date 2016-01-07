@@ -41,16 +41,19 @@
 var _ = require("lodash");
 var colors = require("colors");
 
-var schemaOrgDef = require("./_definitions/schemaOrgDef");
-var properties = require("./_definitions").properties;
-var types = require("./_definitions").types;
-var config = require("./_definitions/config");
-
 var utils = require("./utils");
-var roots = config.domain.roots;
 var validator = require("validator");
 
 module.exports = function(configObj) {
+
+	var schemaOrgDef = configObj.schemaOrgDef;
+	var properties = configObj.properties;
+	var types = configObj.types;
+	var config = configObj.config;
+
+
+	var roots = config.domain.roots;
+
 	configObj = configObj || {};
 	var checkSoundness = configObj.checkSoundness;
 
@@ -60,12 +63,14 @@ module.exports = function(configObj) {
 		console.log(("NOT CHECKING FOR SOUNDNESS").red);
 	}
 
+	//test-covered
 	(function enrichDatatypes() {
 		_.each(schemaOrgDef.datatypes, function(t) {
 			t.isDataType = true;
 		});
 	}());
 
+	//test-covered
 	(function extendTypes() {
 
 		_.each(types, function(t, k) {
@@ -85,8 +90,7 @@ module.exports = function(configObj) {
 				overwrites: k,
 				properties: {},
 				supertypes: _.clone(overwrites.supertypes),
-				removeProperties: [],
-				required: []
+				removeProperties: []
 			});
 
 			if (!t.supertypes) {
@@ -99,6 +103,7 @@ module.exports = function(configObj) {
 	}());
 
 
+	//test-covered
 	(function calcTypeHierarchy() {
 
 		//Recalc ancestors from supertypes. 
@@ -156,6 +161,10 @@ module.exports = function(configObj) {
 
 			_.each(properties, function(p, k) {
 
+				p.id = p.id || k;
+
+				p.required = !!p.required;
+
 				if (p.aliasOf) { //don't process aliased properties yet
 					return;
 				}
@@ -192,9 +201,6 @@ module.exports = function(configObj) {
 				//missing attribute checks
 				if (!p.ranges) {
 					throw new Error("ranges-attrib not supported on (probably isCustom) property: " + k);
-				}
-				if (!p.id) {
-					throw new Error("id-attrib not supported on (probably isCustom) property: " + k);
 				}
 
 				//TODO: https://github.com/Kwhen/crawltest/issues/88
@@ -389,8 +395,8 @@ module.exports = function(configObj) {
 				}
 
 				//check no attributes defined on prop-definition (except isCustom)
-				if (_.size(_.omit(p, ["aliasOf", "isCustom", "ranges"]))) {
-					throw new Error("property containing `aliasOf` may only contain prop (aliasOf, isCustom, ranges): " + k);
+				if (_.size(_.omit(p, ["aliasOf", "isCustom", "required", "id"]))) {
+					throw new Error("property containing `aliasOf` may only contain properties: (aliasOf, isCustom, required, id): " + k + " -> " + JSON.stringify(_.keys(p)));
 				}
 
 				//if !isCustom - > check ranges the same.
@@ -420,48 +426,35 @@ module.exports = function(configObj) {
 
 	(function extendTypesWithProperties() {
 
-		//Array defining attributes that type-property is extended with from property. 
-		//This directly makes sure that these attributes are not overwritten by type-specific property.
-
-		var propertyDirectivesToInherit = [
-			"id",
-			"ranges",
-			"supertypes",
-			"ancestors",
-			"ambiguitySolvedBy",
-			"isAmbiguous",
-			"isAmbiguitySolved",
-			"isMulti",
-			"aliasOf",
-			"validate",
-			"transform",
-			"fieldTransformers"
-		];
-
 		_.each(types, function(t, k) {
 
 			var undefinedPropsOwn = [];
-			_.each(t.properties, function(propTypeSpecific, propK) {
-				if (!properties[propK]) {
-					undefinedPropsOwn.push(propK);
+			var propsNotBool = [];
+			_.each(t.properties, function(isRequired, propK) {
+
+				if (!_.isBoolean(isRequired)) {
+					propsNotBool.push(propK);
 					return;
 				}
 
 				var propGlobal = properties[propK];
 
-				_.extend(propTypeSpecific, _.pick(propGlobal, propertyDirectivesToInherit)); //extend some
+				if (!propGlobal) {
+					undefinedPropsOwn.push(propK);
+					return;
+				}
 
-				// required is OR'ed 
-				propTypeSpecific.required = !!(propGlobal.required || propTypeSpecific.required || ~t.required.indexOf(propK));
-
-				// DO NOT ALLOW CONCAT. THIS COMPLCIATES DATAMODEL FOR NO GAIN. //validate is concatted
-				// propTypeSpecific.validate = (propTypeSpecific.validate || []);
-				// propTypeSpecific.validate = propGlobal.validate.concat(_.isArray(propTypeSpecific.validate) ? propTypeSpecific.validate : [propTypeSpecific.validate]);
+				var prop = t.properties[propK] = _.cloneDeep(propGlobal);
+				prop.required = prop.required || isRequired;
 
 			});
 			if (undefinedPropsOwn.length) {
 				throw new Error("some properties not defined on our own properties definition (type, undefinedProps): " + k +
 					", (" + undefinedPropsOwn.join(",") + ")");
+			}
+			if (propsNotBool.length) {
+				throw new Error("some type properties are not booleans (indicating required): " + k +
+					", (" + propsNotBool.join(",") + ")");
 			}
 
 			t.specific_properties = t.properties;
@@ -485,7 +478,7 @@ module.exports = function(configObj) {
 			var t = types[tName];
 			_.each(properties, function(p, pName) {
 				if (!t.properties[pName]) return;
-				if (!_.intersection(p.domains, t.ancestors).length) { //type not covered yet by ancestor
+				if (!_.intersection(p.domains, t.ancestors).length) { //only if type not covered yet by ancestor
 					p.domains.push(tName);
 				}
 			});
@@ -501,18 +494,40 @@ module.exports = function(configObj) {
 		//type directives to inherit
 		var typeDirectivesToInherit = ["isValueObject"];
 
+		//NOTE: this is hopelessly inefficient, but gets the job done
+		//Better would be to process types in Dag-order and apply down. This is linear instead of quadratic. 
 		_.each(types, function(t, k) {
+
 			_.each(_.clone(t.ancestors).reverse(), function(supertypeName) { //reverse: travel up chain instead of down
 				var supertype = types[supertypeName];
 				if (!supertype) {
 					throw new Error("supertype not defined in Kwhen config (Supertype, refDirect, refTrans) " + supertypeName + ", " + appliedType.id);
 				}
 				_.defaults(t, _.pick(supertype, typeDirectivesToInherit));
+
+				//inherit properties from super that don't exist on type.
 				_.defaults(t.properties, supertype.specific_properties);
+
+				//for all properties that exist on type as well as super do a boolean OR on `required`
+				//Remember we've already done an OR with global property in extendTypesWithProperties
+				_.each(t.properties, function(prop, k) {
+					var superProp = supertype.specific_properties[k];
+					prop.required = prop.required || (superProp && superProp.required);
+				});
+
 				t.removeProperties = t.removeProperties.concat(supertype.removeProperties);
-				t.required = t.required.concat(supertype.required);
 			});
-			t.properties = _.omit(t.properties, t.removeProperties);
+
+			//prune properties by removing the build `removeProperties` from properties.
+			//Required properties cannot be removed and result in an error being thrown directly
+			t.properties = _.omit(t.properties, function(v, k) {
+				var doRemove = t.removeProperties.indexOf(k) !== -1;
+				if (v.required && doRemove) {
+					throw new Error("property may not be removed since it's required (type, prop)" + type + ", " + k);
+				}
+				return doRemove;
+			});
+
 		});
 	}());
 

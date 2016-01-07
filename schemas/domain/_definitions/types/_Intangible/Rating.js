@@ -1,8 +1,8 @@
 module.exports = {
 	supertypes: ["RatingAbstract"],
 	properties: {
-		about: {},
-		author: {},
-		itemReviewed: {},
+		about: false,
+		author: false,
+		itemReviewed: false,
 	}
 };

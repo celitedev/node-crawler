@@ -1,7 +1,7 @@
 //CreativeWorkSeries dedicated to TV broadcast and associated online delivery.
 module.exports = {
 	properties: {
-		countryOfOrigin: {},
-		subtitleLanguage: {}
+		countryOfOrigin: false,
+		subtitleLanguage: false
 	}
 };

@@ -1,19 +1,17 @@
 module.exports = {
 	properties: {
-		aggregateRating: {},
-		address: {},
-		branchCode: {},
-		containedInPlace: {
-			// TBD: not sure want entire hierarchy displayed?
-		},
-		containsPlace: {},
-		geo: {},
-		logo: {},
+		aggregateRating: false,
+		address: true,
+		name: true,
+		branchCode: false,
+		containedInPlace: false, // TBD: not sure want entire hierarchy displayed?
+		containsPlace: false,
+		geo: false,
+		logo: false,
 		// openingHoursSpecification: {}; //TODO
 		//photo: //TODO ? There's already an image
-		// review: {}, //stored separately
+		// review: false, //stored separately
 	},
-	required: ["address"],
 	//properties added on JSON-LD schema.org generation
 	out_properties: {
 		faxNumber: {

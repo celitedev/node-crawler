@@ -1,27 +1,23 @@
 module.exports = {
 	supertypes: ["OrganizationAndPerson"],
 	properties: {
-		address: {},
-		aggregateRating: {},
-		// brand: {} // Org or Brand
-		department: {},
-		dissolutionDate: {},
-		employee: {},
-		founder: {},
-		foundingDate: {},
-		legalName: {},
-		location: {},
-		logo: {},
-		member: { //e.g.: org or persons
-
-		},
-		memberOf: { //the inverse of 'member'
-
-		},
-		// numberOfEmployees: {}, QuantitativeValue
-		parentOrganization: {},
-		// review: {}, //stored separately
-		subOrganization: {},
+		address: false,
+		aggregateRating: false,
+		// brand: false // Org or Brand
+		department: false,
+		dissolutionDate: false,
+		employee: false,
+		founder: false,
+		foundingDate: false,
+		legalName: false,
+		location: false,
+		logo: false,
+		member: false, //e.g.: org or persons
+		memberOf: false, //the inverse of 'member'
+		// numberOfEmployees: false, QuantitativeValue
+		parentOrganization: false,
+		// review: false, //stored separately
+		subOrganization: false,
 	},
 	//properties added on JSON-LD schema.org generation
 	out_properties: {

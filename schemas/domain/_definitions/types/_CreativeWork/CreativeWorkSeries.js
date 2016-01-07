@@ -12,7 +12,7 @@
 // but publishers should be free to apply properties of the series parts to the series as a whole wherever they seem appropriate.
 module.exports = {
 	properties: {
-		endDate: {},
-		startDate: {}
+		endDate: false,
+		startDate: false
 	}
 };

@@ -7,10 +7,10 @@ module.exports = {
 	//always
 	supertypes: ["Organization", "PlaceWithOpeninghours"],
 	properties: {
-		// branchCode: {}, //already on Place
-		// currenciesAccepted: {}, //now now
-		openingHours: {},
-		paymentAccepted: {},
-		priceRange: {},
+		// branchCode: false, //already on Place
+		// currenciesAccepted: false, //now now
+		openingHours: false,
+		paymentAccepted: false,
+		priceRange: false,
 	}
 };

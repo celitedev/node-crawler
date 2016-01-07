@@ -1,9 +1,7 @@
 module.exports = {
 	properties: {
-		awayTeam: {},
-		competitor: {
-
-		},
-		homeTeam: {},
+		awayTeam: false,
+		competitor: false,
+		homeTeam: false,
 	}
 };

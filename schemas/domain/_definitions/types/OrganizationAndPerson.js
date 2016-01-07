@@ -1,4 +1,7 @@
 module.exports = {
 	isCustom: true,
-	supertypes: ["Thing"]
+	supertypes: ["Thing"],
+	properties: {
+		name: true
+	}
 };

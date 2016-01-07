@@ -1,12 +1,11 @@
 module.exports = {
 	supertypes: ["Thing"],
 	properties: {
-		about: {}, //from creativeWOrk
-		author: {}, //from creativeWOrk
-		itemReviewed: {},
-		reviewBody: {},
-		reviewRating: {},
+		about: false, //from creativeWOrk
+		author: false, //from creativeWOrk
+		itemReviewed: true,
+		reviewBody: true,
+		reviewRating: false,
 	},
-	required: ["itemReviewed", "reviewBody"],
 	removeProperties: ["sameAs", "image", "alternateName", "description"]
 };

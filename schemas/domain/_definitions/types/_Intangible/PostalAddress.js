@@ -1,14 +1,12 @@
 module.exports = {
 	properties: {
-		addressCountry: {},
-		// addressCity: {
-		// 	isCustom: true
-		// },
-		addressLocality: {},
-		addressRegion: {},
-		postOfficeBoxNumber: {},
-		postalCode: {},
-		streetAddress: {},
+		addressCountry: false,
+		// addressCity:false,
+		addressLocality: false,
+		addressRegion: false,
+		postOfficeBoxNumber: false,
+		postalCode: false,
+		streetAddress: true,
 	},
 	removeProperties: [
 		"name", "url", "description", "alternateName", "sameAs"
