@@ -625,6 +625,23 @@ module.exports = function(configObj) {
 				});
 			}());
 
+			//validate and transform may only occur on datatypes
+			(function checkValidateTransformOnlyOnDatatypes() {
+				_.each(properties, function(p, propName) {
+
+					var problemFound = false;
+					_.each(p.ranges, function(typeName) {
+						var type = schemaOrgDef.datatypes[typeName];
+						if (!type && (p.validate.length || p.transform.length)) {
+							problemFound = true;
+						}
+					});
+					if (problemFound) {
+						throw new Error("Soundness fail validate or transform should only occur on property with datatype range: " + propName);
+					}
+				});
+			}());
+
 		}
 	}());
 
