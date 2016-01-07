@@ -1,5 +1,5 @@
 module.exports = {
 	properties: {
-		screenCount: {}
+		screenCount: false
 	}
 };

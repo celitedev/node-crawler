@@ -1,8 +1,6 @@
 module.exports = {
 	properties: {
-		numTracks: {},
-		track: {
-
-		}
+		numTracks: false,
+		track: false
 	}
 };

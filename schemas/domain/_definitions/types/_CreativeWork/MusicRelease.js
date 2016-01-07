@@ -2,16 +2,16 @@
 module.exports = {
 	disable: true,
 	properties: {
-		catalogNumber: {},
+		catalogNumber: false,
 
 		//The group the release is credited to if different than the byArtist. 
 		//For example, Red and Blue is credited to "Stefani Germanotta Band", 
 		//but by Lady Gaga.
-		creditedTo: {},
+		creditedTo: false,
 
-		duration: {},
+		duration: false,
 		// musicReleaseFormat: MusicReleaseFormatType 	
-		recordLabel: {},
-		releaseOf: {},
+		recordLabel: false,
+		releaseOf: false,
 	}
 };

@@ -1,8 +1,8 @@
 module.exports = {
 	properties: {
-		contactType: {},
-		email: {},
-		faxNumber: {},
-		telephone: {}
+		contactType: false,
+		email: false,
+		faxNumber: false,
+		telephone: false
 	}
 };

@@ -2,6 +2,6 @@
 module.exports = {
 	isValueObject: true,
 	properties: {
-		// supersededBy: {}
+		// supersededBy: false
 	}
 };
