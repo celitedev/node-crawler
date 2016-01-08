@@ -159,7 +159,7 @@ module.exports = {
 							streetAddress: "[itemprop=streetAddress]",
 							// streetAddressSup: 
 							postalCode: "[itemprop=postalCode]",
-							// neighborhood: ".neighborhood > span", //TODO: add this property
+							neighborhood: ".neighborhood > span",
 							addressLocality: "[itemprop=addressLocality]",
 							addressRegion: "[itemprop=addressRegion]",
 							// country: 
@@ -181,7 +181,14 @@ module.exports = {
 			//returning undefined removes them
 			mapping: {
 				"_detail.geo.latitude": "float",
-				"_detail.geo.longitude": "float"
+				"_detail.geo.longitude": "float",
+				"_detail.address.neighborhood": function mapNeighborhood(val) {
+					if (!val) return val;
+					var needle = "Neighborhood:";
+					var index = val.indexOf(needle);
+					if (index === -1) return val;
+					return val.substring(index + needle.length).trim();
+				}
 			},
 
 		}

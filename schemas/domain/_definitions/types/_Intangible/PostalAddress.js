@@ -2,6 +2,7 @@ module.exports = {
 	properties: {
 		addressCountry: false,
 		// addressCity:false,
+		neighborhood: false,
 		addressLocality: false,
 		addressRegion: false,
 		postOfficeBoxNumber: false,
