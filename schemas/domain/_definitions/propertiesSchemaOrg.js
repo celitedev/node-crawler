@@ -25,18 +25,10 @@ module.exports = {
 	alternateName: {
 		"isMulti": true
 	},
-	// image: { //stored in separate index ImageObject
-	// 	"isMulti": true,
-	// 	ambiguitySolvedBy: {
-	// 		type: "urlVsSomething"
-	// 	},
-	// 	//TODO
-	// 	validation: {
-	// 		URL: { //validation per range-object
-
-	// 		}
-	// 	}
-	// },
+	image: {
+		"isMulti": true,
+		ranges: ["ImageObject"]
+	},
 	sameAs: {
 		"isMulti": true,
 
