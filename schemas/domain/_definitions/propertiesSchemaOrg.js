@@ -101,6 +101,10 @@ module.exports = {
 	// },
 	addressLocality: {},
 	addressRegion: {},
+	neighborhood: {
+		isCustom: true,
+		ranges: ["Text"]
+	},
 	postOfficeBoxNumber: {},
 	postalCode: {},
 	streetAddress: {},
