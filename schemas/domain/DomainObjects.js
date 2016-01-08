@@ -237,9 +237,12 @@ module.exports = function(generatedSchemas) {
 		if (!state.sourceType) {
 			throw new Error("'state.sourceType' should be defined on SourceObject");
 		}
-		if (!state.sourceUrl) {
-			throw new Error("'state.sourceUrl' should be defined on SourceObject");
+		if (!state.sourceId) {
+			throw new Error("'state.sourceId' should be defined on SourceObject");
 		}
+
+		this.sourceId = state.sourceId;
+		this.sourceUrl = state.sourceUrl; //optional
 
 	}
 

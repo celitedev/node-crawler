@@ -15,25 +15,41 @@ var async = require('async');
 var debug = require('debug')('kwhen-crawler');
 var argv = require('yargs').argv;
 var moment = require("moment");
-var Ajv = require('ajv');
+// var Ajv = require('ajv');
 
 var utils = require("./utils");
 var proxyDriver = require("./drivers/proxyDriver");
 
+var generatedSchemas = require("./schemas/domain/createDomainSchemas.js")({
+	checkSoundness: true,
+	config: require("./schemas/domain/_definitions/config"),
+	properties: require("./schemas/domain/_definitions").properties,
+	types: require("./schemas/domain/_definitions").types,
+	schemaOrgDef: require("./schemas/domain/_definitions/schemaOrgDef")
+});
+
+var domainObjects = require("./schemas/domain/DomainObjects")(generatedSchemas);
+var CanonicalObject = domainObjects.CanonicalObject;
+var SourceObject = domainObjects.SourceObject;
+
+var domainUtils = require("./schemas/domain/utils");
+
+
+
 ///////////////
 //validation //
 ///////////////
-var ajv = Ajv({
-	allErrors: true
-});
+// var ajv = Ajv({
+// 	allErrors: true
+// });
 
-ajv.addFormat("date-time", function(dateTimeString) {
-	var m = moment(dateTimeString);
-	return m.isValid();
-});
+// ajv.addFormat("date-time", function(dateTimeString) {
+// 	var m = moment(dateTimeString);
+// 	return m.isValid();
+// });
 
-var abstractTypeSchema = require("./schemas/abstract");
-var validateAbstractSchema = ajv.compile(abstractTypeSchema.schema);
+// var abstractTypeSchema = require("./schemas/abstract");
+// var validateAbstractSchema = ajv.compile(abstractTypeSchema.schema);
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
@@ -89,6 +105,64 @@ fs.readdirSync(normalizedPath).forEach(function(file) {
 });
 
 
+///////////////////////////////
+// Start <source,type> queue //
+///////////////////////////////
+function startCrawlerQueue(crawlConfig) {
+
+	var crawlerName = utils.calculated.getCrawlerName(crawlConfig.source.name, crawlConfig.entity.type);
+
+	var x = Xray();
+
+	//install own driver which does: 
+	//- proxying through crawlera
+	//- caching using S3
+	var proxyAndCacheDriver = proxyDriver(crawlConfig.driver);
+
+	x.driver(proxyAndCacheDriver);
+
+	var resource = resourcesPerCrawlerType[crawlerName] = {
+		x: x,
+		crawlerName: crawlerName,
+		queueName: utils.calculated.getCrawlerQueueName(crawlConfig),
+		proxyAndCacheDriver: proxyAndCacheDriver,
+		crawlConfig: crawlConfig,
+		stats: {
+			intervalMS: 5000, // 5 seconds
+			total: {
+				nrDetailPages: 0,
+				nrItemsComplete: 0,
+				nrItemsPruned: 0,
+				nrItemsFailedToValidate: 0,
+				nrErrorsNonValidation: 0, //TODO: can we get more granular?
+				unzippedInBytes: 0
+			}
+		},
+		crawlResultSchema: _.extend({}, crawlConfig.schema.results.schema(x), {
+			//add _htmlDetail for transormers to use. See #30
+			_htmlDetail: function(el, cb) {
+				cb(undefined, el.html());
+			},
+			calcPageDone: function(el, cb) {
+				resource.stats.total.nrDetailPages++;
+				cb();
+			}
+		})
+	};
+
+	proxyAndCacheDriver.setTotalStats(resource.stats.total);
+
+	//start queue for this crawl
+	queue.process(
+		resource.queueName,
+		crawlConfig.job.concurrentJobs,
+		processJob
+	);
+
+	manageCrawlerLifecycle(resource);
+}
+
+
 
 ////////////////////////
 //Process actual work //
@@ -119,9 +193,6 @@ function processJob(job, done) {
 
 		//the schema of the results (a x-ray mapping)
 		crawlResultSchema = crawlerResource.crawlResultSchema,
-
-		//schema of message that needs to be put on queue
-		outputMessageSchema = crawlerResource.outputMessageSchema,
 
 		//x-ray instance specific to <source,type>
 		x = crawlerResource.x;
@@ -252,6 +323,8 @@ function processJob(job, done) {
 				return results;
 			}
 
+			//reducer may output an array for an item
+			//Lets fuse this (potential) array of arrays to an array by simply concatting
 			return _.compact(_.reduce(results, function(arr, result) {
 				var out = crawlConfig.schema.results.reducer(result);
 				return arr.concat(_.isArray(out) ? out : [out]);
@@ -275,7 +348,15 @@ function processJob(job, done) {
 				return arr;
 			}, []);
 		})
-		.filter(function genericPrunerToCheckForSourceId(result) {
+		.map(function makeCompoundDoc(result) {
+			var detail = result._detail;
+			delete result._detail;
+
+			// create compound doc object by fusing `detail` into toplevel
+			// sourceId and sourceUrl may occur on either toplevel or on `detail`
+			return _.extend(result, detail);
+		})
+		.filter(function genericPrunerToCheckForSourceId(doc) {
 			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
 			//The fact that a sourceId is required allows is to select based on this. 
 			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
@@ -283,118 +364,76 @@ function processJob(job, done) {
 			//Moreover, it will remove results that are falsey. This can happen if we: 
 			//- explicitly remove results by returning undefined in a `reducer`
 
-			var doPrune = !(result && result.sourceId);
+			var doPrune = !(doc && doc._sourceId);
 			if (doPrune) {
 				crawlerResource.stats.total.nrItemsPruned++;
 			}
 			return !doPrune; //return true when we should NOT prune
 		})
-		.map(function removePrivateVariables(result) {
+		.map(function transformToGenericOutput(doc) {
+
+			var domainObject = new SourceObject({
+				type: [crawlConfig.entity.type], //TODO: hmm how to vary in this? 
+				sourceType: crawlConfig.source.name,
+				sourceId: doc._sourceId, //required
+				sourceUrl: doc._sourceUrl, //optional
+			});
+
+			delete doc._sourceId;
+			delete doc._sourceUrl;
+
 			//Private vars such as `_htmlDetail` are removed. 
-			//These can be used in transformers, etc.
-			return _.reduce(result, function(agg, v, k) {
-				if (k.indexOf("_") !== 0) { //don't remove
-					agg[k] = v;
-				}
-				return agg;
-			}, {});
-		})
-		.then(function transformToGenericOutput(out) {
-			return _.reduce(out, function(agg, results) {
-
-				//results may be an array as well. If not make it an array for uniform handling
-				results = _.isArray(results) ? results : [results];
-				_.each(results, function(result) {
-
-					var detail = result.detail,
-						sourceId = result.sourceId,
-						sourceUrl = result.sourceUrl;
-
-					delete result.detail;
-					delete result.sourceId;
-					delete result.sourceUrl;
-
-					var doc = _.extend({
-						id: uuid.v4(),
-						//TODO: check what attributes should always exist in msg: 
-						//- check EIP book
-						//- check guidelines for Kafka
-						meta: {
-							crawl: {
-								batchId: parseInt(data.batchId), //the large batch.
-								jobId: data.jobId, //the specific mini job within this batch. 
-								createdAt: new Date().toISOString(),
-								crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
-								typeVersion: outputMessageSchema.version, //specific version of the target message/type schema. 
-							},
-						},
-						identifiers: {
-							id: sourceId,
-							url: sourceUrl,
-							source: crawlConfig.source.name,
-							type: crawlConfig.entity.type,
-						},
-						payload: _.extend({
-							id: sourceId,
-							url: sourceUrl
-						}, result, detail)
-					});
-
-					agg.push(doc);
-
-				});
-
-				return agg;
-
-			}, []);
-		})
-		.then(function validateGenericEnvelopeSchema(results) {
-
-			var errorArr = [];
-			_.each(results, function(result) {
-
-				debug("DEBUG RESULT PAYLOAD", result.payload);
-
-				var valid = validateAbstractSchema(result);
-				if (!valid) {
-					errorArr.push(validateAbstractSchema.errors);
+			//These can be used in transformers etc.
+			_.each(doc, function(v, k) {
+				if (k.indexOf("_") === 0) { //don't remove
+					delete doc[k];
 				}
 			});
 
-			if (errorArr.length) {
-				console.log(errorArr);
-				var err = new Error("errors in generic part of results. These need fixing. Halting process");
-				err.halt = true;
-				throw err;
-			}
+			domainObject.set(doc);
 
-			return results;
+			//TODO: still to process / save in same way?
+			//We do at least want to save crawlVersion and schemaVersion 
+			// crawl: {
+			// 	batchId: parseInt(data.batchId), //the large batch.
+			// 	jobId: data.jobId, //the specific mini job within this batch. 
+			// 	createdAt: new Date().toISOString(),
+			// 	crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
+			// 	typeVersion: outputMessageSchema.version, //specific version of the target message/type schema. 
+			// }
+
+			return domainObject;
 		})
-		.then(function validateSpecificTypeSchema(results) {
-			var errorArr = [];
-			_.each(results, function(result) {
-				var valid = ajv.validate(outputMessageSchema.schema, result.payload);
-				if (!valid) {
-					crawlerResource.stats.total.nrItemsFailedToValidate++;
-					errorArr.push(ajv.errors);
-				}
-			});
-			if (errorArr.length) {
-				//TODO:
-				//1. better way of handling? What if 1 instance has 1 missing attrib? Should we keep failing entire batch? 
-				//2. If suddenly nr of entities erroring spike, we might have a change in source html format. Alert based on this.
-				console.log(errorArr);
-				var err = new Error("errors in validation. Retrying...");
-				err.isValidationError = true;
-				throw err;
-			}
+		.then(function validateSourceObjects(sourceObjects) {
 
-			return results;
+			//TODO: promise all
+
+			// var errorArr = [];
+			// _.each(results, function(result) {
+			// 	var valid = ajv.validate(outputMessageSchema.schema, result.payload);
+			// 	if (!valid) {
+			// 		crawlerResource.stats.total.nrItemsFailedToValidate++;
+			// 		errorArr.push(ajv.errors);
+			// 	}
+			// });
+			// if (errorArr.length) {
+			// 	//TODO:
+			// 	//1. better way of handling? What if 1 instance has 1 missing attrib? Should we keep failing entire batch? 
+			// 	//2. If suddenly nr of entities erroring spike, we might have a change in source html format. Alert based on this.
+			// 	console.log(errorArr);
+			// 	var err = new Error("errors in validation. Retrying...");
+			// 	err.isValidationError = true;
+			// 	throw err;
+			// }
+
+			return sourceObjects;
 		})
-		.then(function postMessagesToQueue(results) {
-			crawlerResource.stats.total.nrItemsComplete += results.length;
+		.then(function upsertSourceObjects(sourceObjects) {
+			crawlerResource.stats.total.nrItemsComplete += sourceObjects.length;
 
-			_.each(results, function(result) {
+			_.each(sourceObjects, function(sourceObject) {
+				console.log(JSON.stringify(sourceObject.toSimple(sourceObject._propsDirty), null, 2));
+
 				// console.log(result.payload);
 				//push them to other queue
 			});
@@ -438,73 +477,6 @@ function processJob(job, done) {
 			process.exit();
 		});
 
-}
-
-///////////////////////////////
-// Start <source,type> queue //
-///////////////////////////////
-function startCrawlerQueue(crawlConfig) {
-
-	var crawlerName = utils.calculated.getCrawlerName(crawlConfig.source.name, crawlConfig.entity.type);
-
-	var outputMessageSchema;
-	try {
-		var outputSchemaName = crawlConfig.entity.schema.toLowerCase();
-		var outputSchemaPath = path.resolve(__dirname + "/schemas/" + outputSchemaName);
-		outputMessageSchema = require(outputSchemaPath);
-	} catch (err) {
-		throw new Error("outputMessageSchema not found for entitytype: " + outputSchemaName);
-	}
-
-	var x = Xray();
-
-	//install own driver which does: 
-	//- proxying through crawlera
-	//- caching using S3
-	var proxyAndCacheDriver = proxyDriver(crawlConfig.driver);
-
-	x.driver(proxyAndCacheDriver);
-
-	var resource = resourcesPerCrawlerType[crawlerName] = {
-		x: x,
-		crawlerName: crawlerName,
-		queueName: utils.calculated.getCrawlerQueueName(crawlConfig),
-		proxyAndCacheDriver: proxyAndCacheDriver,
-		crawlConfig: crawlConfig,
-		outputMessageSchema: outputMessageSchema,
-		stats: {
-			intervalMS: 5000, // 5 seconds
-			total: {
-				nrDetailPages: 0,
-				nrItemsComplete: 0,
-				nrItemsPruned: 0,
-				nrItemsFailedToValidate: 0,
-				nrErrorsNonValidation: 0, //TODO: can we get more granular?
-				unzippedInBytes: 0
-			}
-		},
-		crawlResultSchema: _.extend({}, crawlConfig.schema.results.schema(x), {
-			//add _htmlDetail for transormers to use. See #30
-			_htmlDetail: function(el, cb) {
-				cb(undefined, el.html());
-			},
-			calcPageDone: function(el, cb) {
-				resource.stats.total.nrDetailPages++;
-				cb();
-			}
-		})
-	};
-
-	proxyAndCacheDriver.setTotalStats(resource.stats.total);
-
-	//start queue for this crawl
-	queue.process(
-		resource.queueName,
-		crawlConfig.job.concurrentJobs,
-		processJob
-	);
-
-	manageCrawlerLifecycle(resource);
 }
 
 
