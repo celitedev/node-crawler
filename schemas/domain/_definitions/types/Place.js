@@ -8,6 +8,7 @@ module.exports = {
 		containsPlace: false,
 		geo: false,
 		logo: false,
+		subtypes: false,
 		// openingHoursSpecification: {}; //TODO
 		//photo: //TODO ? There's already an image
 		// review: false, //stored separately

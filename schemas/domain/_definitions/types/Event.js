@@ -19,6 +19,7 @@ module.exports = {
 		subEvent: false,
 		superEvent: false,
 		workFeatured: false,
-		workPerformed: false
+		workPerformed: false,
+		subtypes: false,
 	}
 };
