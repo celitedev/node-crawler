@@ -44,6 +44,7 @@ module.exports = {
 	url: {},
 
 
+
 	/////////////////////////////
 	//http://schema.org/Rating //
 	/////////////////////////////
@@ -174,6 +175,14 @@ module.exports = {
 		// ambiguitySolvedBy: {
 		// 	type: "urlVsSomething"
 		// }
+	},
+
+	//special property defining custom subtypes. 
+	//E.g.: a PianoBar and a Cocktailbar are subtypes of bar
+	subtypes: {
+		isCustom: true,
+		ranges: ["Text"],
+		isMulti: true
 	},
 
 	//////////////////////////////////////

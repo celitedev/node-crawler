@@ -13,7 +13,8 @@ module.exports = {
 		jobTitle: false,
 		memberOf: false,
 		nationality: false,
-		name: true
+		name: true,
+		subtypes: false,
 	},
 	//properties added on JSON-LD schema.org generation
 	out_properties: {
