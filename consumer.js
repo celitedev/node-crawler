@@ -10,6 +10,7 @@ var kue = require('kue');
 var colors = require('colors');
 var validUrl = require('valid-url');
 
+
 var Promise = require("bluebird");
 var async = require('async');
 
@@ -30,16 +31,16 @@ var generatedSchemas = require("./schemas/domain/createDomainSchemas.js")({
 	schemaOrgDef: require("./schemas/domain/_definitions/schemaOrgDef")
 });
 
+var config = require("./config");
+var redisClient = redis.createClient(config.redis);
+var r = require('rethinkdbdash')(config.rethinkdb);
 
-var domainObjects = require("./schemas/domain/DomainObjects")(generatedSchemas);
+var domainObjects = require("./schemas/domain/DomainObjects")(generatedSchemas, r);
 var CanonicalObject = domainObjects.CanonicalObject;
 var SourceObject = domainObjects.SourceObject;
 
 var domainUtils = require("./schemas/domain/utils");
 
-var config = require("./config");
-
-var redisClient = redis.createClient(config.redis);
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
@@ -413,6 +414,7 @@ function processJob(job, done) {
 			}
 			var domainObject = new SourceObject({
 				type: types,
+				batchId: data.batchId,
 				sourceType: crawlConfig.source.name,
 				sourceId: doc._sourceId, //required
 				sourceUrl: doc._sourceUrl, //optional
@@ -456,6 +458,7 @@ function processJob(job, done) {
 						if (err) {
 							return reject(err); //actual error in code (non-validation)
 						}
+						console.log(JSON.stringify(obj.toRethinkObject(), null, 2));
 						resolve(obj);
 					});
 				}).reflect(); //reflect results in no error thrown ever
@@ -734,6 +737,7 @@ function generateStats(resource, limitToFields) {
 		setTimeout(manageShutdown, 1000);
 	} else {
 		redisClient.quit();
+		r.getPoolMaster().drain();
 		queue.shutdown(5000, function(err) {
 			console.log("SHUTDOWN ALL");
 			process.exit(0);
