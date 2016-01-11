@@ -5,15 +5,14 @@ var _ = require("lodash");
 //type: events
 module.exports = {
 	_meta: {
-		name: "Eventful Plaves",
+		name: "Eventful Places",
 		description: "Distributed Crawler for Eventful.com Places"
 	},
 	source: {
 		name: "Eventful"
 	},
 	entity: {
-		type: "Place",
-		schema: "source_place", //the actual schema to use
+		type: "LocalBusiness",
 	},
 	//General logic/behavior for this crawler 
 	semantics: {
@@ -147,26 +146,33 @@ module.exports = {
 
 			schema: function(x) { //schema for each individual result
 				return {
-					sourceUrl: "a.tn-frame@href",
-					sourceId: "a.tn-frame@href",
-					detail: x("a.tn-frame@href", {
+					_sourceUrl: "a.tn-frame@href",
+					_sourceId: "a.tn-frame@href",
+					_detail: x("a.tn-frame@href", {
 						name: "[itemprop=name] > span",
-						// descriptionShort
 						description: ".section-block.description",
-						latitude: "[itemprop=latitude]@content",
-						longitude: "[itemprop=longitude]@content",
-						streetAddress: "[itemprop=streetAddress]",
-						// streetAddressSup: 
-						zipCode: "[itemprop=postalCode]",
-						neighborhood: ".neighborhood > span",
-						city: "[itemprop=addressLocality]",
-						region: "[itemprop=addressRegion]",
-						// country: 
-						images: x(".image-viewer li", [{
-							url: "a@href",
-							alt: "@title",
-							// cc
+						geo: {
+							latitude: "[itemprop=latitude]@content",
+							longitude: "[itemprop=longitude]@content",
+						},
+						address: {
+							streetAddress: "[itemprop=streetAddress]",
+							// streetAddressSup: 
+							postalCode: "[itemprop=postalCode]",
+							neighborhood: ".neighborhood > span",
+							addressLocality: "[itemprop=addressLocality]",
+							addressRegion: "[itemprop=addressRegion]",
+							// country: 
+						},
+
+						image: x(".image-viewer li", [{
+							_ref: { //notice: _ref here.
+								contentUrl: "a@href",
+								url: "a@href",
+								caption: "@title",
+							}
 						}]),
+						// subtypes: .... TODO
 					})
 				};
 			},
@@ -174,9 +180,17 @@ module.exports = {
 			//mapping allow function(entire obj) || strings or array of those
 			//returning undefined removes them
 			mapping: {
-				"detail.latitude": "float",
-				"detail.longitude": "float"
+				"_detail.geo.latitude": "float",
+				"_detail.geo.longitude": "float",
+				"_detail.address.neighborhood": function mapNeighborhood(val) {
+					if (!val) return val;
+					var needle = "Neighborhood:";
+					var index = val.indexOf(needle);
+					if (index === -1) return val;
+					return val.substring(index + needle.length).trim();
+				}
 			},
+
 		}
 	}
 };
