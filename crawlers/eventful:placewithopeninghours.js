@@ -183,6 +183,7 @@ module.exports = {
 			//mapping allow function(entire obj) || strings or array of those
 			//returning undefined removes them
 			mapping: {
+				//Example of #115: "How to allow multi _types and subtypes in specific crawlers"
 				_type: function(val) {
 					return ["LocalBusiness"]; //must be subs of entity.type (here: PlaceWithOpeninghours)
 				},
