@@ -330,7 +330,8 @@ function processJob(job, done) {
 								//should only happen on: 
 								//1. restart of batch, but only for a short burst. 
 								//   Generally at most N where N is nr of parallel workers
-								//2. if we've seeing more, we're seeing a problem in crawling OR some crawl
+								//2. #117: if we've seeing more, we're seeing a problem in crawling OR some crawl
+								//
 								return cb(); //let's skip since we've already processed this url
 							}
 							//upload next url to queue
