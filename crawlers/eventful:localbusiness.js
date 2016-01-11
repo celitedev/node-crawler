@@ -14,6 +14,9 @@ module.exports = {
 	entity: {
 		type: "LocalBusiness",
 	},
+	scheduler: {
+		runEveryXSeconds: 24 * 60 * 60 //each day
+	},
 	//General logic/behavior for this crawler 
 	semantics: {
 
