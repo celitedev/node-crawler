@@ -4,6 +4,7 @@ var uuid = require("uuid");
 var argv = require('yargs').argv;
 var path = require("path");
 var fs = require("fs");
+var redis = require("redis");
 
 var kue = require('kue');
 var colors = require('colors');
@@ -29,31 +30,20 @@ var generatedSchemas = require("./schemas/domain/createDomainSchemas.js")({
 	schemaOrgDef: require("./schemas/domain/_definitions/schemaOrgDef")
 });
 
+
 var domainObjects = require("./schemas/domain/DomainObjects")(generatedSchemas);
 var CanonicalObject = domainObjects.CanonicalObject;
 var SourceObject = domainObjects.SourceObject;
 
 var domainUtils = require("./schemas/domain/utils");
 
+var config = require("./config");
 
-
-///////////////
-//validation //
-///////////////
-// var ajv = Ajv({
-// 	allErrors: true
-// });
-
-// ajv.addFormat("date-time", function(dateTimeString) {
-// 	var m = moment(dateTimeString);
-// 	return m.isValid();
-// });
-
-// var abstractTypeSchema = require("./schemas/abstract");
-// var validateAbstractSchema = ajv.compile(abstractTypeSchema.schema);
+var redisClient = redis.createClient(config.redis);
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
+	redis: config.redis
 });
 
 
@@ -177,12 +167,25 @@ function deleteJob(job, done) {
 	done();
 }
 
+
+
+function urlAddedToQueueHash(jobData) {
+	var arr = [
+		jobData.source,
+		jobData.type,
+		jobData.batchId
+	];
+
+	return arr.join("--");
+}
+
 ////////////////////////
 //Process actual work //
 ////////////////////////
 function processJob(job, done) {
 
 	var data = job.data;
+
 	if (!data.source) {
 		throw new Error("'source' not defined on job: " + JSON.strinfify(job));
 	}
@@ -264,7 +267,7 @@ function processJob(job, done) {
 
 						var nextUrl = paginateConfig.nextUrlFN(el);
 						debugUrls("PROCESSED url", data.url);
-						debugUrls("ADDING nexturl", nextUrl);
+
 
 						//sometimes the next url just isn't there anymore. 
 						//That's an easy and strong signal to stop bothering
@@ -310,8 +313,37 @@ function processJob(job, done) {
 							return cb();
 						}
 
-						//upload next url to queue
-						utils.addCrawlJob(queue, data.batchId, crawlConfig, nextUrl, cb);
+						//Let's check if we've already addded this url (of this particular batch) to the queue 
+						//We only add the url to the queue if not already done so. 
+						//
+						//TBD: For more considerations on storing urls in Redis: 
+						//http://stackoverflow.com/questions/28719976/redis-list-of-visited-sites-from-crawler
+						var setName = urlAddedToQueueHash(data);
+
+						redisClient.sismember(setName, nextUrl, function(err, urlFound) {
+							if (err) {
+								return cb(err);
+							}
+
+							if (urlFound && !argv.skipCacheCheck) {
+								debug("SKIPPING (BC CACHED) url", nextUrl);
+								//should only happen on: 
+								//1. restart of batch, but only for a short burst. 
+								//   Generally at most N where N is nr of parallel workers
+								//2. if we've seeing more, we're seeing a problem in crawling OR some crawl
+								return cb(); //let's skip since we've already processed this url
+							}
+							//upload next url to queue
+							utils.addCrawlJob(queue, data.batchId, crawlConfig, nextUrl, function(err) {
+								if (err) {
+									return cb(err);
+								}
+								debugUrls("ADDING nexturl", nextUrl);
+								//add item to redis set. THis way we might end up with false positive. 
+								//Better than false negative if we do sadd *before* addCrawlJob
+								redisClient.sadd(setName, nextUrl, cb);
+							});
+						});
 					},
 
 					//results crawling
@@ -667,6 +699,7 @@ function generateStats(resource, limitToFields) {
 	if (resources.length !== resourcesDone.length) {
 		setTimeout(manageShutdown, 1000);
 	} else {
+		redisClient.quit();
 		queue.shutdown(5000, function(err) {
 			console.log("SHUTDOWN ALL");
 			process.exit(0);

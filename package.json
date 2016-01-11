@@ -29,6 +29,7 @@
     "moment": "^2.10.6",
     "moving-average": "0.0.5",
     "node-uuid": "^1.4.3",
+    "redis": "^2.4.2",
     "schema-org": "^0.2.1",
     "superagent": "^1.4.0",
     "superagent-cache": "git+https://github.com/gebrits/superagent-cache.git",
