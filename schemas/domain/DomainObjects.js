@@ -2,10 +2,11 @@ var _ = require("lodash");
 var util = require("util");
 var domainUtils = require("./utils");
 var urlRegex = require('url-regex');
+var md5 = require('md5');
 
 var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
-module.exports = function(generatedSchemas) {
+module.exports = function(generatedSchemas, r) {
 
 	var validator = require("./validation")(generatedSchemas);
 
@@ -195,40 +196,48 @@ module.exports = function(generatedSchemas) {
 			//Instead this should be passed to Elasticsearch by rethink2ES-feeder 
 			// console.log(JSON.stringify(self.toDataObject(props), null, 2));
 
-			setTimeout(function fakeDbCommit() {
 
-				///////////////////////////
-				//FOR NOW: Latest wins. 
-				//
-				//NOTE: THERE'S NO CODE TO UPDATE PROCESS WITH ENTITY UPDATED OUT-OF-PROCESS.
-				//NOT A PROB SINCE THAT SHOULDNT HAPPEN FOR NOW
-				//
-				//PERHAPS LATER: Rethinkdb returns optimisticVersion, this should be set and used when doing update
-				//On optimisticLockIssue we should reload data from DB (returning latest version) and 
-				//see if diff works out. 
-				/////////////////////////////
+			var obj = self.toRethinkObject();
 
-				//on success -> set props = propsDirty
-				self._props = props;
+			//More info: https://www.rethinkdb.com/api/javascript/insert/
+			r.table("sourceObjects").insert(obj, {
+					conflict: "update",
+					returnChanges: true
+				}).run()
+				.then(function(result) {
 
-				//in meantime _propsDirty may have changed..
-				self._state.isDirty = !_.eq(self._propsDirty, self._props);
+					console.log("RESULT", result);
+					///////////////////////////
+					//FOR NOW: Latest wins. 
+					//
+					//NOTE: THERE'S NO CODE TO UPDATE PROCESS WITH ENTITY UPDATED OUT-OF-PROCESS.
+					//NOT A PROB SINCE THAT SHOULDNT HAPPEN FOR NOW
+					//
+					//PERHAPS LATER: Rethinkdb returns optimisticVersion, this should be set and used when doing update
+					//On optimisticLockIssue we should reload data from DB (returning latest version) and 
+					//see if diff works out. 
+					/////////////////////////////
 
-				if (!self._state.isDirty) {
-					self._state.recommitCount = 0;
-					return cb();
-				}
+					//on success -> set props = propsDirty
+					self._props = props;
 
-				if (++self._state.recommitCount >= 3) {
-					//we don't anticpiate this error yet. Seeing this is trouble...
-					return cb(new Error("recommitCount reached for item! Can only happen on REAL high congestion"));
-				}
+					//in meantime _propsDirty may have changed..
+					self._state.isDirty = !_.eq(self._propsDirty, self._props);
 
-				//do a re-commit, until success.
-				self.commit(cb);
+					if (!self._state.isDirty) {
+						self._state.recommitCount = 0;
+						return cb();
+					}
 
-			}, 10);
+					if (++self._state.recommitCount >= 3) {
+						//we don't anticpiate this error yet. Seeing this is trouble...
+						return cb(new Error("recommitCount reached for item! Can only happen on REAL high congestion"));
+					}
 
+					//do a re-commit, until success.
+					self.commit(cb);
+
+				});
 
 		});
 	};
@@ -247,13 +256,20 @@ module.exports = function(generatedSchemas) {
 		if (!state.sourceType) {
 			throw new Error("'state.sourceType' should be defined on SourceObject");
 		}
+		if (!state.sourceType) {
+			throw new Error("'state.sourceType' should be defined on SourceObject");
+		}
 		if (!state.sourceId) {
 			throw new Error("'state.sourceId' should be defined on SourceObject");
 		}
+		if (!state.batchId) {
+			throw new Error("'state.batchId' should be defined on SourceObject");
+		}
 
-		this.sourceId = state.sourceId;
-		this.sourceUrl = state.sourceUrl; //optional
-
+		this.sourceType = state.sourceType;
+		this.sourceUrl = state.sourceUrl;
+		this.sourceId = state.sourceId; //optional
+		this.batchId = state.batchId;
 	}
 
 	CanonicalObject.prototype._validationSchema = validator.createSchema();
@@ -318,6 +334,27 @@ module.exports = function(generatedSchemas) {
 		}, _toSimpleRecursive(props || this._props));
 	};
 
+
+	SourceObject.prototype.toRethinkObject = function(props) {
+
+		return _.extend(_toRethinkObjectRecursive(props || this._props, true), {
+			id: this.getSourceObjectId(),
+			_type: this._type,
+			_sourceUrl: this.sourceUrl,
+			_sourceId: this.sourceId,
+			_sourceType: this.sourceType,
+			_batchId: this.batchId,
+		});
+	};
+
+	SourceObject.prototype.getSourceObjectId = function() {
+		var arr = [
+			this.sourceType,
+			this._type[0], //the type as specified in the crawler
+			this.sourceId
+		];
+		return md5(arr.join("--"));
+	};
 
 
 	//1. transform obj so all values are expanded into objects. 
@@ -570,15 +607,15 @@ module.exports = function(generatedSchemas) {
 		var dto = _.reduce(_.clone(properties), function(agg, v, k) {
 			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
 
+			//remove aliasOf properties. 
+			//By now these are already validated and copied to the aliasOf-target
+			if (generatedSchemas.properties[k].aliasOf) {
+				return agg;
+			}
+
 			//NOTE: at this point _type is guaranteed NOT an array anymore. That was only at toplevel
 			function transformSingleItem(v) {
 				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
-
-				//remove aliasOf properties. 
-				//By now these are already validated and copied to the aliasOf-target
-				if (generatedSchemas.properties[k].aliasOf) {
-					return agg;
-				}
 
 				if (propType.isValueObject) {
 					v = _toDataObjectRecursive(v); //recurse non-datatypes
@@ -597,6 +634,47 @@ module.exports = function(generatedSchemas) {
 
 		return dto;
 	}
+
+	function _toRethinkObjectRecursive(properties, isToplevel) {
+
+		var dto = _.reduce(_.clone(properties), function(agg, v, k) {
+			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
+
+			//remove aliasOf properties. 
+			//By now these are already validated and copied to the aliasOf-target
+			if (generatedSchemas.properties[k].aliasOf) {
+				return agg;
+			}
+
+			//NOTE: at this point _type is guaranteed NOT an array anymore. That was only at toplevel
+			function transformSingleItem(v) {
+				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
+
+				if (propType.isValueObject) {
+					v = _toRethinkObjectRecursive(v); //recurse non-datatypes
+				} else if (v._ref) {
+					v = _.pick(v, ["_ref"]); //no change
+				} else {
+					v = v._value; //simplify all datatypes and object-references to their value
+				}
+				return v;
+			}
+
+			//rethink-object stores all toplevel properties as arrays. 
+			//This keeps rethink-objects invariant under isMulti-changes.
+			if (isToplevel) {
+				v = _.isArray(v) ? v : [v];
+			}
+
+			agg[k] = _.isArray(v) ? _.map(v, transformSingleItem) : transformSingleItem(v);
+			return agg;
+		}, {});
+
+
+		return dto;
+	}
+
+
 
 	function _toSimpleRecursive(properties) {
 
