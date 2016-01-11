@@ -349,6 +349,8 @@ function processJob(job, done) {
 			}, []);
 		})
 		.map(function makeCompoundDoc(result) {
+
+
 			var detail = result._detail;
 			delete result._detail;
 
@@ -404,78 +406,98 @@ function processJob(job, done) {
 
 			return domainObject;
 		})
-		.then(function validateSourceObjects(sourceObjects) {
+		.then(function commitSourceObjects(sourceObjects) {
 
-			//TODO: promise all
-
-			// var errorArr = [];
-			// _.each(results, function(result) {
-			// 	var valid = ajv.validate(outputMessageSchema.schema, result.payload);
-			// 	if (!valid) {
-			// 		crawlerResource.stats.total.nrItemsFailedToValidate++;
-			// 		errorArr.push(ajv.errors);
-			// 	}
-			// });
-			// if (errorArr.length) {
-			// 	//TODO:
-			// 	//1. better way of handling? What if 1 instance has 1 missing attrib? Should we keep failing entire batch? 
-			// 	//2. If suddenly nr of entities erroring spike, we might have a change in source html format. Alert based on this.
-			// 	console.log(errorArr);
-			// 	var err = new Error("errors in validation. Retrying...");
-			// 	err.isValidationError = true;
-			// 	throw err;
-			// }
-
-			return sourceObjects;
-		})
-		.then(function upsertSourceObjects(sourceObjects) {
-			crawlerResource.stats.total.nrItemsComplete += sourceObjects.length;
-
-			_.each(sourceObjects, function(sourceObject) {
-				console.log(JSON.stringify(sourceObject.toSimple(sourceObject._propsDirty), null, 2));
-
-				// console.log(result.payload);
-				//push them to other queue
+			//Validate and upsert objects. 
+			//We don't fail batch if single item results in a validation error. 
+			//All other errors, still *do* result in a complete batch failure, although at that point some 
+			//objects may have been upserted already. This is not a big deal because idempotence.
+			var promises = _.map(sourceObjects, function(obj) {
+				return new Promise(function(resolve, reject) {
+					obj.commit(function(err) {
+						if (err) {
+							return reject(err); //actual error in code (non-validation)
+						}
+						resolve(obj);
+					});
+				}).reflect(); //reflect results in no error thrown ever
 			});
+
+			return Promise.all(promises)
+				.each(function(inspection) { //insepection API because we used `reflect()` above
+					if (inspection.isRejected()) {
+
+						var err = inspection.reason();
+
+						if (err.isValidationError) {
+							crawlerResource.stats.total.nrItemsFailedToValidate++;
+
+							//TODO: log errors
+							//1. sourceUrl / sourceId
+							//2. _state.errors
+							//3. crawlId (which version of this crawler)  + schemaId
+							console.error("A promise in the array was rejected with", err);
+
+							return;
+						}
+
+						//it's not a validation error. So we throw it which will fail -> reschedule the batch.
+						throw err;
+
+					} else {
+						if (inspection.isFulfilled()) {
+
+							crawlerResource.stats.total.nrItemsComplete++;
+						} else if (inspection.isCancelled()) {
+							throw new Error("SANITY CHECK: we don't cancel promises!");
+						} else {
+							throw new Error("SANITY CHECK: promise inspection in unclear state? NOT fulfilled / rejected / cancelled");
+						}
+					}
+				});
+
 		})
 		.then(done)
-		.catch(function catchall(err) {
-
-			if (err.halt) {
-				//errors that require immediate halting are thrown
-				throw err;
-			}
-
-			if (!err.isValidationError) {
-				crawlerResource.stats.total.nrErrorsNonValidation++;
-			}
-
-			// if (err.code === "ENOTFOUND") {
-			// 	throw err; //CHECK THIS
-			// }
-
-			// if (err.code === "ECONNABORTED") {
-			// 	//likely timeout -> move back to queue
-
-			// }
-
-			//Non-200 http codes are treated as errors. 
-			//These error-objects are huge so we extract only the needed info here
-			if (err.status) {
-				var errTmp = new Error(err.message);
-				errTmp.status = err.status;
-				err = errTmp;
-			}
-
-			console.log("ERR", err);
-			done(new Error("job error: orig: " + err.message));
-
-		})
-		.catch(function severe(err) {
-			//TODO: we might do some cleanup here?
-			console.log("SEVERE ERR", err);
-			process.exit();
+		.catch(function(err) {
+			throw err;
 		});
+	// .catch(function catchall(err) {
+	// 
+	// No validationErrors here since these are not thrown, only logged. 
+	// 
+	// 	if (err.halt) {
+	// 		//errors that require immediate halting are thrown
+	// 		throw err;
+	// 	}
+
+	// crawlerResource.stats.total.nrErrorsNonValidation++;
+
+	// 	// if (err.code === "ENOTFOUND") {
+	// 	// 	throw err; //CHECK THIS
+	// 	// }
+
+	// 	// if (err.code === "ECONNABORTED") {
+	// 	// 	//likely timeout -> move back to queue
+
+	// 	// }
+
+	// 	//Non-200 http codes are treated as errors. 
+	// 	//These error-objects are huge so we extract only the needed info here
+	// 	if (err.status) {
+	// 		var errTmp = new Error(err.message);
+	// 		errTmp.status = err.status;
+	// 		err = errTmp;
+	// 	}
+
+	// 	console.log("ERR", err);
+	// 	done(new Error("job error: orig: " + err.message));
+
+	// })
+	// .catch(function severe(err) {
+	// 	//TODO: we might do some cleanup here?
+	// 	console.log("SEVERE ERR", err);
+	// 	process.exit();
+	// });
 
 }
 
