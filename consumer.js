@@ -313,11 +313,12 @@ function processJob(job, done) {
 
 							if (urlFound && !argv.skipCacheCheck) {
 								debug("SKIPPING (BC CACHED) url", nextUrl);
-								//should only happen on: 
-								//1. restart of batch, but only for a short burst. 
+								//should only happen : 
+								//1. on restart of batch, but only for a short burst. 
 								//   Generally at most N where N is nr of parallel workers
-								//2. #117: if we've seeing more, we're seeing a problem in crawling OR some crawl
-								//
+								//2. #117: if we've seeing more, we're seeing a problem in crawling OR 
+								//   some anti-crawl algo pointing to same url over and over again.
+								//3. if current job is processed multiple times because of error
 								return cb(); //let's skip since we've already processed this url
 							}
 							//upload next url to queue
@@ -406,8 +407,12 @@ function processJob(job, done) {
 		})
 		.map(function transformToGenericOutput(doc) {
 
+			var types = [crawlConfig.entity.type];
+			if (doc._type) {
+				types = types.concat(_.isArray(doc._type) ? doc._type : [doc._type]);
+			}
 			var domainObject = new SourceObject({
-				type: [crawlConfig.entity.type], //TODO: hmm how to vary in this? 
+				type: types,
 				sourceType: crawlConfig.source.name,
 				sourceId: doc._sourceId, //required
 				sourceUrl: doc._sourceUrl, //optional
@@ -415,6 +420,7 @@ function processJob(job, done) {
 
 			delete doc._sourceId;
 			delete doc._sourceUrl;
+			delete doc._type;
 
 			//Private vars such as `_htmlDetail` are removed. 
 			//These can be used in transformers etc.
