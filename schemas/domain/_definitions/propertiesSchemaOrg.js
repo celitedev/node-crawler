@@ -7,18 +7,18 @@ module.exports = {
 	name: {
 		// required: true,
 
-		//just for show...woot
-		validate: {
-			type: "isLength",
+		// //just for show...woot
+		// validate: {
+		// 	type: "isLength",
 
-			//if options is an array it's `applied` to validator, i.e.: 
-			//spreading/applying array items as arguments to function. 
-			//if non array -> arg passed as first parameter
-			options: [5], //name should have min 5 chars
+		// 	//if options is an array it's `applied` to validator, i.e.: 
+		// 	//spreading/applying array items as arguments to function. 
+		// 	//if non array -> arg passed as first parameter
+		// 	options: [5], //name should have min 5 chars
 
-			//custom errorMessage which is mustache-expanded
-			errorMessage: "'{{val}}' doesn't satisfy length >= 5",
-		},
+		// 	//custom errorMessage which is mustache-expanded
+		// 	errorMessage: "'{{val}}' doesn't satisfy length >= 5",
+		// },
 
 	},
 	description: {},
