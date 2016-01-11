@@ -5,13 +5,14 @@ var h = require("highland");
 var uuid = require("uuid");
 var argv = require('yargs').argv;
 var path = require("path");
-
+var colors = require('colors');
+var redis = require("redis");
 var kue = require('kue');
 var Promise = require("bluebird");
 var utils = require("./utils");
 
 var config = require("./config");
-
+var redisClient = redis.createClient(config.redis);
 
 /////////
 //init //
@@ -34,42 +35,107 @@ var queue = kue.createQueue({
 	redis: config.redis
 });
 
-var batchid = "1";
+var hashObj = {
+	source: crawlConfig.source.name,
+	type: crawlConfig.entity.type,
+};
 
+var lastbatchIdObj = utils.lastBatchIdHash(hashObj);
+var lastBatchIdEpochObj = utils.lastBatchIdEpoch(hashObj);
 
-//create urls that need to be seeded
-var urlsOrFN = crawlConfig.schema.seed.seedUrls,
-	urls = _.isFunction(urlsOrFN) ? urlsOrFN() : urlsOrFN;
+var newEpoch = new Date().getTime();
+redisClient.hget(lastBatchIdEpochObj[0], lastBatchIdEpochObj[1], function(err, epoch) {
+	if (err) {
+		return getToWork(err);
+	}
 
-urls = _.isArray(urls) ? urls : [urls];
+	epoch = epoch ? +epoch : epoch; //if epoch set, conver to number, otherwise leave the same
+	var periodInSec = crawlConfig.scheduler.runEveryXSeconds || 24 * 60 * 60; //default to 24 hours
 
+	if (epoch !== null && !argv.forceNewBatch && newEpoch < epoch + (periodInSec * 1000)) {
 
-//TODO:
-//Running will ALWAYS run with increased batchId. 
-//
-//However, there's a check that if currentBatchId was added less than x time ago it will shortcircuit by default. 
-//forceNewBatch=true overwrites this failsafe.
-//
-//A default safe solution is important, because depending on config this may mean that 
-//in-process + queued jobs of current batchId are discarded. 
-//
-//deleteOldJobs=true | false(default) can be added to remove old jobs from the queue. I.e.: of batchid < newly created batchId
-//
-var promises = _.map(urls, function(url) {
-	return new Promise(function(resolve, reject) {
-		utils.addCrawlJob(queue, batchid, crawlConfig, url, function(err) {
+		//it's too soon
+		getToWork(undefined, {
+			doSkip: true
+		});
+		return;
+	}
+
+	//////////////////////////
+	//STATE: all systems go //
+	//////////////////////////
+
+	//set new batchid and get it in 1 go
+	redisClient.zincrby(lastbatchIdObj[0], 1, lastbatchIdObj[1], function(err, result) {
+		if (err) {
+			return getToWork(err);
+		}
+
+		//update epoch
+		redisClient.hset(lastBatchIdEpochObj[0], lastBatchIdEpochObj[1], newEpoch, function(err) {
 			if (err) {
-				return reject(err);
+				return getToWork(err);
 			}
-			resolve();
+
+			getToWork(undefined, {
+				batchId: Math.floor(+result),
+				isFixed: false
+			});
 		});
 	});
 });
 
-Promise.all(promises)
-	.finally(function() {
+function getToWork(err, config) {
+	if (err) {
+		throw err;
+	}
+
+	var batchId = config.batchId;
+
+	if (config.doSkip) {
+		console.log(("shortcircuit because batch has been run too recently. " +
+			"Overwrite with --forceNewBatch or just wait until auto-rescheduled").red);
+		setTimeout(function() {
+			doQuit(true);
+		}, 100);
+		return;
+	} else {
+
+		console.log(("Processing " + ((config.isFixed) ? "fixed" : "auto-incremented") +
+			" batch with (source, type, batchId) " +
+			"(" + hashObj.source + "," + hashObj.type + "," + batchId + ")").yellow);
+
+		crawlConfig.isFixed = config.isFixed; //pass-along, so it's avail on consumer
+
+		//create urls that need to be seeded
+		var urlsOrFN = crawlConfig.schema.seed.seedUrls,
+			urls = _.isFunction(urlsOrFN) ? urlsOrFN() : urlsOrFN;
+
+		urls = _.isArray(urls) ? urls : [urls];
+
+		var promises = _.map(urls, function(url) {
+			return new Promise(function(resolve, reject) {
+				utils.addCrawlJob(queue, batchId, crawlConfig, url, function(err) {
+					if (err) {
+						return reject(err);
+					}
+					resolve();
+				});
+			});
+		});
+
+		Promise.all(promises).finally(doQuit);
+	}
+
+	function doQuit(doSkip) {
+		redisClient.quit();
 		queue.shutdown(5000, function(err) {
 			console.log('Kue shutdown: ', err || '');
-			console.log("done seeding (source, type, batchid)", crawlConfig.source.name, crawlConfig.entity.type, batchid);
+			if (!doSkip) {
+				console.log("done seeding (source, type, batchid)", crawlConfig.source.name, crawlConfig.entity.type, batchId);
+			}
 		});
-	});
+	}
+
+
+}

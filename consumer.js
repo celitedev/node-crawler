@@ -169,16 +169,6 @@ function deleteJob(job, done) {
 
 
 
-function urlAddedToQueueHash(jobData) {
-	var arr = [
-		jobData.source,
-		jobData.type,
-		jobData.batchId
-	];
-
-	return arr.join("--");
-}
-
 ////////////////////////
 //Process actual work //
 ////////////////////////
@@ -187,10 +177,10 @@ function processJob(job, done) {
 	var data = job.data;
 
 	if (!data.source) {
-		throw new Error("'source' not defined on job: " + JSON.strinfify(job));
+		throw new Error("'source' not defined on job: " + JSON.stringify(job));
 	}
 	if (!data.type) {
-		throw new Error("'type' not defined on job: " + JSON.strinfify(job));
+		throw new Error("'type' not defined on job: " + JSON.stringify(job));
 	}
 
 	var crawlerName = utils.calculated.getCrawlerName(data);
@@ -213,6 +203,34 @@ function processJob(job, done) {
 		x = crawlerResource.x;
 
 	Promise.resolve()
+		.then(function getLatestBatchId() {
+			//get latest batchId from redis
+
+			var hashObj = {
+				source: crawlConfig.source.name,
+				type: crawlConfig.entity.type,
+			};
+
+			var lastbatchIdObj = utils.lastBatchIdHash(hashObj);
+
+			return new Promise(function(resolve, reject) {
+
+				redisClient.zscore(lastbatchIdObj[0], lastbatchIdObj[1], function(err, latestBatchId) {
+					if (err) {
+						return reject(err);
+					}
+
+					if (+data.batchId !== +latestBatchId) { //outdated -> skip
+						debug("SKIPPING OUTDATED batch (new batch, job batch, job url", latestBatchId, data.batchId, data.url);
+						return reject({
+							outdated: true
+						});
+					}
+
+					resolve();
+				});
+			});
+		})
 		.then(function() {
 			return new Promise(function(resolve, reject) {
 				debug("PROCESSING url", data.url);
@@ -286,7 +304,7 @@ function processJob(job, done) {
 						//
 						//TBD: For more considerations on storing urls in Redis: 
 						//http://stackoverflow.com/questions/28719976/redis-list-of-visited-sites-from-crawler
-						var setName = urlAddedToQueueHash(data);
+						var setName = utils.urlAddedToQueueHash(data);
 
 						redisClient.sismember(setName, nextUrl, function(err, urlFound) {
 							if (err) {
@@ -482,6 +500,12 @@ function processJob(job, done) {
 		// 	throw err;
 		// });
 		.catch(function catchall(err) {
+
+			if (err.outdated) {
+				//remove outdated jobs
+				//logging was done earlier.
+				return done();
+			}
 
 			if (err.halt) {
 				//errors that require immediate halting are thrown

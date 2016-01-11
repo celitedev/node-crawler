@@ -8,6 +8,33 @@ var utils = module.exports = {
 	URL_DONE_DETAIL_PREFIX: "url_done_detail",
 	KUE_PREFIX: "kwhenqueue2",
 
+
+	urlAddedToQueueHash: function(jobData) {
+		var arr = [
+			jobData.source,
+			jobData.type,
+			jobData.batchId
+		];
+		return arr.join("--");
+	},
+
+	lastBatchIdHash: function(jobData) {
+		var arr = [
+			jobData.source,
+			jobData.type,
+		];
+		return ["kwhen--lastid", arr.join("--")];
+	},
+
+	lastBatchIdEpoch: function(jobData) {
+		var arr = [
+			jobData.source,
+			jobData.type,
+		];
+		return ["kwhen--lastidEpoch", arr.join("--")];
+	},
+
+
 	fetchCrawlConfig: function(config) {
 		config.source = config.source.toLowerCase();
 		config.type = config.type.toLowerCase();
