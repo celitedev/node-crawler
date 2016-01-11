@@ -1,4 +1,5 @@
 var _ = require("lodash");
+var moment = require("moment");
 
 //crawlSchema for: 
 //source: Eventful
@@ -97,10 +98,41 @@ module.exports = {
 		seed: {
 			disable: false, //for testing. Disabled nextUrl() call
 
-			//TODO: Seed" list of neightborhoods * dates
-			seedUrls: [
-				"http://www.fandango.com/manhattan_+ny_movietimes?pn=1"
-			],
+			seedUrls: function() {
+
+				//only fetch 7 days ahead (ultimately leading to rolling 7 days of data)
+				// var dates = [
+				// 	moment().add(7, 'days').format('L')
+				// 	];
+
+				//fetch all 7 days, each and every day
+				var dates = [
+					moment().add(1, 'days').format('L'),
+					moment().add(2, 'days').format('L'),
+					moment().add(3, 'days').format('L'),
+					moment().add(4, 'days').format('L'),
+					moment().add(5, 'days').format('L'),
+					moment().add(6, 'days').format('L'),
+					moment().add(7, 'days').format('L')
+				];
+
+				var districts = [
+					"http://www.fandango.com/manhattan_+ny_movietimes?pn=1",
+					"http://www.fandango.com/brooklyn_+ny_movietimes?pn=1",
+					"http://www.fandango.com/queens_+ny_movietimes?pn=1",
+					"http://www.fandango.com/bronx_+ny_movietimes?pn=1",
+					"http://www.fandango.com/staten+island_+ny_movietimes?pn=1"
+				];
+
+				var urls = _.reduce(districts, function(agg, url) {
+					_.each(dates, function(date) {
+						agg.push(url + "&date=" + date);
+					});
+					return agg;
+				}, []);
+
+				return urls;
+			},
 
 			nextUrlFN: function(el) {
 				return el.find("#GlobalBody_paginationControl_NextLink").attr("href");

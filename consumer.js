@@ -13,6 +13,7 @@ var Promise = require("bluebird");
 var async = require('async');
 
 var debug = require('debug')('kwhen-crawler');
+var debugUrls = require('debug')('kwhen-crawler-urls');
 var argv = require('yargs').argv;
 var moment = require("moment");
 // var Ajv = require('ajv');
@@ -153,16 +154,28 @@ function startCrawlerQueue(crawlConfig) {
 	proxyAndCacheDriver.setTotalStats(resource.stats.total);
 
 	//start queue for this crawl
-	queue.process(
-		resource.queueName,
-		crawlConfig.job.concurrentJobs,
-		processJob
-	);
+	if (argv.delete) {
+		console.log(("OK YOU WANTED IT: deleting jobs!").yellow);
+		queue.process(
+			resource.queueName,
+			crawlConfig.job.concurrentJobs,
+			deleteJob
+		);
+	} else {
+		queue.process(
+			resource.queueName,
+			crawlConfig.job.concurrentJobs,
+			processJob
+		);
+	}
 
 	manageCrawlerLifecycle(resource);
 }
 
 
+function deleteJob(job, done) {
+	done();
+}
 
 ////////////////////////
 //Process actual work //
@@ -170,7 +183,6 @@ function startCrawlerQueue(crawlConfig) {
 function processJob(job, done) {
 
 	var data = job.data;
-
 	if (!data.source) {
 		throw new Error("'source' not defined on job: " + JSON.strinfify(job));
 	}
@@ -232,6 +244,7 @@ function processJob(job, done) {
 	Promise.resolve()
 		.then(function() {
 			return new Promise(function(resolve, reject) {
+				debug("PROCESSING url", data.url);
 				x(data.url, "html", {
 
 					//pagination
@@ -250,8 +263,8 @@ function processJob(job, done) {
 						}
 
 						var nextUrl = paginateConfig.nextUrlFN(el);
-						debug("url", data.url);
-						debug("nexturl", nextUrl);
+						debugUrls("PROCESSED url", data.url);
+						debugUrls("ADDING nexturl", nextUrl);
 
 						//sometimes the next url just isn't there anymore. 
 						//That's an easy and strong signal to stop bothering
@@ -436,12 +449,16 @@ function processJob(job, done) {
 							//1. sourceUrl / sourceId
 							//2. _state.errors
 							//3. crawlId (which version of this crawler)  + schemaId
+
+							//err.message here returns the actual top level problem
+							//err.validationError (which is also printed as part of err.toString) prints where
+							//it occurs. We BOTH need them for a complete picture. 
 							console.error("A promise in the array was rejected with", err);
 
 							return;
 						}
 
-						//it's not a validation error. So we throw it which will fail -> reschedule the batch.
+						//it's not a validation error. So we throw it which will fail (and thus reschedule)  the batch.
 						throw err;
 
 					} else {
@@ -457,47 +474,48 @@ function processJob(job, done) {
 				});
 
 		})
-		.then(done)
-		.catch(function(err) {
-			throw err;
+		.then(function() {
+			done(); //be sure to call done without arguments
+		})
+		// .catch(function(err) {
+		// 	throw err;
+		// });
+		.catch(function catchall(err) {
+
+			if (err.halt) {
+				//errors that require immediate halting are thrown
+				throw err;
+			}
+
+			//No validationErrors here since these are not thrown, only logged.
+			crawlerResource.stats.total.nrErrorsNonValidation++;
+
+			// if (err.code === "ENOTFOUND") {
+			// 	throw err; //CHECK THIS
+			// }
+
+			// if (err.code === "ECONNABORTED") {
+			// 	//likely timeout -> move back to queue
+
+			// }
+
+			//Non-200 http codes are treated as errors. 
+			//These error-objects are huge so we extract only the needed info here
+			if (err.status) {
+				var errTmp = new Error(err.message);
+				errTmp.status = err.status;
+				err = errTmp;
+			}
+
+			console.log("ERR", err);
+			done(new Error("job error: orig: " + err.message));
+
+		})
+		.catch(function severe(err) {
+			//TODO: we might do some cleanup here?
+			console.log("SEVERE ERR", err);
+			process.exit();
 		});
-	// .catch(function catchall(err) {
-	// 
-	// No validationErrors here since these are not thrown, only logged. 
-	// 
-	// 	if (err.halt) {
-	// 		//errors that require immediate halting are thrown
-	// 		throw err;
-	// 	}
-
-	// crawlerResource.stats.total.nrErrorsNonValidation++;
-
-	// 	// if (err.code === "ENOTFOUND") {
-	// 	// 	throw err; //CHECK THIS
-	// 	// }
-
-	// 	// if (err.code === "ECONNABORTED") {
-	// 	// 	//likely timeout -> move back to queue
-
-	// 	// }
-
-	// 	//Non-200 http codes are treated as errors. 
-	// 	//These error-objects are huge so we extract only the needed info here
-	// 	if (err.status) {
-	// 		var errTmp = new Error(err.message);
-	// 		errTmp.status = err.status;
-	// 		err = errTmp;
-	// 	}
-
-	// 	console.log("ERR", err);
-	// 	done(new Error("job error: orig: " + err.message));
-
-	// })
-	// .catch(function severe(err) {
-	// 	//TODO: we might do some cleanup here?
-	// 	console.log("SEVERE ERR", err);
-	// 	process.exit();
-	// });
 
 }
 
