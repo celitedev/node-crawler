@@ -100,6 +100,10 @@ module.exports = function(generatedSchemas) {
 		return !!this._state.isValid;
 	};
 
+	AbstractDomainObject.prototype.getErrors = function() {
+		return this._state.errors;
+	};
+
 	AbstractDomainObject.prototype.isDirty = function() {
 		return !!this._state.isDirty;
 	};
@@ -176,7 +180,13 @@ module.exports = function(generatedSchemas) {
 				return cb(err);
 			}
 			if (!self.isValidOrUnchecked()) {
-				return cb(new Error("Cannot commit because of validation errors"));
+				err = new Error(self._state.errors);
+				err.validationError = self._state.errors;
+				// console.log(self._state.errors);
+				// err = new Error("Cannot commit because of validation errors in item: " + self._kind + " - " + self.sourceId +
+				// 	" - " + self._type + " - " + JSON.stringify(self.getErrors(), null, 2));
+				err.isValidationError = true;
+				return cb(err);
 			}
 
 			var props = _.cloneDeep(self._propsDirty); //freeze propsDirty to persist
@@ -191,7 +201,7 @@ module.exports = function(generatedSchemas) {
 				//FOR NOW: Latest wins. 
 				//
 				//NOTE: THERE'S NO CODE TO UPDATE PROCESS WITH ENTITY UPDATED OUT-OF-PROCESS.
-				//THIS SHOULDN'T HAPPEN FOR NOW.
+				//NOT A PROB SINCE THAT SHOULDNT HAPPEN FOR NOW
 				//
 				//PERHAPS LATER: Rethinkdb returns optimisticVersion, this should be set and used when doing update
 				//On optimisticLockIssue we should reload data from DB (returning latest version) and 
@@ -217,7 +227,7 @@ module.exports = function(generatedSchemas) {
 				//do a re-commit, until success.
 				self.commit(cb);
 
-			}, 100);
+			}, 10);
 
 
 		});
