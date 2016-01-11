@@ -8,7 +8,7 @@ module.exports = {
 		"url": false,
 		"description": false,
 		"alternateName": false,
-		// "image": false, //nope: on ImageObject index instead
+		"image": false,
 		"sameAs": false //might be use to provide references from canonical to specific sources.
 	},
 };
