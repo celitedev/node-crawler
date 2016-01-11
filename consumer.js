@@ -220,7 +220,6 @@ function processJob(job, done) {
 					if (err) {
 						return reject(err);
 					}
-
 					if (+data.batchId !== +latestBatchId) { //outdated -> skip
 						debug("SKIPPING OUTDATED batch (new batch, job batch, job url", latestBatchId, data.batchId, data.url);
 						return reject({
@@ -458,7 +457,6 @@ function processJob(job, done) {
 						if (err) {
 							return reject(err); //actual error in code (non-validation)
 						}
-						console.log(JSON.stringify(obj.toRethinkObject(), null, 2));
 						resolve(obj);
 					});
 				}).reflect(); //reflect results in no error thrown ever

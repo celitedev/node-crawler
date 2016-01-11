@@ -197,7 +197,7 @@ module.exports = function(generatedSchemas, r) {
 			// console.log(JSON.stringify(self.toDataObject(props), null, 2));
 
 
-			var obj = self.toRethinkObject();
+			var obj = self.toRethinkObject(props);
 
 			//More info: https://www.rethinkdb.com/api/javascript/insert/
 			r.table("sourceObjects").insert(obj, {
@@ -206,7 +206,6 @@ module.exports = function(generatedSchemas, r) {
 				}).run()
 				.then(function(result) {
 
-					console.log("RESULT", result);
 					///////////////////////////
 					//FOR NOW: Latest wins. 
 					//
