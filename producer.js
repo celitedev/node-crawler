@@ -10,6 +10,8 @@ var kue = require('kue');
 var Promise = require("bluebird");
 var utils = require("./utils");
 
+var config = require("./config");
+
 
 /////////
 //init //
@@ -29,6 +31,7 @@ var crawlConfig = utils.fetchCrawlConfig({
 
 var queue = kue.createQueue({
 	prefix: utils.KUE_PREFIX,
+	redis: config.redis
 });
 
 var batchid = "1";
