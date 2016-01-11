@@ -212,38 +212,6 @@ function processJob(job, done) {
 		//x-ray instance specific to <source,type>
 		x = crawlerResource.x;
 
-	function doFieldMappings(mappingName) {
-		return function(results) {
-
-			//transform results using declarative `mappings`
-			if (!crawlConfig.schema.results[mappingName]) {
-				return results;
-			}
-			return _.map(results, function(result) {
-
-				_.each(crawlConfig.schema.results[mappingName], function(pipeline, path) {
-
-					var needle = path.lastIndexOf("."),
-						parent = ~needle ? _.property(path.substring(0, needle))(result) : result,
-						childKey = ~needle ? path.substring(needle + 1) : path;
-
-					pipeline = _.isArray(pipeline) ? pipeline : [pipeline];
-
-					//transform pipeline of single field
-					parent[childKey] = _.reduce(pipeline, function(val, stage) {
-						var stageFn = _.isString(stage) ? functionLib[stage] : stage;
-						if (!stageFn) {
-							throw "canned transformer not available: '" + stage + "'. You should choose from '" + _.keys(functionLib).join(",") + "'";
-						}
-						return stageFn(val, result);
-					}, parent[childKey]);
-
-				});
-				return result;
-			});
-		};
-	}
-
 	Promise.resolve()
 		.then(function() {
 			return new Promise(function(resolve, reject) {
@@ -363,7 +331,7 @@ function processJob(job, done) {
 		.then(function returnResultsAttrib(obj) {
 			return obj.results;
 		})
-		.then(doFieldMappings("mapping"))
+		.then(doFieldMappings("mapping", crawlConfig))
 		.then(function callCustomReducer(results) {
 			if (!crawlConfig.schema.results.reducer) {
 				return results;
@@ -376,7 +344,7 @@ function processJob(job, done) {
 				return arr.concat(_.isArray(out) ? out : [out]);
 			}, []));
 		})
-		.then(doFieldMappings("postMapping"))
+		.then(doFieldMappings("postMapping", crawlConfig))
 		.then(function customPruner(results) {
 			if (!crawlConfig.schema.results.pruner) {
 				return results;
@@ -612,6 +580,41 @@ function manageCrawlerLifecycle(resource) {
 		}
 	});
 }
+
+
+
+function doFieldMappings(mappingName, crawlConfig) {
+	return function(results) {
+
+		//transform results using declarative `mappings`
+		if (!crawlConfig.schema.results[mappingName]) {
+			return results;
+		}
+		return _.map(results, function(result) {
+
+			_.each(crawlConfig.schema.results[mappingName], function(pipeline, path) {
+
+				var needle = path.lastIndexOf("."),
+					parent = ~needle ? _.property(path.substring(0, needle))(result) : result,
+					childKey = ~needle ? path.substring(needle + 1) : path;
+
+				pipeline = _.isArray(pipeline) ? pipeline : [pipeline];
+
+				//transform pipeline of single field
+				parent[childKey] = _.reduce(pipeline, function(val, stage) {
+					var stageFn = _.isString(stage) ? functionLib[stage] : stage;
+					if (!stageFn) {
+						throw "canned transformer not available: '" + stage + "'. You should choose from '" + _.keys(functionLib).join(",") + "'";
+					}
+					return stageFn(val, result);
+				}, parent[childKey]);
+
+			});
+			return result;
+		});
+	};
+}
+
 
 function generateStats(resource, limitToFields) {
 
