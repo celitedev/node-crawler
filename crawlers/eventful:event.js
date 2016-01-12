@@ -13,7 +13,9 @@ module.exports = {
 	},
 	entity: {
 		type: "Event",
-		schema: "source_event", //the actual schema to use
+	},
+	scheduler: {
+		runEveryXSeconds: 24 * 60 * 60 //each day
 	},
 	//General logic/behavior for this crawler 
 	semantics: {
@@ -74,6 +76,7 @@ module.exports = {
 		// fail job if not complete in 100 seconds. This is used because a consumer/box can fail/crash
 		// In that case the job would get stuck indefinitely in 'active' state. 
 		// With this solution, the job is placed back on the queue, and retried according to 'retries'-policy
+		// This should be WAY larger then driver.timeoutMS
 		ttl: 100 * 1000,
 	},
 	driver: {
@@ -100,7 +103,7 @@ module.exports = {
 			//may be a string an array or string or a function producing any of those
 			seedUrls: function() {
 				var urls = [];
-				for (var i = 1; i < 20; i++) {
+				for (var i = 1; i < 20; i++) { //array to kickstart the lot
 					urls.push("http://newyorkcity.eventful.com/events/categories?page_number=" + i);
 				}
 				return urls;
@@ -145,38 +148,32 @@ module.exports = {
 
 			schema: function(x) { //schema for each individual result
 				return {
-					sourceUrl: "a.tn-frame@href",
-					sourceId: "a.tn-frame@href",
-					detail: x("a.tn-frame@href", {
+					_sourceUrl: "a.tn-frame@href",
+					_detail: x("a.tn-frame@href", {
 						name: "[itemprop=name] > span",
-						//descriptionShort
 						description: "[itemprop=description]",
-						dtstart: "[itemprop=startDate]@content",
-						//dtend
-						//duration
-						//rdate
-						//rrule
-						placeRefs: x("[itemprop=location]", [{
-							id: "[itemprop=name] > a@href",
-							url: "[itemprop=name] > a@href",
-							name: "[itemprop=name]"
-
+						location: x("[itemprop=location]", [{
+							_ref: "> a@href"
 						}]),
-						performerRefs: x("[itemprop=performer]", [{
-							id: "> a@href",
-							url: "> a@href",
-							name: "[itemprop=name]"
+						performer: x("[itemprop=performer]", [{
+							_ref: "> a@href"
 						}]),
 					})
 				};
 			},
 
 			mapping: {
-				"detail.description": function(desc, obj) {
+				"_detail.description": function(desc, obj) {
 					if (desc === "There is no description for this event.") {
 						return undefined;
 					}
 					return desc;
+				},
+				"_detail.location": function(location, obj) {
+					return location.length ? location : undefined;
+				},
+				"_detail.performer": function(performer, obj) {
+					return performer.length ? performer : undefined;
 				},
 			},
 		}

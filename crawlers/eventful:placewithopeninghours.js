@@ -100,14 +100,13 @@ module.exports = {
 			disable: false, //for testing. Disabled nextUrl() call
 
 			//may be a string an array or string or a function producing any of those
-			// seedUrls: function() {
-			// 	var urls = [];
-			// 	for (var i = 1; i < 20; i++) {
-			// 		urls.push("http://newyorkcity.eventful.com/venues?page_number=" + i);
-			// 	}
-			// 	return urls;
-			// },
-			seedUrls: "http://newyorkcity.eventful.com/venues?page_number=1",
+			seedUrls: function() {
+				var urls = [];
+				for (var i = 1; i < 20; i++) {
+					urls.push("http://newyorkcity.eventful.com/venues?page_number=" + i);
+				}
+				return urls;
+			},
 
 			nextUrlFN: function(el) {
 				return el.find(".next > a").attr("href");

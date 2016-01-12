@@ -256,11 +256,8 @@ module.exports = function(generatedSchemas, r) {
 		if (!state.sourceType) {
 			throw new Error("'state.sourceType' should be defined on SourceObject");
 		}
-		if (!state.sourceType) {
-			throw new Error("'state.sourceType' should be defined on SourceObject");
-		}
-		if (!state.sourceId) {
-			throw new Error("'state.sourceId' should be defined on SourceObject");
+		if (!state.sourceUrl) {
+			throw new Error("'state.sourceUrl' should be defined on SourceObject");
 		}
 		if (!state.batchId) {
 			throw new Error("'state.batchId' should be defined on SourceObject");
@@ -351,7 +348,7 @@ module.exports = function(generatedSchemas, r) {
 		var arr = [
 			this.sourceType,
 			this._type[0], //the type as specified in the crawler
-			this.sourceId
+			this.sourceUrl
 		];
 		return new UUID(5, "ns:URL", arr.join("--")).format();
 	};

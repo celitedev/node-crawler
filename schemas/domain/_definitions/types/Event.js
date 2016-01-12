@@ -5,6 +5,7 @@
 
 module.exports = {
 	properties: {
+		name: true,
 		aggregateRating: false,
 		doorTime: false,
 		duration: false,
