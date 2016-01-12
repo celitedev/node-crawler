@@ -47,6 +47,17 @@ var queue = kue.createQueue({
 	redis: config.redis
 });
 
+queue.on('error', function(err) {
+	//Redis or Kue errors
+	//TODO: Log these to datadog or something. 
+	//This is rare
+	//
+	//TODO: We should split these errors between: 
+	//- timeouts. These should just be logged, the rest is handled. 
+	//- other errors such as Redis not present. this MIGHT need to crash process?
+	console.log(('TODO: setup logging. #121 ' + err.message).red);
+});
+
 
 var functionLib = {
 	"float": function(val) {
@@ -144,21 +155,26 @@ function startCrawlerQueue(crawlConfig) {
 
 	proxyAndCacheDriver.setTotalStats(resource.stats.total);
 
-	//start queue for this crawl
-	if (argv.delete) {
-		console.log(("OK YOU WANTED IT: deleting jobs!").yellow);
-		queue.process(
-			resource.queueName,
-			crawlConfig.job.concurrentJobs,
-			deleteJob
-		);
-	} else {
-		queue.process(
-			resource.queueName,
-			crawlConfig.job.concurrentJobs,
-			processJob
-		);
-	}
+	Promise.resolve().then(function() {
+
+		//start queue for this crawl
+		if (argv.delete) {
+			console.log(("OK YOU WANTED IT: deleting jobs!").yellow);
+			queue.process(
+				resource.queueName,
+				crawlConfig.job.concurrentJobs,
+				deleteJob
+			);
+		} else {
+			queue.process(
+				resource.queueName,
+				crawlConfig.job.concurrentJobs,
+				processJob
+			);
+		}
+	}).catch(function(err) {
+		console.log(("ERROR in startCrawlerQueue (TODO: log per #121)" + err).red);
+	});
 
 	manageCrawlerLifecycle(resource);
 }
@@ -203,7 +219,7 @@ function processJob(job, done) {
 		//x-ray instance specific to <source,type>
 		x = crawlerResource.x;
 
-	Promise.resolve()
+	var promise = Promise.resolve()
 		.then(function getLatestBatchId() {
 			//get latest batchId from redis
 
@@ -390,16 +406,28 @@ function processJob(job, done) {
 			// create compound doc object by fusing `detail` into toplevel
 			// sourceId and sourceUrl may occur on either toplevel or on `detail`
 			return _.extend(result, detail);
-		})
-		.filter(function genericPrunerToCheckForSourceId(doc) {
+		});
+
+	if (argv.test) {
+		promise = promise.map(function showBeforeMapping(obj) {
+
+			var out = _.cloneDeep(obj);
+			delete out._htmlDetail;
+			console.log("AFTER COMPOUND DOC", JSON.stringify(out, null, 2));
+			return obj;
+		});
+	}
+
+
+	promise = promise.filter(function genericPrunerToCheckForSourceId(doc) {
 			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
-			//The fact that a sourceId is required allows is to select based on this. 
-			//It's extremely unlikely that ill-selected results have an id (as fetched by the schema)
+			//The fact that a sourceUrl is required allows is to select based on this. 
+			//It's extremely unlikely that ill-selected results have an sourceUrl (as fetched by the schema)
 			//
 			//Moreover, it will remove results that are falsey. This can happen if we: 
 			//- explicitly remove results by returning undefined in a `reducer`
 
-			var doPrune = !(doc && doc._sourceId);
+			var doPrune = !(doc && doc._sourceUrl);
 			if (doPrune) {
 				crawlerResource.stats.total.nrItemsPruned++;
 			}
@@ -444,8 +472,11 @@ function processJob(job, done) {
 			// }
 
 			return domainObject;
-		})
-		.then(function commitSourceObjects(sourceObjects) {
+		});
+
+
+	if (!argv.test) {
+		promise = promise.then(function commitSourceObjects(sourceObjects) {
 
 			//Validate and upsert objects. 
 			//We don't fail batch if single item results in a validation error. 
@@ -480,7 +511,7 @@ function processJob(job, done) {
 							//err.message here returns the actual top level problem
 							//err.validationError (which is also printed as part of err.toString) prints where
 							//it occurs. We BOTH need them for a complete picture. 
-							console.error("A promise in the array was rejected with", err);
+							console.error("Validation error: Todo log #121", err);
 
 							return;
 						}
@@ -500,8 +531,14 @@ function processJob(job, done) {
 					}
 				});
 
-		})
-		.then(function() {
+		});
+	} else {
+		promise = promise.map(function(obj) {
+			console.log("BEFORE COMMIT", JSON.stringify(obj.toRethinkObject(obj._propsDirty), null, 2));
+		});
+	}
+
+	promise.then(function() {
 			done(); //be sure to call done without arguments
 		})
 		// .catch(function(err) {
@@ -516,6 +553,7 @@ function processJob(job, done) {
 			}
 
 			if (err.halt) {
+				console.log(("halting error encountered!").red);
 				//errors that require immediate halting are thrown
 				throw err;
 			}
@@ -523,14 +561,6 @@ function processJob(job, done) {
 			//No validationErrors here since these are not thrown, only logged.
 			crawlerResource.stats.total.nrErrorsNonValidation++;
 
-			// if (err.code === "ENOTFOUND") {
-			// 	throw err; //CHECK THIS
-			// }
-
-			// if (err.code === "ECONNABORTED") {
-			// 	//likely timeout -> move back to queue
-
-			// }
 
 			//Non-200 http codes are treated as errors. 
 			//These error-objects are huge so we extract only the needed info here
@@ -545,11 +575,11 @@ function processJob(job, done) {
 
 		})
 		.catch(function severe(err) {
+
 			//TODO: we might do some cleanup here?
 			console.log("SEVERE ERR", err);
 			process.exit();
 		});
-
 }
 
 

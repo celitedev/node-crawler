@@ -31,8 +31,27 @@ function driver(opts) {
     agent
       .get(ctx.url)
       .set(_.defaults(ctx.headers, opts.headers))
-      .timeout(opts.timeoutMS || 20000) //have a timeout. Seems by default superagent doesn't set one, which can lead to hands
+      .timeout(opts.timeoutMS || 40000) //have a timeout. Seems by default superagent doesn't set one, which can lead to hands
       .proxy(opts.proxy) //TOR
+      .on('error', function(err) {
+        if (err.code === "ECONNABORTED") {
+          if (this.res) { //sometimes this.res is not set yet. In that case we can't have a Z_BUF_ERROR... hopefully...
+            this.res.on("error", function(errInternal) {
+              if (errInternal.code !== "Z_BUF_ERROR") {
+                console.log(("'Error on Superagent response again..Sigh. See #126").red);
+                throw errInternal; //crash this shit
+              }
+              // See: #126
+              //We're ignoring Z_BUF_ERROR in case 'ECONNABORTED' was rootCause. 
+              //In that case we only report the root-cause error. 
+              //
+              //This is a terrible hack to ensure lib error doesn't crash our entire process.
+            });
+          }
+        }
+
+        return fn(err);
+      })
       .end(function(err, res) {
 
         //This includes request errors (4xx and 5xx) as well as node errors, which is what we want. 
