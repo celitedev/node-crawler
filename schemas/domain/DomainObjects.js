@@ -2,7 +2,8 @@ var _ = require("lodash");
 var util = require("util");
 var domainUtils = require("./utils");
 var urlRegex = require('url-regex');
-var md5 = require('md5');
+
+var UUID = require("pure-uuid");
 
 var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
@@ -352,7 +353,7 @@ module.exports = function(generatedSchemas, r) {
 			this._type[0], //the type as specified in the crawler
 			this.sourceId
 		];
-		return md5(arr.join("--"));
+		return new UUID(5, "ns:URL", arr.join("--")).format();
 	};
 
 
