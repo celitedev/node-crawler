@@ -132,7 +132,8 @@ function getToWork(err, config) {
 		queue.shutdown(5000, function(err) {
 			console.log('Kue shutdown: ', err || '');
 			if (!doSkip) {
-				console.log("done seeding (source, type, batchid)", crawlConfig.source.name, crawlConfig.entity.type, batchId);
+				console.log("done seeding (source, type, batchid)", crawlConfig.source.name,
+					utils.calculated.getCrawlerName(crawlConfig.source.name, crawlConfig.entity.type), batchId);
 			}
 		});
 	}

@@ -1,22 +1,21 @@
 var _ = require("lodash");
 
-
-throw new Error("Unfinished. See #42");
-
 //crawlSchema for: 
 //source: Eventful
 //type: events
 module.exports = {
 	_meta: {
-		name: "Fandango Moviews",
-		description: "Distributed Crawler for Fandango.com Movies (Event Object)"
+		name: "Fandango Places",
+		description: "Distributed Crawler for Fandango.com Places"
 	},
 	source: {
 		name: "fandango"
 	},
 	entity: {
-		type: "Object",
-		schema: "source_object", //the actual schema to use
+		type: "CreativeWork",
+	},
+	scheduler: {
+		runEveryXSeconds: 24 * 60 * 60 //each day
 	},
 	//General logic/behavior for this crawler 
 	semantics: {
@@ -86,43 +85,72 @@ module.exports = {
 		timeoutMS: 40000,
 
 		//local proxy, e.g.: TOR
-		proxy: "socks://localhost:5566"
+		proxy: "socks://localhost:5566",
+
+		//Default Headers for all requests
+		headers: {
+			"Accept-Encoding": 'gzip, deflate'
+		}
 	},
 	schema: {
 		version: "0.1", //version of this schema
 		type: "masterDetail", //signifies overall type of scroll. For now: only 'masterDetail'
 		requiresJS: false, //If true, use PhantomJS
 		seed: {
-			disable: true, //for testing. Disabled nextUrl() call
+			disable: false, //for testing. Disabled nextUrl() call
 
-			seedUrls: "http://www.fandango.com/manhattan_+ny_movietimes?pn=1",
-			// seedUrls: [
-			// 	"http://www.fandango.com/manhattan_+ny_movietimes?pn=1",
-			// 	"http://www.fandango.com/brooklyn_+ny_movietimes?pn=1",
-			// 	"http://www.fandango.com/queens_+ny_movietimes?pn=1",
-			// 	"http://www.fandango.com/bronx_+ny_movietimes?pn=1",
-			// 	"http://www.fandango.com/staten+island_+ny_movietimes?pn=1"
-			// ],
+			seedUrls: [
+				"http://www.fandango.com/manhattan_+ny_movietimes?pn=1",
+				"http://www.fandango.com/brooklyn_+ny_movietimes?pn=1",
+				"http://www.fandango.com/queens_+ny_movietimes?pn=1",
+				"http://www.fandango.com/bronx_+ny_movietimes?pn=1",
+				"http://www.fandango.com/staten+island_+ny_movietimes?pn=1"
+			],
 
 			nextUrlFN: function(el) {
 				return el.find("#GlobalBody_paginationControl_NextLink").attr("href");
 			}
 		},
+		headers: { //Default Headers for all requests
+			"Accept-Encoding": 'gzip, deflate'
+		},
 		results: {
-			selector: "[itemtype='http://schema.org/MovieTheater']", //selector for results
+			selector: "[itemtype='http://schema.org/Movie']", //selector for results
 
 			schema: function(x) { //schema for each individual result
 				return {
-					sourceUrl: "[itemprop=url]@content",
-					sourceId: "[itemprop=url]@content",
+					_sourceUrl: "[itemprop=url]@content",
 					name: "[itemprop=name]@content",
-					logo: "[itemprop=logo]@content",
-					streetAddress: "[itemprop=streetAddress]@content",
-					zipCode: "[itemprop=postalCode]@content",
-					city: "[itemprop=addressLocality]@content",
-					region: "[itemprop=addressRegion]@content",
-					country: "[itemprop=addressCountry]@content",
+					description: "[itemprop=description]@content",
+					image: x("[itemprop=image]", [{
+						_ref: {
+							contentUrl: "@content",
+							url: "@content",
+						}
+					}]),
+					genre: ["[itemprop=genre]@content"],
+					contentRating: "[itemprop=contentRating]@content",
+					aggregateRating: {
+						ratingValue: "[itemprop=ratingValue]@content",
+						ratingCount: "[itemprop=ratingCount]@content",
+					}
 				};
+			},
+
+			mapping: {
+				_type: function(val) {
+					return ["Movie"];
+				},
+				genre: function(val) {
+					return val.length ? val : undefined; //don't return empty array
+				},
+
+				//#129: "automatic type coercing" should take care of this.
+				"aggregateRating.ratingCount": function(val) {
+					if (val === undefined) return val;
+					return +val;
+				},
+
 			}
 		}
 	}
