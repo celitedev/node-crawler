@@ -452,6 +452,7 @@ function processJob(job, done) {
 			//All other errors, still *do* result in a complete batch failure, although at that point some 
 			//objects may have been upserted already. This is not a big deal because idempotence.
 			var promises = _.map(sourceObjects, function(obj) {
+
 				return new Promise(function(resolve, reject) {
 					obj.commit(function(err) {
 						if (err) {
