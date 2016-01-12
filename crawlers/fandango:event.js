@@ -13,8 +13,10 @@ module.exports = {
 		name: "fandango"
 	},
 	entity: {
-		type: "Event",
-		schema: "source_event", //the actual schema to use
+		type: ["Event", "ScreeningEvent"],
+	},
+	scheduler: {
+		runEveryXSeconds: 24 * 60 * 60 //each day
 	},
 	//General logic/behavior for this crawler 
 	semantics: {
@@ -100,20 +102,16 @@ module.exports = {
 
 			seedUrls: function() {
 
-				//only fetch 7 days ahead (ultimately leading to rolling 7 days of data)
-				// var dates = [
-				// 	moment().add(7, 'days').format('L')
-				// 	];
 
 				//fetch all 7 days, each and every day
 				var dates = [
 					moment().add(1, 'days').format('L'),
-					moment().add(2, 'days').format('L'),
-					moment().add(3, 'days').format('L'),
-					moment().add(4, 'days').format('L'),
-					moment().add(5, 'days').format('L'),
-					moment().add(6, 'days').format('L'),
-					moment().add(7, 'days').format('L')
+					// moment().add(2, 'days').format('L'),
+					// moment().add(3, 'days').format('L'),
+					// moment().add(4, 'days').format('L'),
+					// moment().add(5, 'days').format('L'),
+					// moment().add(6, 'days').format('L'),
+					// moment().add(7, 'days').format('L')
 				];
 
 				var districts = [
@@ -228,11 +226,6 @@ module.exports = {
 					return sourceUrl;
 				},
 			},
-
-			//no pruning: just for show
-			pruner: function(doc) {
-				return doc;
-			}
 		}
 	}
 };

@@ -120,9 +120,9 @@ module.exports = {
 
 			schema: function(x) { //schema for each individual result
 				return {
-					sourceUrl: ".biz-name@href",
-					sourceId: ".biz-name@href",
-					detail: x(".biz-name@href", {
+					_sourceUrl: ".biz-name@href",
+					_sourceId: ".biz-name@href",
+					_detail: x(".biz-name@href", {
 
 						name: ".biz-page-title",
 
@@ -187,7 +187,7 @@ module.exports = {
 			mapping: {
 
 				//fetch based on urlencoded json-stringified data-attrib
-				"detail.latitude": [
+				"_detail.latitude": [
 					function(latitude, obj) {
 						try {
 							return JSON.parse(decodeURIComponent(latitude)).center.latitude;
@@ -199,7 +199,7 @@ module.exports = {
 				],
 
 				//fetch based on urlencoded json-stringified data-attrib
-				"detail.longitude": [
+				"_detail.longitude": [
 					function(longitude, obj) {
 						try {
 							return JSON.parse(decodeURIComponent(longitude)).center.longitude;
@@ -211,7 +211,7 @@ module.exports = {
 				],
 
 				//parse the url from a redirect
-				"detail.website": function(url, obj) {
+				"_detail.website": function(url, obj) {
 					if (!url) {
 						return undefined;
 					}
@@ -232,11 +232,11 @@ module.exports = {
 				// },
 
 				//make categories unique
-				"detail.categories": function(categories, obj) {
+				"_detail.categories": function(categories, obj) {
 					return _.uniq(categories);
 				},
-				"detail.reviews_nr": "int",
-				"detail.reviews_avg": "float"
+				"_detail.reviews_nr": "int",
+				"_detail.reviews_avg": "float"
 			},
 		}
 	}

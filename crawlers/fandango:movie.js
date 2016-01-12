@@ -120,6 +120,7 @@ module.exports = {
 			schema: function(x) { //schema for each individual result
 				return {
 					_sourceUrl: "[itemprop=url]@content",
+					_sourceId: "[itemprop=url]@content",
 					name: "[itemprop=name]@content",
 					description: "[itemprop=description]@content",
 					image: x("[itemprop=image]", [{

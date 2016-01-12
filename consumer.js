@@ -421,13 +421,13 @@ function processJob(job, done) {
 
 	promise = promise.filter(function genericPrunerToCheckForSourceId(doc) {
 			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
-			//The fact that a sourceUrl is required allows is to select based on this. 
+			//The fact that a sourceId is required allows is to select based on this. 
 			//It's extremely unlikely that ill-selected results have an sourceUrl (as fetched by the schema)
 			//
 			//Moreover, it will remove results that are falsey. This can happen if we: 
 			//- explicitly remove results by returning undefined in a `reducer`
 
-			var doPrune = !(doc && doc._sourceUrl);
+			var doPrune = !(doc && doc._sourceId);
 			if (doPrune) {
 				crawlerResource.stats.total.nrItemsPruned++;
 			}
