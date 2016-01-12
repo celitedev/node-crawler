@@ -435,7 +435,7 @@ function processJob(job, done) {
 		})
 		.map(function transformToGenericOutput(doc) {
 
-			var types = [crawlConfig.entity.type];
+			var types = _.isArray(crawlConfig.entity.type) ? crawlConfig.entity.type : [crawlConfig.entity.type];
 			if (doc._type) {
 				types = types.concat(_.isArray(doc._type) ? doc._type : [doc._type]);
 			}

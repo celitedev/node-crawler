@@ -12,8 +12,10 @@ module.exports = {
 		name: "fandango"
 	},
 	entity: {
-		type: "Place",
-		schema: "source_place", //the actual schema to use
+		type: "PlaceWithOpeninghours",
+	},
+	scheduler: {
+		runEveryXSeconds: 24 * 60 * 60 //each day
 	},
 	//General logic/behavior for this crawler 
 	semantics: {
@@ -117,16 +119,23 @@ module.exports = {
 
 			schema: function(x) { //schema for each individual result
 				return {
-					sourceUrl: "[itemprop=url]@content",
-					sourceId: "[itemprop=url]@content",
+					_sourceUrl: "[itemprop=url]@content",
 					name: "[itemprop=name]@content",
 					logo: "[itemprop=logo]@content",
-					streetAddress: "[itemprop=streetAddress]@content",
-					zipCode: "[itemprop=postalCode]@content",
-					city: "[itemprop=addressLocality]@content",
-					region: "[itemprop=addressRegion]@content",
-					country: "[itemprop=addressCountry]@content",
+					address: {
+						streetAddress: "[itemprop=streetAddress]@content",
+						postalCode: "[itemprop=postalCode]@content",
+						addressLocality: "[itemprop=addressLocality]@content",
+						addressRegion: "[itemprop=addressRegion]@content",
+						addressCountry: "[itemprop=addressCountry]@content",
+					}
 				};
+			},
+
+			mapping: {
+				_type: function(val) {
+					return ["MovieTheater"];
+				}
 			}
 		}
 	}

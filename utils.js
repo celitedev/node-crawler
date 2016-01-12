@@ -12,7 +12,7 @@ var utils = module.exports = {
 	urlAddedToQueueHash: function(jobData) {
 		var arr = [
 			jobData.source,
-			jobData.type,
+			_.isArray(jobData.type) ? jobData.type.join(":") : jobData.type,
 			jobData.batchId
 		];
 		return arr.join("--");
@@ -21,7 +21,7 @@ var utils = module.exports = {
 	lastBatchIdHash: function(jobData) {
 		var arr = [
 			jobData.source,
-			jobData.type,
+			_.isArray(jobData.type) ? jobData.type.join(":") : jobData.type,
 		];
 		return ["kwhen--lastid", arr.join("--")];
 	},
@@ -29,12 +29,14 @@ var utils = module.exports = {
 	lastBatchIdEpoch: function(jobData) {
 		var arr = [
 			jobData.source,
-			jobData.type,
+			_.isArray(jobData.type) ? jobData.type.join(":") : jobData.type,
 		];
 		return ["kwhen--lastidEpoch", arr.join("--")];
 	},
 
 
+
+	//NOTE: config is from commandline. Here type is never an array
 	fetchCrawlConfig: function(config) {
 		config.source = config.source.toLowerCase();
 		config.type = config.type.toLowerCase();
@@ -55,15 +57,6 @@ var utils = module.exports = {
 			throw err;
 			// console.log(err);
 			// throw new Error("crawler not found: " + config.crawler);
-		}
-
-		if (crawlConfig.entity.type.toLowerCase() !== config.type) {
-			throw new Error("crawler type doesn't match up with filename (type, filename): " +
-				crawlConfig.entity.type.toLowerCase() + ", " + crawlerName);
-		}
-		if (crawlConfig.source.name.toLowerCase() !== config.source) {
-			throw new Error("crawler source doesn't match up with filename (source, filename): " +
-				crawlConfig.source.name.toLowerCase() + ", " + crawlerName);
 		}
 
 		return crawlConfig;
@@ -109,9 +102,9 @@ var utils = module.exports = {
 		getCrawlerName: function(source, type) {
 			var name;
 			if (_.isObject(source)) {
-				name = source.source + ":" + source.type;
+				name = source.source + ":" + (_.isArray(source.type) ? source.type.join("-") : source.type);
 			} else {
-				name = source + ":" + type;
+				name = source + ":" + (_.isArray(type) ? type.join("-") : type);
 			}
 			return name.toLowerCase();
 		},
