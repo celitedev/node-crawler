@@ -149,6 +149,7 @@ module.exports = {
 			schema: function(x) { //schema for each individual result
 				return {
 					_sourceUrl: "a.tn-frame@href",
+					_sourceId: "a.tn-frame@href",
 					_detail: x("a.tn-frame@href", {
 						name: "[itemprop=name] > span",
 						description: "[itemprop=description]",
