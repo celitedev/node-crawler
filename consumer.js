@@ -140,17 +140,7 @@ function startCrawlerQueue(crawlConfig) {
 				nrErrorsNonValidation: 0, //TODO: can we get more granular?
 				unzippedInBytes: 0
 			}
-		},
-		crawlResultSchema: _.extend({}, crawlConfig.schema.results.schema(x), {
-			//add _htmlDetail for transormers to use. See #30
-			_htmlDetail: function(el, cb) {
-				cb(undefined, el.html());
-			},
-			calcPageDone: function(el, cb) {
-				resource.stats.total.nrDetailPages++;
-				cb();
-			}
-		})
+		}
 	};
 
 	proxyAndCacheDriver.setTotalStats(resource.stats.total);
@@ -208,27 +198,37 @@ function processJob(job, done) {
 	}
 
 	//the entire crawl config as defined in /crawlers
-	var crawlConfig = crawlerResource.crawlConfig,
+	var crawlConfig = crawlerResource.crawlConfig;
 
-		//the schema
-		crawlSchema = crawlConfig.schema,
+	//the schema
+	var crawlSchema = crawlConfig.schema;
 
-		//the schema of the results (a x-ray mapping)
-		crawlResultSchema = crawlerResource.crawlResultSchema,
+	//x-ray instance specific to <source,type>
+	var x = crawlerResource.x;
 
-		//x-ray instance specific to <source,type>
-		x = crawlerResource.x;
+	var detailData = _.extend({
+		semantics: crawlConfig.semantics
+	}, data);
+
+	var crawlResultSchema = _.extend({}, {
+			redisClient: redisClient,
+			utils: utils,
+			//add _htmlDetail for transormers to use. See #30
+			_htmlDetail: function(el, cb) {
+				cb(undefined, el.html());
+			},
+			calcPageDone: function(el, cb) {
+				crawlerResource.stats.total.nrDetailPages++;
+				cb();
+			}
+		},
+		crawlConfig.schema.results.schema(x, detailData));
 
 	var promise = Promise.resolve()
 		.then(function getLatestBatchId() {
 			//get latest batchId from redis
 
-			var hashObj = {
-				source: crawlConfig.source.name,
-				type: crawlConfig.entity.type,
-			};
-
-			var lastbatchIdObj = utils.lastBatchIdHash(hashObj);
+			var lastbatchIdObj = utils.lastBatchIdHash(data);
 
 			return new Promise(function(resolve, reject) {
 
@@ -547,7 +547,7 @@ function processJob(job, done) {
 		})
 		// .catch(function(err) {
 		// 	throw err;
-		// });
+		// })
 		.catch(function catchall(err) {
 
 			if (err.outdated) {

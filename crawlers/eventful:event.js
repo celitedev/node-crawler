@@ -147,7 +147,8 @@ module.exports = {
 			//We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
 			selector: ".search-results > li", //selector for results
 
-			schema: function(x) { //schema for each individual result
+			schema: function(x, detailObj) { //schema for each individual result
+
 				return {
 					_sourceUrl: "a.tn-frame@href",
 					_sourceId: "a.tn-frame@href",
@@ -160,7 +161,7 @@ module.exports = {
 						performer: x("[itemprop=performer]", [{
 							_ref: "> a@href"
 						}]),
-					})
+					}, undefined, detailObj)
 				};
 			},
 

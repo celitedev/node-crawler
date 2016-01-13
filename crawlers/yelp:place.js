@@ -118,7 +118,7 @@ module.exports = {
 		results: {
 			selector: ".search-results > li.regular-search-result", //selector for results
 
-			schema: function(x) { //schema for each individual result
+			schema: function(x, detailObj) { //schema for each individual result
 				return {
 					_sourceUrl: ".biz-name@href",
 					_sourceId: ".biz-name@href",
@@ -176,7 +176,7 @@ module.exports = {
 							val: "> dd"
 						}]),
 
-					})
+					}, undefined, detailObj)
 				};
 			},
 
