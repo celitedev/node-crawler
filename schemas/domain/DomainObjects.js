@@ -262,11 +262,19 @@ module.exports = function(generatedSchemas, r) {
 		if (!state.batchId) {
 			throw new Error("'state.batchId' should be defined on SourceObject");
 		}
+		if (state.detailPageAware === undefined) {
+			throw new Error("'detailPageAware.detailPageAware' should be defined");
+		}
 
 		this.sourceType = state.sourceType;
 		this.sourceUrl = state.sourceUrl; //optional
 		this.sourceId = state.sourceId;
 		this.batchId = state.batchId;
+		this.detailPageAware = state.detailPageAware;
+
+		if (this.detailPageAware && !this.sourceUrl) {
+			throw new Error("sourceObject with detailPageAware=true but sourceUrl undefined");
+		}
 	}
 
 	CanonicalObject.prototype._validationSchema = validator.createSchema();

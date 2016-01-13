@@ -32,7 +32,19 @@ module.exports = {
 		//- false: never prune
 		//- true: prune if url already processed
 		//- batch: prune if url already processed for this batch
+
 		pruneEntity: true,
+
+		//
+		//Example of variable pruneEntity which re-processes 
+		//every entity once every x times.
+		//
+		// pruneEntity: function(batchId) {
+		// 	if (batchId % 7 === 0) {
+		// 		return "batch"; //every 7 batches let's do an entire rerun
+		// 	}
+		// 	return "true";
+		// },
 
 		//How to check entity is updated since last processed
 		// - string (templated functions) 
@@ -146,6 +158,11 @@ module.exports = {
 			//WEIRD: selector: ".search-results > li[itemscope]" produces 9 instead of 10 results
 			//We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
 			selector: ".search-results > li", //selector for results
+
+			//does detailPage pruning. For this to work: 
+			//- _sourceUrl should exist and should equal detail page visisted
+			//- 'detail page visited' is the page on which the detailObj is attached.
+			detailPageAware: true,
 
 			schema: function(x, detailObj) { //schema for each individual result
 
