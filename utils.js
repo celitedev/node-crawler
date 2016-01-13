@@ -9,27 +9,51 @@ var utils = module.exports = {
 	KUE_PREFIX: "kwhenqueue2",
 
 
-	urlAddedToQueueHash: function(jobData) {
+	//Given a crawler return the name of the sorted set which contains all urls
+	//processed by crawler in history. For each url maintain last batch at which 
+	//this url was processed.
+	//
+	//This sortedset is used for both indexUrls as well as entityUrls.
+	//
+	//Used by consumer.
+	//
+	//redis type: sorted set
+	addedUrlsSortedSet: function(jobData) {
+
+		var firstType = _.isArray(jobData.type) ? jobData.type[0] : jobData.type;
+
 		var arr = [
+			"kwhen--urlsAdded",
 			jobData.source,
-			_.isArray(jobData.type) ? jobData.type.join(":") : jobData.type,
-			jobData.batchId
+			firstType,
 		];
 		return arr.join("--");
 	},
 
+	//the last batchid per crawler
+	//Used to remove outdated jobs from the queue
+	//Used by consumer and producer
+	//
+	//redis type: hash
 	lastBatchIdHash: function(jobData) {
+		var firstType = _.isArray(jobData.type) ? jobData.type[0] : jobData.type;
+
 		var arr = [
 			jobData.source,
-			_.isArray(jobData.type) ? jobData.type.join(":") : jobData.type,
+			firstType
 		];
 		return ["kwhen--lastid", arr.join("--")];
 	},
 
+	//used by producer to see if we're not too fast with producing.
+	//
+	// redis type: hash 
 	lastBatchIdEpoch: function(jobData) {
+		var firstType = _.isArray(jobData.type) ? jobData.type[0] : jobData.type;
+
 		var arr = [
 			jobData.source,
-			_.isArray(jobData.type) ? jobData.type.join(":") : jobData.type,
+			firstType
 		];
 		return ["kwhen--lastidEpoch", arr.join("--")];
 	},

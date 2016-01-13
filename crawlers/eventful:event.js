@@ -32,7 +32,19 @@ module.exports = {
 		//- false: never prune
 		//- true: prune if url already processed
 		//- batch: prune if url already processed for this batch
+
 		pruneEntity: true,
+
+		//
+		//Example of variable pruneEntity which re-processes 
+		//every entity once every x times.
+		//
+		// pruneEntity: function(batchId) {
+		// 	if (batchId % 7 === 0) {
+		// 		return "batch"; //every 7 batches let's do an entire rerun
+		// 	}
+		// 	return "true";
+		// },
 
 		//How to check entity is updated since last processed
 		// - string (templated functions) 
@@ -41,6 +53,7 @@ module.exports = {
 		//template options: 
 		//- hash: hash of detail contents
 		//- headers: based on cache headers
+		//- db: check against saved SourceObject
 		dirtyCheckEntity: "hash",
 
 
@@ -146,7 +159,13 @@ module.exports = {
 			//We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
 			selector: ".search-results > li", //selector for results
 
-			schema: function(x) { //schema for each individual result
+			//does detailPage pruning. For this to work: 
+			//- _sourceUrl should exist and should equal detail page visisted
+			//- 'detail page visited' is the page on which the detailObj is attached.
+			detailPageAware: true,
+
+			schema: function(x, detailObj) { //schema for each individual result
+
 				return {
 					_sourceUrl: "a.tn-frame@href",
 					_sourceId: "a.tn-frame@href",
@@ -159,7 +178,7 @@ module.exports = {
 						performer: x("[itemprop=performer]", [{
 							_ref: "> a@href"
 						}]),
-					})
+					}, undefined, detailObj)
 				};
 			},
 

@@ -118,7 +118,12 @@ module.exports = {
 		results: {
 			selector: ".search-results > li.regular-search-result", //selector for results
 
-			schema: function(x) { //schema for each individual result
+			//does detailPage pruning. For this to work: 
+			//- _sourceUrl should exist and should equal detail page visisted
+			//- 'detail page visited' is the page on which the detailObj is attached.
+			detailPageAware: true,
+
+			schema: function(x, detailObj) { //schema for each individual result
 				return {
 					_sourceUrl: ".biz-name@href",
 					_sourceId: ".biz-name@href",
@@ -176,7 +181,7 @@ module.exports = {
 							val: "> dd"
 						}]),
 
-					})
+					}, undefined, detailObj)
 				};
 			},
 
