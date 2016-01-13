@@ -232,6 +232,8 @@ function processJob(job, done) {
 
 			return new Promise(function(resolve, reject) {
 
+				//Sorted set check to get latest batchid for crawler. 
+				//If job has an older batchId than latest batchid, the job is outdated and thus discarded. 
 				redisClient.zscore(lastbatchIdObj[0], lastbatchIdObj[1], function(err, latestBatchId) {
 					if (err) {
 						return reject(err);
@@ -315,20 +317,21 @@ function processJob(job, done) {
 							return cb();
 						}
 
-						//Let's check if we've already addded this url (of this particular batch) to the queue 
-						//We only add the url to the queue if not already done so. 
-						//
-						//TBD: For more considerations on storing urls in Redis: 
-						//http://stackoverflow.com/questions/28719976/redis-list-of-visited-sites-from-crawler
-						var setName = utils.urlAddedToQueueHash(data);
 
-						redisClient.sismember(setName, nextUrl, function(err, urlFound) {
+						var sortedSetname = utils.addedUrlsSortedSet(data);
+
+						//get the last time (batchId) nextUrl was added to queue
+						redisClient.zscore(sortedSetname, nextUrl, function(err, score) {
 							if (err) {
 								return cb(err);
 							}
 
-							if (urlFound && !argv.skipCacheCheck) {
-								debug("SKIPPING (BC CACHED) url", nextUrl);
+							//skip if: 
+							//- nextUrl was added to queue once (score !== null)
+							//- nextUrl was added to queue as part of current batch (+score === +data.batchId)
+							//- and we don't want to skip this check
+							if (score !== null && +score === +data.batchId && !argv.skipCacheCheck) {
+								debug("SKIPPING bc url already on queue  or processed for current batchid", nextUrl);
 								//should only happen : 
 								//1. on restart of batch, but only for a short burst. 
 								//   Generally at most N where N is nr of parallel workers
@@ -337,15 +340,16 @@ function processJob(job, done) {
 								//3. if current job is processed multiple times because of error
 								return cb(); //let's skip since we've already processed this url
 							}
+
 							//upload next url to queue
 							utils.addCrawlJob(queue, data.batchId, crawlConfig, nextUrl, function(err) {
 								if (err) {
 									return cb(err);
 								}
 								debugUrls("ADDING nexturl", nextUrl);
-								//add item to redis set. THis way we might end up with false positive. 
-								//Better than false negative if we do sadd *before* addCrawlJob
-								redisClient.sadd(setName, nextUrl, cb);
+
+								//update score to data.batchId 
+								redisClient.zadd(sortedSetname, data.batchId, nextUrl, cb);
 							});
 						});
 					},
