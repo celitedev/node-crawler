@@ -21,13 +21,6 @@ module.exports = {
 	//General logic/behavior for this crawler 
 	semantics: {
 
-		//prune LIST URL if already processed 
-		//options: 
-		//- false: never prune
-		//- true: prune if url already processed
-		//- batch: prune if url already processed for this batch
-		pruneList: "batch",
-
 		//prune ENTITY URL if already processed 
 		//options: 
 		//- false: never prune
