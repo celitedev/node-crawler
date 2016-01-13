@@ -145,6 +145,10 @@ function startCrawlerQueue(crawlConfig) {
 
 	proxyAndCacheDriver.setTotalStats(resource.stats.total);
 
+	if (crawlConfig.schema.results.detailPageAware === undefined) {
+		throw new Error("Crawler should define schema.results.detailPageAware");
+	}
+
 	Promise.resolve().then(function() {
 
 		//start queue for this crawl
@@ -156,6 +160,7 @@ function startCrawlerQueue(crawlConfig) {
 				deleteJob
 			);
 		} else {
+
 			queue.process(
 				resource.queueName,
 				crawlConfig.job.concurrentJobs,
@@ -207,12 +212,13 @@ function processJob(job, done) {
 	var x = crawlerResource.x;
 
 	var detailData = _.extend({
-		semantics: crawlConfig.semantics
+		semantics: crawlConfig.semantics,
+		utils: utils,
+		redisClient: redisClient,
+		prunedDetailUrls: []
 	}, data);
 
-	var crawlResultSchema = _.extend({}, {
-			redisClient: redisClient,
-			utils: utils,
+	var crawlResultSchema = _.extend({
 			//add _htmlDetail for transormers to use. See #30
 			_htmlDetail: function(el, cb) {
 				cb(undefined, el.html());
@@ -403,7 +409,6 @@ function processJob(job, done) {
 		})
 		.map(function makeCompoundDoc(result) {
 
-
 			var detail = result._detail;
 			delete result._detail;
 
@@ -422,20 +427,27 @@ function processJob(job, done) {
 		});
 	}
 
-
 	promise = promise.filter(function genericPrunerToCheckForSourceId(doc) {
 			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
+
 			//The fact that a sourceId is required allows is to select based on this. 
 			//It's extremely unlikely that ill-selected results have an sourceUrl (as fetched by the schema)
 			//
 			//Moreover, it will remove results that are falsey. This can happen if we: 
 			//- explicitly remove results by returning undefined in a `reducer`
 
-			var doPrune = !(doc && doc._sourceId);
-			if (doPrune) {
+			var doPruneOnSourceId = !(doc && doc._sourceId);
+
+			//also prune if we've explicitly didn't process detailpage because we've processed it before.
+			var doPruneOnSkippedDetailPage = doc && doc._sourceUrl &&
+				detailData.prunedDetailUrls.indexOf(doc._sourceUrl) !== -1;
+
+			if (doPruneOnSourceId || doPruneOnSkippedDetailPage) {
 				crawlerResource.stats.total.nrItemsPruned++;
+				return false;
+			} else {
+				return true; //return true when we should NOT prune
 			}
-			return !doPrune; //return true when we should NOT prune
 		})
 		.map(function transformToGenericOutput(doc) {
 
@@ -449,6 +461,7 @@ function processJob(job, done) {
 				sourceType: crawlConfig.source.name,
 				sourceId: doc._sourceId, //required
 				sourceUrl: doc._sourceUrl, //optional
+				detailPageAware: crawlConfig.schema.results.detailPageAware
 			});
 
 			delete doc._sourceId;
@@ -527,6 +540,26 @@ function processJob(job, done) {
 						if (inspection.isFulfilled()) {
 
 							crawlerResource.stats.total.nrItemsComplete++;
+
+							var obj = inspection.value();
+
+							//We've crawled a detailPage to get here and succeeded.
+							//Let's set this in stone so next time (depending on strategy) we may prune this entity
+							//obj.sourceUrl guaranteed to exist
+							if (obj.detailPageAware) {
+								return new Promise(function(resolve, reject) {
+
+									var sortedSetname = utils.addedUrlsSortedSet(data);
+
+									redisClient.zadd(sortedSetname, data.batchId, obj.sourceUrl, function(err, score) {
+										if (err) {
+											return reject(err);
+										}
+										resolve();
+									});
+								});
+							}
+
 						} else if (inspection.isCancelled()) {
 							throw new Error("SANITY CHECK: we don't cancel promises!");
 						} else {
@@ -629,7 +662,7 @@ function manageCrawlerLifecycle(resource) {
 			}));
 		}
 
-		if (argv.showStats) {
+		if (argv.showStats || argv.stats) {
 			showStats();
 		} else {
 			showStats(["nrItemsComplete"]);

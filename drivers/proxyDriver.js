@@ -20,7 +20,7 @@ module.exports = driver;
  * @return {Function}
  */
 
-function driver(opts) {
+function driver(driverOpts) {
 
   //TODO: passing options is for certificate and cookies only 
   var agent = superagent.agent();
@@ -28,64 +28,65 @@ function driver(opts) {
 
   var fn = function http_driver(ctx, fn) {
 
-    // return processUrl();
+    var opts = ctx.opts;
 
-    // var opts = ctx.opts;
+    //if opts.batchId exists, we're processing a DETAIL PAGE. 
+    //This is not enforced in any way, but opts should be supplied by crawler on the correct place. 
+    //THIS IS A LITTLE BRITTLE BUT WORKS. 
 
-    // //if opts.batchId exists, we're processing a DETAIL PAGE. 
-    // //This is not enforced in any way, but opts should be supplied by crawler on the correct place. 
-    // //THIS IS BRITTLE BUT WORKS. 
+    //if detailpage is being processed, check if it's already (being) processed before. 
+    //Depending on semantics.pruneEntity we prune as follows: 
+    //semantics.pruneEntity = true -> prune if processed once before, regardless of batch
+    //semantics.pruneEntity = batch -> prune if processed during this batch already 
+    if (opts.batchId !== undefined) {
 
-    // //if detailpage is being processed, check if it's already (being) processed before. 
-    // //Depending on semantics.pruneEntity we prune as follows: 
-    // //semantics.pruneEntity = true -> prune if processed once before, regardless of batch
-    // //semantics.pruneEntity = batch -> prune if processed during this batch already 
-    // if (opts.batchId !== undefined) {
+      var redisClient = opts.redisClient;
+      var utils = opts.utils;
+      var sortedSetname = utils.addedUrlsSortedSet(opts);
 
-    //   console.log("ASDASD");
-    //   var redisClient = opts.redisClient;
-    //   var utils = opts.utils;
-    //   var sortedSetname = utils.addedUrlsSortedSet(opts);
+      //get the last time (batchId) nextUrl was added to queue
+      redisClient.zscore(sortedSetname, ctx.url, function(err, score) {
+        if (err) {
+          return fn(err);
+        }
 
-    //   //get the last time (batchId) nextUrl was added to queue
-    //   redisClient.zscore(sortedSetname, ctx.url, function(err, score) {
-    //     if (err) {
-    //       return fn(err);
-    //     }
+        if (score === null) {
+          return processUrl(driverOpts);
+        }
 
-    //     if (score === null) {
-    //       return processUrl();
-    //     }
+        var pruneEntity = _.isFunction(opts.semantics.pruneEntity) ? opts.semantics.pruneEntity(+opts.batchId) : opts.semantics.pruneEntity;
 
-    //     console.log("ASDASDASD");
-    //     var pruneEntity = _.isFunction(opts.semantics.pruneEntity) ? opts.semantics.pruneEntity(+opts.batchId) : opts.semantics.pruneEntity;
+        switch (pruneEntity) {
+          case "batch":
+            if (+opts.batchId > +score) { //process in case of semantics.pruneEntity = batch
+              return processUrl(driverOpts);
+            }
+            break;
+          case false:
+            //never prune
+            return processUrl(driverOpts);
+          case true:
+            //prune if url already processed, which is the case since score !== null
+            break;
+          default:
+            throw new Error("pruneEntity value not supported. Must be (true, false, batch) " + pruneEntity);
+        }
 
-    //     switch (pruneEntity) {
-    //       case "batch":
-    //         if (+opts.batchId > +score) { //process in case of semantics.pruneEntity = batch
-    //           return processUrl();
-    //         }
-    //         break;
-    //       case false:
-    //         //never prune
-    //         return processUrl();
-    //       case true:
-    //         //prune if url already processed, which is the case since score !== null
-    //         break;
-    //       default:
-    //         throw new Error("pruneEntity value not supported. Must be (true, false, batch) " + pruneEntity);
-    //     }
+        opts.prunedDetailUrls.push(ctx.url);
+        fn(null, {
+          body: ""
+        });
 
-    //     console.log("EMPTY");
-    //     ctx.body = "";
-    //     fn(null, ctx); //empty result set... So what happens now? 
+      });
+    } else {
+      processUrl(driverOpts);
+    }
 
-    //   });
-    // } else {
-    //   processUrl();
-    // }
-
-
+    function processUrl(driverOpts) {
+      if (!driverOpts) {
+        throw new Error("driveOpts not passed");
+      }
+      var opts = driverOpts;
       agent
         .get(ctx.url)
         .set(_.defaults(ctx.headers, opts.headers))
@@ -134,7 +135,8 @@ function driver(opts) {
 
           return fn(null, ctx);
         });
-  
+    }
+
   };
 
   fn.setTotalStats = function(statsObj) {
