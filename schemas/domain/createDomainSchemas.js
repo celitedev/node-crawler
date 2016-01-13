@@ -251,7 +251,34 @@ module.exports = function(configObj) {
 				function checkAmbiguousRangeType() {
 					if (p.ranges.length > 1) {
 						p.isAmbiguous = true;
+					} else {
+						//if only 1 range defined it can still be ambiguous iff there's a subtypes (1 or more) that 
+						//define their own root. 
+						//e.g.: Location (a root) has a subtype (PlaceWithOpeningHours) that's a root as well. 
 
+						var typeInRangeName = p.ranges[0];
+						var typeInRange = types[typeInRangeName];
+
+						if (typeInRange) { //only possibly ambiguous if type is a Type instead of a DataType
+
+							var roots = [typeInRange.rootName];
+
+							_.each(types, function(t) {
+								if (t.ancestors.indexOf(typeInRangeName) !== -1) {
+									roots.push(t.rootName);
+								}
+							});
+
+							roots = _.uniq(roots);
+							if (roots.length > 1) {
+								// console.log(("ambiguous range for (type, rootnames) " + typeInRangeName + " - " + roots.join(",")));
+								p.isAmbiguous = true;
+							}
+						}
+					}
+
+
+					if (p.isAmbiguous) {
 						if (!p.ambiguitySolvedBy) {
 							ambiguousStrategyUndefined.push(p.id);
 						} else {
@@ -327,12 +354,22 @@ module.exports = function(configObj) {
 							//This requires for all types to be Type (instead of DataType) and of the same root
 
 							var roots = _.uniq(_.reduce(p.ranges, function(arr, typeName) {
-								var t = types[typeName];
-								if (!t || !t.isEntity) {
+								var type = types[typeName];
+								if (!type || !type.isEntity) {
 									nonEntityFound = true;
 									return arr;
 								}
-								arr.push(t.rootName);
+
+								arr.push(type.rootName);
+
+								//also walk all subtypes since these can be contained in different root. 
+								//e.g.: PlaceWithOpeningHours is own root but is subtype of Place.
+								_.each(types, function(t) {
+									if (t.ancestors.indexOf(typeName) !== -1) {
+										arr.push(t.rootName);
+									}
+								});
+
 								return arr;
 							}, []));
 

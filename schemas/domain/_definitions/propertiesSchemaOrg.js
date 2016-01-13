@@ -153,9 +153,17 @@ module.exports = {
 	},
 	branchCode: {},
 	containedInPlace: { //we probably store entire place hierarchy
+		ambiguitySolvedBy: { //Place is ambiguous: Place or PlaceWithOpeninghours
+			type: "implicitType",
+			storage: "thingIndex"
+		},
 		isMulti: true
 	},
 	containsPlace: {
+		ambiguitySolvedBy: { //Place is ambiguous: Place or PlaceWithOpeninghours
+			type: "implicitType",
+			storage: "thingIndex"
+		},
 		"isMulti": true
 	},
 	geo: {
@@ -258,10 +266,10 @@ module.exports = {
 	author: {
 		isMulti: true,
 
-		//Person || Organization
+		//Person || Organization || PlaceWithOpeningHours
 		ambiguitySolvedBy: {
 			type: "implicitType",
-			storage: "sharedRoot"
+			storage: "thingIndex"
 		}
 	},
 	character: {
@@ -300,7 +308,7 @@ module.exports = {
 		//Person || Organization
 		ambiguitySolvedBy: {
 			type: "implicitType",
-			storage: "sharedRoot"
+			storage: "thingIndex"
 		},
 		isMulti: true
 	},
@@ -308,7 +316,7 @@ module.exports = {
 		//Person || Organization
 		ambiguitySolvedBy: {
 			type: "implicitType",
-			storage: "sharedRoot"
+			storage: "thingIndex"
 		},
 		isMulti: true
 	},
@@ -365,7 +373,16 @@ module.exports = {
 		},
 		isMulti: true
 	},
-	productionCompany: {},
+	productionCompany: {
+		//Organization allowed. 
+		//This means roots: 
+		//- OrganizationAndPerson
+		//- PlaceWithOpeninghours (bc. LocalBusiness)
+		ambiguitySolvedBy: {
+			type: "implicitType",
+			storage: "thingIndex"
+		},
+	},
 	trailer: {
 		isMulti: true
 	},
@@ -387,7 +404,7 @@ module.exports = {
 	composer: {
 		ambiguitySolvedBy: {
 			type: "implicitType",
-			storage: "sharedRoot"
+			storage: "thingIndex"
 		},
 		isMulti: true
 	},
@@ -486,10 +503,14 @@ module.exports = {
 	honorificSuffix: {},
 	jobTitle: {},
 	memberOf: {
-		// ambiguitySolvedBy: {
-		// 	type: "implicitType",
-		// 	storage: "sharedRoot"
-		// },
+		//Organization allowed. 
+		//This means roots: 
+		//- OrganizationAndPerson
+		//- PlaceWithOpeninghours (bc. LocalBusiness)
+		ambiguitySolvedBy: {
+			type: "implicitType",
+			storage: "thingIndex"
+		},
 		ranges: ["Organization"], //Don't allow ProgramMembership for now
 		isMulti: true
 	},
@@ -499,7 +520,16 @@ module.exports = {
 	///////////////////////////////////
 	//http://schema.org/Organization //
 	///////////////////////////////////
-	department: {},
+	department: {
+		//Organization allowed. 
+		//This means roots: 
+		//- OrganizationAndPerson
+		//- PlaceWithOpeninghours (bc. LocalBusiness)
+		ambiguitySolvedBy: {
+			type: "implicitType",
+			storage: "thingIndex"
+		},
+	},
 	dissolutionDate: {},
 	employee: {
 		isMulti: true
@@ -510,18 +540,39 @@ module.exports = {
 	foundingDate: {},
 	legalName: {},
 	location: {
-		ranges: ["Place"], //important
+		ranges: ["Place"], //NO: PostalAddress or Text
+		ambiguitySolvedBy: { //Place is ambiguous: Place or PlaceWithOpeninghours
+			type: "implicitType",
+			storage: "thingIndex"
+		},
 		isMulti: true
 	},
 	member: { //e.g.: org or persons
 		ambiguitySolvedBy: {
 			type: "implicitType",
-			storage: "sharedRoot"
+			storage: "thingIndex"
 		},
 		isMulti: true
 	},
-	parentOrganization: {},
+	parentOrganization: {
+		//Organization allowed. 
+		//This means roots: 
+		//- OrganizationAndPerson
+		//- PlaceWithOpeninghours (bc. LocalBusiness)
+		ambiguitySolvedBy: {
+			type: "implicitType",
+			storage: "thingIndex"
+		},
+	},
 	subOrganization: {
+		//Organization allowed. 
+		//This means roots: 
+		//- OrganizationAndPerson
+		//- PlaceWithOpeninghours (bc. LocalBusiness)
+		ambiguitySolvedBy: {
+			type: "implicitType",
+			storage: "thingIndex"
+		},
 		isMulti: true
 	},
 
@@ -556,7 +607,7 @@ module.exports = {
 		//Person || Organization
 		ambiguitySolvedBy: {
 			type: "implicitType",
-			storage: "sharedRoot"
+			storage: "thingIndex"
 		},
 		isMulti: true
 	},
@@ -564,7 +615,7 @@ module.exports = {
 		//Person || Organization
 		ambiguitySolvedBy: {
 			type: "implicitType",
-			storage: "sharedRoot"
+			storage: "thingIndex"
 		},
 		isMulti: true
 	},
