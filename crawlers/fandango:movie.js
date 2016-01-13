@@ -117,6 +117,8 @@ module.exports = {
 		results: {
 			selector: "[itemtype='http://schema.org/Movie']", //selector for results
 
+			detailPageAware: false,
+
 			schema: function(x) { //schema for each individual result
 				return {
 					_sourceUrl: "[itemprop=url]@content",

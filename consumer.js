@@ -140,20 +140,14 @@ function startCrawlerQueue(crawlConfig) {
 				nrErrorsNonValidation: 0, //TODO: can we get more granular?
 				unzippedInBytes: 0
 			}
-		},
-		crawlResultSchema: _.extend({}, crawlConfig.schema.results.schema(x), {
-			//add _htmlDetail for transormers to use. See #30
-			_htmlDetail: function(el, cb) {
-				cb(undefined, el.html());
-			},
-			calcPageDone: function(el, cb) {
-				resource.stats.total.nrDetailPages++;
-				cb();
-			}
-		})
+		}
 	};
 
 	proxyAndCacheDriver.setTotalStats(resource.stats.total);
+
+	if (crawlConfig.schema.results.detailPageAware === undefined) {
+		throw new Error("Crawler should define schema.results.detailPageAware");
+	}
 
 	Promise.resolve().then(function() {
 
@@ -166,6 +160,7 @@ function startCrawlerQueue(crawlConfig) {
 				deleteJob
 			);
 		} else {
+
 			queue.process(
 				resource.queueName,
 				crawlConfig.job.concurrentJobs,
@@ -208,30 +203,43 @@ function processJob(job, done) {
 	}
 
 	//the entire crawl config as defined in /crawlers
-	var crawlConfig = crawlerResource.crawlConfig,
+	var crawlConfig = crawlerResource.crawlConfig;
 
-		//the schema
-		crawlSchema = crawlConfig.schema,
+	//the schema
+	var crawlSchema = crawlConfig.schema;
 
-		//the schema of the results (a x-ray mapping)
-		crawlResultSchema = crawlerResource.crawlResultSchema,
+	//x-ray instance specific to <source,type>
+	var x = crawlerResource.x;
 
-		//x-ray instance specific to <source,type>
-		x = crawlerResource.x;
+	var detailData = _.extend({
+		semantics: crawlConfig.semantics,
+		utils: utils,
+		redisClient: redisClient,
+		prunedDetailUrls: []
+	}, data);
+
+	var crawlResultSchema = _.extend({
+			//add _htmlDetail for transormers to use. See #30
+			_htmlDetail: function(el, cb) {
+				cb(undefined, el.html());
+			},
+			calcPageDone: function(el, cb) {
+				crawlerResource.stats.total.nrDetailPages++;
+				cb();
+			}
+		},
+		crawlConfig.schema.results.schema(x, detailData));
 
 	var promise = Promise.resolve()
 		.then(function getLatestBatchId() {
 			//get latest batchId from redis
 
-			var hashObj = {
-				source: crawlConfig.source.name,
-				type: crawlConfig.entity.type,
-			};
-
-			var lastbatchIdObj = utils.lastBatchIdHash(hashObj);
+			var lastbatchIdObj = utils.lastBatchIdHash(data);
 
 			return new Promise(function(resolve, reject) {
 
+				//Sorted set check to get latest batchid for crawler. 
+				//If job has an older batchId than latest batchid, the job is outdated and thus discarded. 
 				redisClient.zscore(lastbatchIdObj[0], lastbatchIdObj[1], function(err, latestBatchId) {
 					if (err) {
 						return reject(err);
@@ -315,20 +323,21 @@ function processJob(job, done) {
 							return cb();
 						}
 
-						//Let's check if we've already addded this url (of this particular batch) to the queue 
-						//We only add the url to the queue if not already done so. 
-						//
-						//TBD: For more considerations on storing urls in Redis: 
-						//http://stackoverflow.com/questions/28719976/redis-list-of-visited-sites-from-crawler
-						var setName = utils.urlAddedToQueueHash(data);
 
-						redisClient.sismember(setName, nextUrl, function(err, urlFound) {
+						var sortedSetname = utils.addedUrlsSortedSet(data);
+
+						//get the last time (batchId) nextUrl was added to queue
+						redisClient.zscore(sortedSetname, nextUrl, function(err, score) {
 							if (err) {
 								return cb(err);
 							}
 
-							if (urlFound && !argv.skipCacheCheck) {
-								debug("SKIPPING (BC CACHED) url", nextUrl);
+							//skip if: 
+							//- nextUrl was added to queue once (score !== null)
+							//- nextUrl was added to queue as part of current batch (+score === +data.batchId)
+							//- and we don't want to skip this check
+							if (score !== null && +score === +data.batchId && !argv.skipCacheCheck) {
+								debug("SKIPPING bc url already on queue  or processed for current batchid", nextUrl);
 								//should only happen : 
 								//1. on restart of batch, but only for a short burst. 
 								//   Generally at most N where N is nr of parallel workers
@@ -337,15 +346,16 @@ function processJob(job, done) {
 								//3. if current job is processed multiple times because of error
 								return cb(); //let's skip since we've already processed this url
 							}
+
 							//upload next url to queue
 							utils.addCrawlJob(queue, data.batchId, crawlConfig, nextUrl, function(err) {
 								if (err) {
 									return cb(err);
 								}
 								debugUrls("ADDING nexturl", nextUrl);
-								//add item to redis set. THis way we might end up with false positive. 
-								//Better than false negative if we do sadd *before* addCrawlJob
-								redisClient.sadd(setName, nextUrl, cb);
+
+								//update score to data.batchId 
+								redisClient.zadd(sortedSetname, data.batchId, nextUrl, cb);
 							});
 						});
 					},
@@ -399,7 +409,6 @@ function processJob(job, done) {
 		})
 		.map(function makeCompoundDoc(result) {
 
-
 			var detail = result._detail;
 			delete result._detail;
 
@@ -418,20 +427,27 @@ function processJob(job, done) {
 		});
 	}
 
-
 	promise = promise.filter(function genericPrunerToCheckForSourceId(doc) {
 			//This is a generic filter that removes all ill-selected results, e.g.: headers and footers
+
 			//The fact that a sourceId is required allows is to select based on this. 
 			//It's extremely unlikely that ill-selected results have an sourceUrl (as fetched by the schema)
 			//
 			//Moreover, it will remove results that are falsey. This can happen if we: 
 			//- explicitly remove results by returning undefined in a `reducer`
 
-			var doPrune = !(doc && doc._sourceId);
-			if (doPrune) {
+			var doPruneOnSourceId = !(doc && doc._sourceId);
+
+			//also prune if we've explicitly didn't process detailpage because we've processed it before.
+			var doPruneOnSkippedDetailPage = doc && doc._sourceUrl &&
+				detailData.prunedDetailUrls.indexOf(doc._sourceUrl) !== -1;
+
+			if (doPruneOnSourceId || doPruneOnSkippedDetailPage) {
 				crawlerResource.stats.total.nrItemsPruned++;
+				return false;
+			} else {
+				return true; //return true when we should NOT prune
 			}
-			return !doPrune; //return true when we should NOT prune
 		})
 		.map(function transformToGenericOutput(doc) {
 
@@ -445,6 +461,7 @@ function processJob(job, done) {
 				sourceType: crawlConfig.source.name,
 				sourceId: doc._sourceId, //required
 				sourceUrl: doc._sourceUrl, //optional
+				detailPageAware: crawlConfig.schema.results.detailPageAware
 			});
 
 			delete doc._sourceId;
@@ -523,6 +540,26 @@ function processJob(job, done) {
 						if (inspection.isFulfilled()) {
 
 							crawlerResource.stats.total.nrItemsComplete++;
+
+							var obj = inspection.value();
+
+							//We've crawled a detailPage to get here and succeeded.
+							//Let's set this in stone so next time (depending on strategy) we may prune this entity
+							//obj.sourceUrl guaranteed to exist
+							if (obj.detailPageAware) {
+								return new Promise(function(resolve, reject) {
+
+									var sortedSetname = utils.addedUrlsSortedSet(data);
+
+									redisClient.zadd(sortedSetname, data.batchId, obj.sourceUrl, function(err, score) {
+										if (err) {
+											return reject(err);
+										}
+										resolve();
+									});
+								});
+							}
+
 						} else if (inspection.isCancelled()) {
 							throw new Error("SANITY CHECK: we don't cancel promises!");
 						} else {
@@ -543,7 +580,7 @@ function processJob(job, done) {
 		})
 		// .catch(function(err) {
 		// 	throw err;
-		// });
+		// })
 		.catch(function catchall(err) {
 
 			if (err.outdated) {
@@ -625,7 +662,7 @@ function manageCrawlerLifecycle(resource) {
 			}));
 		}
 
-		if (argv.showStats) {
+		if (argv.showStats || argv.stats) {
 			showStats();
 		} else {
 			showStats(["nrItemsComplete"]);

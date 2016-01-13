@@ -139,6 +139,8 @@ module.exports = {
 		results: {
 			selector: ".showtimes-theater", //selector for results
 
+			detailPageAware: false,
+
 			schema: function(x) { //schema for each individual result
 
 				return {
