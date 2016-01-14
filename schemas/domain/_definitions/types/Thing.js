@@ -9,6 +9,8 @@ module.exports = {
 		"description": false,
 		"alternateName": false,
 		"image": false,
-		"sameAs": false //might be use to provide references from canonical to specific sources.
+		"sameAs": false, //might be use to provide references from canonical to specific sources.
+		"fact": false, //isCustom 
+		"tag": false //isCustom
 	},
 };
