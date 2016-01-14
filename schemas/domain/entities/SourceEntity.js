@@ -3,13 +3,14 @@ var util = require("util");
 var domainUtils = require("../utils");
 var UUID = require("pure-uuid");
 
+var SOURCETABLE = "sourceEntities";
 module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 	var validator = require("../validation")(generatedSchemas);
 
-	function SourceEntity(state) {
+	function SourceEntity(state, bootstrapObj) {
 		this._kind = domainUtils.enums.kind.SOURCE;
-		SourceEntity.super_.call(this, state);
+		SourceEntity.super_.call(this, state, bootstrapObj);
 		if (!state.sourceType) {
 			throw new Error("'state.sourceType' should be defined on SourceEntity");
 		}
@@ -32,11 +33,63 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		if (this.detailPageAware && !this.sourceUrl) {
 			throw new Error("SourceEntity with detailPageAware=true but sourceUrl undefined");
 		}
+
+		//bootstrapObject: the object from DB
+		if (bootstrapObj) {
+
+			////
+			//Some Logic:
+			//sourceId: guaranteed to match up (otherwise we wouldn't have this bootstrapObj)
+			//TBD: sourceUrl: ok to be overwritten? for now: yeah. Later we need to recheck links.
+
+			if (this.sourceType !== bootstrapObj._sourceType) {
+				throw new Error("sourceType is different between current and saved object (current, saved): " +
+					this.sourceType + ", " + bootstrapObj._sourceType);
+			}
+
+			//TBD: temporary check until we're sure we can handle (some) changs here.
+			if (!_.eq(this._type, bootstrapObj._type)) {
+				throw new Error("TBD: _type doesn't line up between current and saved object (current, saved): " +
+					this._type + ", " + bootstrapObj._type);
+			}
+
+			//Set id. Pretty useful for updating...
+			this.id = bootstrapObj.id;
+
+			//get this value from db. It's later possibly overwritten with true if dirty (never with false!)
+			this.hasUpdatedData = bootstrapObj._hasUpdatedData;
+
+			//createdAt: never modified
+			this.created = bootstrapObj._created;
+
+			//modifiedAt: modified on commit
+			this.modified = bootstrapObj._modified;
+
+			//the batchId as read from the DB. 
+			//Not used ATM?, but could be used for optimistic concurrency control
+			this.batchIdRead = bootstrapObj._batchId;
+
+		}
 	}
 
 	SourceEntity.prototype._validationSchema = validator.createSchemaSourceEntity();
 
 	util.inherits(SourceEntity, AbstractEntity);
+
+	//static
+	SourceEntity.getBySourceId = function(id) {
+		return r.table(SOURCETABLE).filter({
+			_sourceId: id
+		}).then(function(results) {
+			if (!results || !results.length) {
+				return null;
+			}
+			if (results.length > 1) {
+				throw new Error("Multiple objects with _sourceId in rethinkDB: " + id);
+			}
+			return results[0];
+		});
+	};
 
 	SourceEntity.prototype.commit = function(cb) {
 
@@ -61,18 +114,20 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			//after save because of in between change.
 			var props = _.cloneDeep(self._propsDirty);
 
-			var obj = self.toRethinkObject(props);
+			//if not dirty -> only upload the meta-properties for perf-reasons
+			var obj = self.toRethinkObject(self.isDirty() ? props : {});
 
+			//set _hasUpdatedData to true if dirty. This signals serverside that it should (re)process
+			//SourceEntity
 			if (self.isDirty()) {
 				obj._hasUpdatedData = true;
 			}
 
 			//More info: https://www.rethinkdb.com/api/javascript/insert/
-			r.table("sourceEntities").insert(obj, {
-					conflict: "update",
-					returnChanges: true
+			r.table(SOURCETABLE).insert(obj, {
+					conflict: "update"
 				}).run()
-				.then(function(result) {
+				.then(function() {
 
 					///////////////////////////
 					//FOR NOW: Latest wins. 
@@ -91,7 +146,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					//in meantime _propsDirty may have changed..
 					self._state.isDirty = !_.eq(self._propsDirty, self._props);
 
-					if (!self._state.isDirty) {
+					if (!self.isDirty()) {
 						self._state.recommitCount = 0;
 						return cb();
 					}
@@ -104,7 +159,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					//do a re-commit, until success.
 					self.commit(cb);
 
-				});
+				})
+				.catch(cb); //this passes an error back to the callback
 
 		});
 	};
@@ -115,26 +171,35 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		var now = new Date();
 
 		return _.extend(AbstractEntity._toRethinkObjectRecursive(props || this._props, true), {
-			id: this.getSourceEntityId(),
+
+			//the lazy or is not strictly needed since the created id frmo `getSourceEntityId` will still be the same as this.id (the id
+			//generated the last time and coming from the db). However we might change getSourceEntityId to generate uuid4 or just leave it 
+			//to rethinkDb entirely, so this is future proof.
+			//
+			//getSourceEntityId is BS. Deprecating.
+
+			id: this.id, //this.id may not be set in which case it's set by Rethink // DEPRECATED: this.id|| this.getSourceEntityId(),
 			_type: this._type,
 			_sourceUrl: this.sourceUrl,
-			_sourceId: this.sourceId,
+			_sourceId: this.sourceId, //a reasable sourceId like an url or an explicitly created compound-created id by crawler
 			_sourceType: this.sourceType,
 			_batchId: this.batchId,
-			_created: this._created || now,
+			_created: this.created || now,
 			_modified: now,
-			_hasUpdatedData: !!this._hasUpdatedData //turn undefined in false
+			_hasUpdatedData: !!this.hasUpdatedData //turn undefined in false
 		});
 	};
 
-	SourceEntity.prototype.getSourceEntityId = function() {
-		var arr = [
-			this.sourceType,
-			this._type[0], //the type as specified in the crawler
-			this.sourceId
-		];
-		return new UUID(5, "ns:URL", arr.join("--")).format();
-	};
+	// SourceEntity.prototype.getSourceEntityId = function() {
+	// 	//TBD: Why did we want to have a regeneratable id again? 
+	// 	//We can 
+	// 	var arr = [
+	// 		this.sourceType,
+	// 		this._type[0], //the type as specified in the crawler
+	// 		this.sourceId
+	// 	];
+	// 	return new UUID(5, "ns:URL", arr.join("--")).format();
+	// };
 
 
 	return SourceEntity;

@@ -447,6 +447,7 @@ function processJob(job, done) {
 
 			var doPruneOnSourceId = !(doc && doc._sourceId);
 
+			////////
 			//also prune if we've explicitly didn't process detailpage because we've processed it before.
 			var doPruneOnSkippedDetailPage = doc && doc._sourceUrl &&
 				detailData.prunedDetailUrls.indexOf(doc._sourceUrl) !== -1;
@@ -460,55 +461,62 @@ function processJob(job, done) {
 		})
 		.map(function transformToGenericOutput(doc) {
 
-			var types = _.isArray(crawlConfig.entity.type) ? crawlConfig.entity.type : [crawlConfig.entity.type];
-			if (doc._type) {
-				types = types.concat(_.isArray(doc._type) ? doc._type : [doc._type]);
-			}
-			var domainObject = new SourceEntity({
-				type: types,
-				batchId: data.batchId,
-				sourceType: crawlConfig.source.name,
-				sourceId: doc._sourceId, //required
-				sourceUrl: doc._sourceUrl, //optional
-				detailPageAware: crawlConfig.schema.results.detailPageAware
-			});
+			//fetch item by doc._sourceId
+			return SourceEntity.getBySourceId(doc._sourceId)
+				.then(function(result) {
 
-			delete doc._sourceId;
-			delete doc._sourceUrl;
-			delete doc._type;
+					var types = _.isArray(crawlConfig.entity.type) ? crawlConfig.entity.type : [crawlConfig.entity.type];
+					if (doc._type) {
+						types = types.concat(_.isArray(doc._type) ? doc._type : [doc._type]);
+					}
 
-			//Private vars such as `_htmlDetail` are removed. 
-			//These can be used in transformers etc.
-			_.each(doc, function(v, k) {
-				if (k.indexOf("_") === 0) { //don't remove
-					delete doc[k];
-				}
-			});
+					var domainObject = new SourceEntity({
+						type: types,
+						batchId: data.batchId,
+						sourceType: crawlConfig.source.name,
+						sourceId: doc._sourceId, //required
+						sourceUrl: doc._sourceUrl, //optional
+						detailPageAware: crawlConfig.schema.results.detailPageAware
+					}, result);
 
-			domainObject.set(doc);
+					delete doc._sourceId;
+					delete doc._sourceUrl;
+					delete doc._type;
 
-			//TODO: still to process / save in same way?
-			//We do at least want to save crawlVersion and schemaVersion 
-			// crawl: {
-			// 	batchId: parseInt(data.batchId), //the large batch.
-			// 	jobId: data.jobId, //the specific mini job within this batch. 
-			// 	createdAt: new Date().toISOString(),
-			// 	crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
-			// 	typeVersion: outputMessageSchema.version, //specific version of the target message/type schema. 
-			// }
+					//Private vars such as `_htmlDetail` are removed. 
+					//These can be used in transformers etc.
+					_.each(doc, function(v, k) {
+						if (k.indexOf("_") === 0) { //don't remove
+							delete doc[k];
+						}
+					});
 
-			return domainObject;
+					domainObject.set(doc);
+
+					//TODO: still to process / save in same way?
+					//We do at least want to save crawlVersion and schemaVersion 
+					// crawl: {
+					// 	batchId: parseInt(data.batchId), //the large batch.
+					// 	jobId: data.jobId, //the specific mini job within this batch. 
+					// 	createdAt: new Date().toISOString(),
+					// 	crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
+					// 	typeVersion: outputMessageSchema.version, //specific version of the target message/type schema. 
+					// }
+
+					return domainObject;
+
+				});
 		});
 
-
 	if (!argv.test) {
-		promise = promise.then(function commitSourceEntitys(SourceEntitys) {
+
+		promise = promise.then(function commitSourceEntities(SourceEntities) {
 
 			//Validate and upsert objects. 
 			//We don't fail batch if single item results in a validation error. 
 			//All other errors, still *do* result in a complete batch failure, although at that point some 
 			//objects may have been upserted already. This is not a big deal because idempotence.
-			var promises = _.map(SourceEntitys, function(obj) {
+			var promises = _.map(SourceEntities, function(obj) {
 
 				return new Promise(function(resolve, reject) {
 					obj.commit(function(err) {
