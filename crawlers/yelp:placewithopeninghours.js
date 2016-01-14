@@ -13,8 +13,10 @@ module.exports = {
 		name: "Yelp"
 	},
 	entity: {
-		type: "Place",
-		schema: "source_place", //the actual schema to use
+		type: ["PlaceWithOpeninghours", "LocalBusiness"],
+	},
+	scheduler: {
+		runEveryXSeconds: 24 * 60 * 60 //each day
 	},
 	//General logic/behavior for this crawler 
 	semantics: {
@@ -24,7 +26,7 @@ module.exports = {
 		//- false: never prune
 		//- true: prune if url already processed
 		//- batch: prune if url already processed for this batch
-		pruneEntity: true,
+		pruneEntity: "batch",
 
 		//How to check entity is updated since last processed
 		// - string (templated functions) 
@@ -124,26 +126,28 @@ module.exports = {
 
 						name: ".biz-page-title",
 
-						// descriptionShort  //nope?
-						// description: //nope? //"meta[property='og:description']@content", //NOT CORRECT. No General description it seems
+						geo: {
+							latitude: ".lightbox-map@data-map-state", //can't directly get to latitude but this is done in post-process
+							longitude: ".lightbox-map@data-map-state",
+						},
 
-						latitude: ".lightbox-map@data-map-state",
-						longitude: ".lightbox-map@data-map-state",
+						address: {
+							streetAddress: "[itemprop=streetAddress]",
+							postalCode: "[itemprop=postalCode]",
+							neighborhood: ".neighborhood-str-list",
+							crossStreets: ".cross-streets",
+							addressLocality: "[itemprop=addressLocality]",
+							addressRegion: "[itemprop=addressRegion]",
+							telephone: "[itemprop=telephone]",
+						},
 
-						streetAddress: "[itemprop=streetAddress]",
-						// streetAddressSup: nope
 
-						zipCode: "[itemprop=postalCode]",
-						neighborhood: ".neighborhood-str-list",
-						crossStreets: ".cross-streets",
-						city: "[itemprop=addressLocality]",
-						region: "[itemprop=addressRegion]",
-						// country: nope
+						sameAs: ".biz-website > a@href", //weird there's no other place for website?
 
-						tel: "[itemprop=telephone]",
-						//fax: nope
-						//email: nope
-						website: ".biz-website > a@href",
+						aggregateRating: {
+							ratingValue: "[itemprop=ratingValue]@content",
+							reviewCount: "[itemprop=reviewCount]",
+						},
 
 						//Works, but bit costly
 						//TODO: in laer crawl possibly. Probably should 
@@ -154,22 +158,21 @@ module.exports = {
 						// 	// cc
 						// }]),
 
-						openinghours: x(".hours-table tr", [{
+
+						_openinghours: x(".hours-table tr", [{
 							dayOfWeek: "> th",
 							range: "> td",
 						}]),
 
-						pricerange: ".price-range",
+						priceRange: ".price-description",
 
-						//A category is nothing but a top-tier tag. That's the same system we wanted to opt-into.
-						//This means there may be multiple top categories per entity
-						categories: x(".mapbox-container > [itemtype='http://data-vocabulary.org/Breadcrumb'] > a > span", ["@text"]),
+						//contains _type (e.g.: Restaurants) as well as genres / cuisines, etc.
+						//let's post process this
+						_categories: x(".mapbox-container > [itemtype='http://data-vocabulary.org/Breadcrumb'] > a > span", ["@text"]),
 
-						tags: x(".category-str-list", ["a"]),
-						reviews_nr: "[itemprop=reviewCount]",
-						reviews_avg: "[itemprop=ratingValue]@content",
+						_tags: x(".category-str-list", ["a"]),
 
-						facts: x(".short-def-list dl", [{
+						_facts: x(".short-def-list dl", [{
 							name: "> dt",
 							val: "> dd"
 						}]),
@@ -185,7 +188,7 @@ module.exports = {
 			mapping: {
 
 				//fetch based on urlencoded json-stringified data-attrib
-				"_detail.latitude": [
+				"_detail.geo.latitude": [
 					function(latitude, obj) {
 						try {
 							return JSON.parse(decodeURIComponent(latitude)).center.latitude;
@@ -197,7 +200,7 @@ module.exports = {
 				],
 
 				//fetch based on urlencoded json-stringified data-attrib
-				"_detail.longitude": [
+				"_detail.geo.longitude": [
 					function(longitude, obj) {
 						try {
 							return JSON.parse(decodeURIComponent(longitude)).center.longitude;
@@ -209,7 +212,7 @@ module.exports = {
 				],
 
 				//parse the url from a redirect
-				"_detail.website": function(url, obj) {
+				"_detail.sameAs": function(url, obj) {
 					if (!url) {
 						return undefined;
 					}
@@ -218,7 +221,7 @@ module.exports = {
 					return urlObj.query.url;
 				},
 
-				//from thumb to complete
+				//from thumb to complete images
 				// "detail.images": function(obj) {
 				// 	return _.map(obj.detail.images, function(v) {
 				// 		var url = v.url.substring(0, v.url.lastIndexOf("/")) + "/o.jpg";
@@ -230,11 +233,11 @@ module.exports = {
 				// },
 
 				//make categories unique
-				"_detail.categories": function(categories, obj) {
+				"_detail._categories": function(categories, obj) {
 					return _.uniq(categories);
 				},
-				"_detail.reviews_nr": "int",
-				"_detail.reviews_avg": "float"
+
+				"_detail.aggregateRating.reviewCount": "int"
 			},
 		}
 	}

@@ -213,6 +213,9 @@ module.exports = function(generatedSchemas) {
 		}
 
 		switch (dt) {
+			case "Object":
+				validateObj.type = "object";
+				break;
 			case "Boolean":
 				validateObj.type = "boolean";
 				break;
