@@ -26,6 +26,8 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 				//checks, which we can because they don't matter for this particular code-path.
 				obj._isBogusType = true;
 				return fieldtype.ranges[0];
+			case "implicitDataType":
+				return fieldtype.ambiguitySolvedBy.sharedParentDataType;
 			default:
 				throw new Error("Ambiguous solver not implemented: " + fieldtype.ambiguitySolvedBy.type);
 		}

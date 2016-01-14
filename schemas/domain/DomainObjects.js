@@ -483,7 +483,7 @@ module.exports = function(generatedSchemas, r) {
 			// //		sourceId: "some source id"
 			// //	}
 
-			//TODO: soundness check #107 so we know (if first el = Type <=> all type of range is Type)
+			//Due to soundness check #107 we know that first el = Type <=> all type of range is Type
 			var rangeType = generatedSchemas.types[fieldtype.ranges[0]];
 			if (kind === domainUtils.enums.kind.SOURCE && rangeType && rangeType.isEntity) {
 				//we've got an entity reference which is to be expanded to a _ref-object.
@@ -526,6 +526,16 @@ module.exports = function(generatedSchemas, r) {
 	}
 
 	function _transformSingleObject(ancestors, k, kind, val) {
+
+		var fieldtype = generatedSchemas.properties[k]; //guaranteed to exist
+
+		//special: datatype 'Object' should not be transformed further. This datatype allows any complex object.         
+		if (fieldtype.ranges.indexOf("Object") !== -1 && _.isObject(val)) {
+			return {
+				_value: val
+			};
+		}
+
 		if (!_.isObject(val)) {
 			val = {
 				_value: val
@@ -644,8 +654,15 @@ module.exports = function(generatedSchemas, r) {
 
 			//NOTE: at this point _type is guaranteed NOT an array anymore. That was only at toplevel
 			function transformSingleItem(v) {
-				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
+				//if first is range is datatype -> all in range are datatype. As per #107
+				//If datatype -> just grab _value
+				//Needed for Datatype: Object
+				if (generatedSchemas.datatypes[generatedSchemas.properties[k].ranges[0]]) {
+					return v._value;
+				}
+
+				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 				if (propType.isValueObject) {
 					v = _toDataObjectRecursive(v); //recurse non-datatypes
 				} else if (v._ref) {
@@ -653,6 +670,7 @@ module.exports = function(generatedSchemas, r) {
 				} else {
 					v = v._value; //simplify all datatypes and object-references to their value
 				}
+
 				return v;
 			}
 
@@ -677,8 +695,15 @@ module.exports = function(generatedSchemas, r) {
 
 			//NOTE: at this point _type is guaranteed NOT an array anymore. That was only at toplevel
 			function transformSingleItem(v) {
-				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
+				//if first is range is datatype -> all in range are datatype. As per #107
+				//If datatype -> just grab _value
+				//Needed for Datatype: Object
+				if (generatedSchemas.datatypes[generatedSchemas.properties[k].ranges[0]]) {
+					return v._value;
+				}
+
+				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 				if (propType.isValueObject) {
 					v = _toRethinkObjectRecursive(v); //recurse non-datatypes
 				} else if (v._ref) {
@@ -712,6 +737,13 @@ module.exports = function(generatedSchemas, r) {
 
 
 			function transformSingleItem(v) {
+
+				//if first is range is datatype -> all in range are datatype. As per #107
+				//If datatype -> just grab _value
+				//Needed for Datatype: Object
+				if (generatedSchemas.datatypes[generatedSchemas.properties[k].ranges[0]]) {
+					return v._value;
+				}
 
 				//NOTE: at this point _type is guaranteed NOT an array anymore. That was only at toplevel
 				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
