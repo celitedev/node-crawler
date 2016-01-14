@@ -36,7 +36,7 @@ module.exports = function(generatedSchemas, r) {
 		  ]
 		}
 	 */
-	function AbstractEntity(state) {
+	function AbstractEntity(state, bootstrapObj) {
 
 		if (!this._kind) {
 			throw new Error("AbstractEntity should be called by subtype");
@@ -80,7 +80,7 @@ module.exports = function(generatedSchemas, r) {
 		this._type = typeName;
 
 		this._propsDirty = {
-			_type: typeName
+			_type: this._type
 		};
 
 		this._state = {
@@ -89,6 +89,20 @@ module.exports = function(generatedSchemas, r) {
 			// isDirty: false //signals if props have changed since last call to validate
 			recommitCount: 0
 		};
+
+		//load object
+		if (bootstrapObj) {
+			//add all properties excluding those starting with '_'
+			//also skip 'id'
+			this.set(_.reduce(bootstrapObj, function(agg, v, k) {
+				if (k.indexOf("_") !== 0 && k !== "id") {
+					agg[k] = v;
+				}
+				return agg;
+			}, {}), true, true);
+		}
+
+		this.isInitialized = true;
 	}
 
 
@@ -108,7 +122,12 @@ module.exports = function(generatedSchemas, r) {
 		return !!this._state.isDirty;
 	};
 
-	AbstractEntity.prototype.set = function(objMutable, doOverwrite) {
+	AbstractEntity.prototype.set = function(objMutable, doOverwrite, isFromDB) {
+
+
+		if (isFromDB && this.isInitialized) {
+			throw new Error("AbstractEntity.set(toPropsDirectly) may only be used on init");
+		}
 		if (!objMutable) {
 			throw new Error("objMutable should be provided to create domain object");
 		}
@@ -126,20 +145,29 @@ module.exports = function(generatedSchemas, r) {
 			}
 		);
 
-		var combined = _transformProperties(doOverwrite ? delta : _.extend({}, this._propsDirty, delta), true, [], this._kind);
+		var combined = _transformProperties(doOverwrite ? delta : _.extend({}, this._propsDirty, delta), true, [], this._kind, isFromDB);
 
-		//if combined isn't the same as _propsDirty -> reset isValidated & isValid 
-		if (!_.eq(combined, this._propsDirty)) {
-			this._state.isValidated = false;
-			this._state.isValid = false;
+		//if loaded from DB -> directly load into into _props
+		if (isFromDB) {
+			//only used on init
+			this._props = combined;
+
+		} else {
+
+			//if combined isn't the same as _propsDirty -> reset isValidated & isValid 
+			if (!_.eq(combined, this._propsDirty)) {
+				this._state.isValidated = false;
+				this._state.isValid = false;
+			}
+
+			//TECH: propsDirty becomes a NEW object since `combined` is new.
+			//This results in being able to safely set props <- propsDirty on commit
+			this._propsDirty = combined;
+
+			//if _propsDirty isn't the same as _props -> set isDirty = true, otherwise set to false
+			this._state.isDirty = !_.eq(this._propsDirty, this._props);
 		}
 
-		//TECH: propsDirty becomes a NEW object since `combined` is new.
-		//This results in being able to safely set props <- propsDirty on commit
-		this._propsDirty = combined;
-
-		//if _propsDirty isn't the same as _props -> set isDirty = true, otherwise set to false
-		this._state.isDirty = !_.eq(this._propsDirty, this._props);
 	};
 
 
@@ -229,7 +257,7 @@ module.exports = function(generatedSchemas, r) {
 	//1. transform obj so all values are expanded into objects. 
 	//E.g.: "some value" is expanded to {"_value": "some value"}
 	//2. 
-	function _transformProperties(obj, isTopLevel, ancestors, kind) {
+	function _transformProperties(obj, isTopLevel, ancestors, kind, isFromDB) {
 
 		if (!_.isObject(obj)) {
 			throw new Error("SANITY CHECK: `obj` passed to _transformProperties should be an object");
@@ -335,6 +363,15 @@ module.exports = function(generatedSchemas, r) {
 			//We don't want this made into an array unless that's already the case.
 			if (fieldtype.isMulti && k !== "val") {
 				v = _.isArray(v) ? v : [v];
+			} else if (!fieldtype.isMulti && isFromDB) {
+
+				//loading from DB which has all values multivalued. 
+				//Therefore, let's go back to proper single/multivalued-ness on every field
+				if (_.isArray(v) && v.length > 1) {
+					throw new Error("array with multiple items, for isMulti=false. Probably schema evolution error which we're not attempting to handle yet.:" +
+						k + " - " + JSON.stringify(v, null, 2));
+				}
+				v = _.isArray(v) ? (v.length ? v[0] : undefined) : v;
 			}
 
 			//transform input
@@ -361,7 +398,7 @@ module.exports = function(generatedSchemas, r) {
 				v = !_.isArray(v) ? expandToRef(v) : _.map(v, expandToRef);
 			}
 
-			obj[k] = !_.isArray(v) ? _transformSingleObject(ancestors, k, kind, v) : _.map(v, _.partial(_transformSingleObject, ancestors, k, kind));
+			obj[k] = !_.isArray(v) ? _transformSingleObject(ancestors, k, kind, isFromDB, v) : _.map(v, _.partial(_transformSingleObject, ancestors, k, kind, isFromDB));
 
 		}); //end each
 
@@ -396,7 +433,7 @@ module.exports = function(generatedSchemas, r) {
 		return obj;
 	}
 
-	function _transformSingleObject(ancestors, k, kind, val) {
+	function _transformSingleObject(ancestors, k, kind, isFromDB, val) {
 
 		var fieldtype = generatedSchemas.properties[k]; //guaranteed to exist
 
@@ -412,7 +449,7 @@ module.exports = function(generatedSchemas, r) {
 				_value: val
 			};
 		}
-		return _transformProperties(val, undefined, ancestors.concat([k]), kind);
+		return _transformProperties(val, undefined, ancestors.concat([k]), kind, isFromDB);
 	}
 
 	//When shortcut _ref given expand to _ref object. 
