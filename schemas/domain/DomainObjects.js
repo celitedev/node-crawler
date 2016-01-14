@@ -193,11 +193,6 @@ module.exports = function(generatedSchemas, r) {
 
 			var props = _.cloneDeep(self._propsDirty); //freeze propsDirty to persist
 
-			//NOTE: toDataObject should NOT be passed to Rethink. 
-			//Instead this should be passed to Elasticsearch by rethink2ES-feeder 
-			// console.log(JSON.stringify(self.toDataObject(props), null, 2));
-
-
 			var obj = self.toRethinkObject(props);
 
 			//More info: https://www.rethinkdb.com/api/javascript/insert/
@@ -566,18 +561,47 @@ module.exports = function(generatedSchemas, r) {
 	//	}
 	//}
 	function expandToRef(v) {
+		var key;
 		if (!_.isObject(v)) {
 
+			//transform if we've set item directly 
 			var objExpanded = {
 				_ref: {}
 			};
 
-			var key = urlRegex({
+			key = urlRegex({
 				exact: true
-			}).test(v) ? "sourceUrl" : "sourceId";
+			}).test(v) ? "_sourceUrl" : "_sourceId";
 
 			objExpanded._ref[key] = v;
 			v = objExpanded;
+		} else {
+
+			if (v._ref) {
+
+				if (!_.isObject(v._ref)) {
+
+					//transform if we've set item to _ref
+					var val = v._ref;
+
+					key = urlRegex({
+						exact: true
+					}).test(val) ? "_sourceUrl" : "_sourceId";
+
+					v._ref = {};
+					v._ref[key] = val;
+				}
+				//we sometimes mistakingly use _sourceId and _sourceUrl in _ref
+				//Let's transform them to sourceId and sourceUrl resp.
+				if (v._ref.sourceUrl) {
+					v._ref._sourceUrl = v._ref.sourceUrl;
+					delete v._ref.sourceUrl;
+				}
+				if (v._ref.sourceId) {
+					v._ref._sourceId = v._ref.sourceId;
+					delete v._ref.sourceId;
+				}
+			}
 		}
 		return v;
 	}

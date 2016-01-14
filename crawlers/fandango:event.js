@@ -96,15 +96,16 @@ module.exports = {
 			seedUrls: function() {
 
 
-				//fetch all 7 days, each and every day
+				//fetch all 7 days, each and every time crawler is run
 				var dates = [
+					moment().format('L'),
 					moment().add(1, 'days').format('L'),
-					// moment().add(2, 'days').format('L'),
-					// moment().add(3, 'days').format('L'),
-					// moment().add(4, 'days').format('L'),
-					// moment().add(5, 'days').format('L'),
-					// moment().add(6, 'days').format('L'),
-					// moment().add(7, 'days').format('L')
+					moment().add(2, 'days').format('L'),
+					moment().add(3, 'days').format('L'),
+					moment().add(4, 'days').format('L'),
+					moment().add(5, 'days').format('L'),
+					moment().add(6, 'days').format('L'),
+					moment().add(7, 'days').format('L')
 				];
 
 				var districts = [
@@ -138,38 +139,25 @@ module.exports = {
 
 				return {
 
+					locationName: ".showtimes-theater-title",
+
 					//movietheater
-					placeRefs: x(".showtimes-theater-title", [{
-						id: "@href",
-						url: "@href",
-						name: "@text"
-					}]),
+					location: ".showtimes-theater-title@href", //automatic expansion to _ref
 
 					//multiple movies per movietheater
-					movieContainer: x(".showtimes-movie-container", [{
+					movie: x(".showtimes-movie-container", [{
 
-						movieShowingContainer: x(".showtimes-times > a", [{
-							sourceId: "time@datetime",
-							sourceUrl: "@href",
-							name: "time@datetime",
-							//descriptionShort: nope
-							// description: nope
-							dtstart: "time@datetime",
-							//dtend: nope
-							//duration: nope
-							//rdate: nope
-							//rrule: nope
+						screeningEvent: x(".showtimes-times > a", [{
+							_sourceUrl: "@href",
+							startDate: "time@datetime",
 						}]),
 
-						//moie
-						objectRefs: x(".showtimes-movie-title", [{
-							id: "@href",
-							url: "@href",
-							name: "@text"
-						}])
-					}]),
+						movieName: ".showtimes-movie-title",
 
-					//performerRefs: nope
+						//movie
+						workPresented: ".showtimes-movie-title@href", //automatic expansion to _ref
+
+					}]),
 				};
 			},
 
@@ -182,30 +170,26 @@ module.exports = {
 
 				var showings = [];
 
-				_.each(doc.movieContainer, function(movieContainer) {
-					_.each(movieContainer.movieShowingContainer, function(movieShowingContainer) {
+				_.each(doc.movie, function(movie) {
+					_.each(movie.screeningEvent, function(screeningEvent) {
 
-						//Create compound name/id
-						//
-						//TODO: we should probably adhere to some schema for constructing things such as 'movieshowing names' 
-						//in a uniform wau. 
-						//
-						var time = movieShowingContainer.name,
-							placeName = doc.placeRefs[0].name,
-							movieName = movieContainer.objectRefs[0].name;
+						//Id is required so make it up. 
+						//NOTE: we can't use _sourceId = _sourceUrl, since _sourceUrl doesn't
+						//always exist.
+						var time = screeningEvent.startDate,
+							locationName = doc.locationName,
+							movieName = movie.movieName;
 
-						var id = (placeName + " -- " + movieName + " -- " + time);
-						name = id;
+						var id = (locationName + " -- " + movieName + " -- " + time);
 
-						// if(movieShowingContainer.sourceUrl.lastIndexOf("#")
-
-						showings.push(_.extend(movieShowingContainer, {
-							sourceId: id, //should have an id. Otherwise it's auto-pruned
-							name: name,
-							idCompound: true,
-							objectRefs: movieContainer.objectRefs,
-							placeRefs: doc.placeRefs
-						}));
+						showings.push({
+							_sourceUrl: screeningEvent._sourceUrl, //doesn't always exist
+							_sourceId: id,
+							name: id,
+							startDate: screeningEvent.startDate,
+							workPresented: movie.workPresented,
+							location: doc.location
+						});
 					});
 				});
 
@@ -213,8 +197,9 @@ module.exports = {
 			},
 
 			postMapping: {
-				"sourceUrl": function(sourceUrl) {
+				"_sourceUrl": function(sourceUrl) {
 					//only keep urls if they actually point somewhere
+					//I.e.: outdated events don't have real urls
 					if (sourceUrl.lastIndexOf("#") === sourceUrl.length - 1) {
 						return undefined;
 					}
