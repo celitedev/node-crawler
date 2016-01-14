@@ -131,9 +131,6 @@ module.exports = {
 				}
 			}]
 		},
-		headers: { //Default Headers for all requests
-			"Accept-Encoding": 'gzip, deflate'
-		},
 		results: {
 			//WEIRD: selector: ".search-results > li[itemscope]" produces 9 instead of 10 results
 			//We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
