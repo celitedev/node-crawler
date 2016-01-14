@@ -376,6 +376,15 @@ function processJob(job, done) {
 		.then(function returnResultsAttrib(obj) {
 			return obj.results;
 		})
+		.map(function optionalShow(result) {
+			if (argv.test) {
+
+				var out = _.cloneDeep(result);
+				delete out._htmlDetail;
+				console.log("BEFORE MAPPING COMPOUND DOC", JSON.stringify(out, null, 2));
+			}
+			return result;
+		})
 		.then(doFieldMappings("mapping", crawlConfig))
 		.then(function callCustomReducer(results) {
 			if (!crawlConfig.schema.results.reducer) {
@@ -418,7 +427,7 @@ function processJob(job, done) {
 		});
 
 	if (argv.test) {
-		promise = promise.map(function showBeforeMapping(obj) {
+		promise = promise.map(function showAfterCompoundDoc(obj) {
 
 			var out = _.cloneDeep(obj);
 			delete out._htmlDetail;

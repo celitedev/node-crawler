@@ -634,7 +634,7 @@ module.exports = {
 
 	//A work performed in some event, for example a play performed in a TheaterEvent.
 	workPerformed: {
-		isMulti: true
+		aliasOf: "workFeatured"
 	},
 
 
@@ -651,7 +651,9 @@ module.exports = {
 		ranges: ["Text"]
 	},
 	videoFormat: {},
-	workPresented: {},
+	workPresented: {
+		aliasOf: "workFeatured"
+	},
 
 
 	///////////////////////////////////
