@@ -13,5 +13,5 @@ module.exports = {
 		keywords: false, //from creativeWOrk
 		license: false, //from creativeWOrk
 	},
-	removeProperties: ["sameAs", "alternateName", "description"]
+	removeProperties: ["sameAs", "alternateName", "description", "fact", "tag"]
 };

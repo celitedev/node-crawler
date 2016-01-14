@@ -7,5 +7,5 @@ module.exports = {
 		ratingValue: false,
 		// worstRating: {} //curious: this seems type-level attribute?
 	},
-	removeProperties: ["sameAs", "alternateName", "url", "description", "name"]
+	removeProperties: ["sameAs", "alternateName", "url", "description", "name", "fact", "tag"]
 };

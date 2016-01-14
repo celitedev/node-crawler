@@ -159,7 +159,7 @@ module.exports = {
 						// }]),
 
 
-						_openinghours: x(".hours-table tr", [{
+						_openingHours: x(".hours-table tr", [{
 							dayOfWeek: "> th",
 							range: "> td",
 						}]),
@@ -172,7 +172,7 @@ module.exports = {
 
 						_tags: x(".category-str-list", ["a"]),
 
-						_facts: x(".short-def-list dl", [{
+						fact: x(".short-def-list dl", [{
 							name: "> dt",
 							val: "> dd"
 						}]),
@@ -232,13 +232,54 @@ module.exports = {
 				// 	});
 				// },
 
-				//make categories unique
-				"_detail._categories": function(categories, obj) {
-					return _.uniq(categories);
-				},
-
 				"_detail.aggregateRating.reviewCount": "int"
 			},
+
+			reducer: function(obj) {
+
+				//combine yelp tags and yelp categories.
+				var tags = obj._detail._tags || [];
+				tags = _.uniq(tags.concat(obj._detail._categories || []));
+
+				//It's important to get the type straight now, to allow added properties. 
+				//The rest (tags, facts) are stored to those catch-all properties. 
+				//Later on we can translate these tags and facts to more semantic-rich structures.
+				var yelpTypes = {
+					"Restaurants": "Restaurant",
+					"Pubs": "BarOrPub",
+					"Bars": "BarOrPub"
+				};
+
+				//store Schema.org types as inferred from Yelp
+				obj._type = _.compact(_.map(yelpTypes, function(v, k) {
+					if (tags.indexOf(k) !== -1) {
+						return v;
+					}
+				}));
+				if (!obj._type.length) {
+					delete obj._type;
+				}
+
+				//store remainder of intersect(categories, tags) -> tag
+				obj._detail._tags = _.difference(tags, _.keys(yelpTypes));
+				if (!obj._detail._tags.length) {
+					delete obj._detail._tags;
+				}
+
+				//add _openingHours to `fact`
+				obj._detail.fact = obj._detail.fact || [];
+				if (obj._detail._openingHours) {
+					obj._detail.fact.push({
+						name: "openingHours",
+						val: obj._detail._openingHours
+					});
+				}
+				if (!obj._detail.fact.length) {
+					delete obj._detail.fact;
+				}
+
+				return obj;
+			}
 		}
 	}
 };

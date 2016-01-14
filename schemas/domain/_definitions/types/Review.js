@@ -7,5 +7,5 @@ module.exports = {
 		reviewBody: true,
 		reviewRating: false,
 	},
-	removeProperties: ["sameAs", "image", "alternateName", "description"]
+	removeProperties: ["sameAs", "image", "alternateName", "description", "fact", "tag"]
 };

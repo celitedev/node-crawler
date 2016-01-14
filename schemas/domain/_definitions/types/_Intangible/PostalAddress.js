@@ -11,6 +11,6 @@ module.exports = {
 		streetAddress: true,
 	},
 	removeProperties: [
-		"name", "url", "description", "alternateName", "sameAs"
+		"name", "url", "description", "alternateName", "sameAs", "fact", "tag"
 	]
 };

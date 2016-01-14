@@ -5,5 +5,5 @@ module.exports = {
 	//http://webmasters.stackexchange.com/questions/50358/how-to-set-itemprop-duration
 	//This probably means we want to just have a string value for each property referencing
 	//Duration
-	removeProperties: ["bitrate", "duration"]
+	removeProperties: ["bitrate", "duration", "fact", "tag"]
 };
