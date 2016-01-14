@@ -65,6 +65,22 @@ module.exports = function(configObj) {
 
 	//test-covered
 	(function enrichDatatypes() {
+
+		schemaOrgDef.datatypes.Object = {
+			"ancestors": [
+				"DataType"
+			],
+			"comment": "Object. Any JS-object",
+			"comment_plain": "Object. Any JS-object",
+			"id": "Object",
+			"label": "Object",
+			"properties": [],
+			"specific_properties": [],
+			"subtypes": [],
+			"supertypes": [],
+			"url": "http://schema.org/Object"
+		};
+
 		_.each(schemaOrgDef.datatypes, function(t) {
 			t.isDataType = true;
 		});
@@ -310,7 +326,12 @@ module.exports = function(configObj) {
 										ambiguousStrategyWrong.push(p.id);
 									}
 									break;
+								case "implicitDataType":
 
+									p.ambiguitySolvedBy.storage = "sharedField"; //default
+									checkAmbiguousRangeStorageStrategy();
+
+									break;
 								default:
 									throw new Error("ambiguitySolvedBy.type not supported. (propertyname, type) " + p.id + "," + p.ambiguitySolvedBy.type);
 							}
@@ -342,8 +363,11 @@ module.exports = function(configObj) {
 
 							//if intersection.length > 0 -> there's a shared datatype left
 							if (intersection.length) {
+								//get the closest shared root.
 								p.ambiguitySolvedBy.sharedParentDataType = intersection[intersection.length - 1];
 								p.isAmbiguitySolved = true;
+
+								console.log("AAAAAAAAAAAAA", p.id, p.ambiguitySolvedBy.sharedParentDataType);
 							} else {
 								ambiguousStrategyWrong.push(p.id);
 							}
