@@ -164,6 +164,7 @@ module.exports = {
 						description: "[itemprop=description]",
 						location: x("[itemprop=location]", ["> a@href"]),
 						performer: x("[itemprop=performer]", ["> a@href"]),
+						startDate: "[itemprop=startDate]@content",
 					}, undefined, detailObj)
 				};
 			},
