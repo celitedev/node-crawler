@@ -462,7 +462,9 @@ module.exports = function(generatedSchemas, r) {
 			var fieldtype = generatedSchemas.properties[k]; //guaranteed to exist
 
 			//create array if fieldtype isMulti
-			if (fieldtype.isMulti) {
+			//make explicit exception for 'val' property which is part of 'fact'
+			//We don't want this made into an array unless that's already the case.
+			if (fieldtype.isMulti && k !== "val") {
 				v = _.isArray(v) ? v : [v];
 			}
 
