@@ -64,7 +64,7 @@ module.exports = {
 		//
 		//#6: distribute concurrency per <source,type> or <source>
 		//for more controlled throttling.
-		concurrentJobs: 1,
+		concurrentJobs: 2,
 		retries: 5,
 
 		// fail job if not complete in 100 seconds. This is used because a consumer/box can fail/crash
@@ -91,16 +91,8 @@ module.exports = {
 		type: "masterDetail", //signifies overall type of scroll. For now: only 'masterDetail'
 		requiresJS: false, //If true, use PhantomJS
 		seed: {
-			disable: true, //for testing. Disabled nextUrl() call
+			disable: false, //for testing. Disabled nextUrl() call
 
-			//may be a string an array or string or a function producing any of those
-			// seedUrls: function() {
-			// 	var urls = [];
-			// 	for (var i = 1; i < 20; i++) {
-			// 		urls.push("http://newyorkcity.eventful.com/venues?page_number=" + i);
-			// 	}
-			// 	return urls;
-			// },
 			seedUrls: "http://www.yelp.com/search?find_loc=New+York,+NY,+USA&cflt=restaurants&start=0",
 
 			nextUrlFN: function(el) {
@@ -261,9 +253,10 @@ module.exports = {
 				}
 
 				//store remainder of intersect(categories, tags) -> tag
-				obj._detail._tags = _.difference(tags, _.keys(yelpTypes));
-				if (!obj._detail._tags.length) {
-					delete obj._detail._tags;
+				obj._detail.tag = _.difference(tags, _.keys(yelpTypes));
+
+				if (!obj._detail.tag.length) {
+					delete obj._detail.tag;
 				}
 
 				//add _openingHours to `fact`
