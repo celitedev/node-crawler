@@ -26,7 +26,7 @@
     "jsonld-request": "^0.1.0",
     "kue": "^0.10.2",
     "lodash": "^3.10.1",
-    "moment": "^2.10.6",
+    "moment": "^2.11.1",
     "moving-average": "0.0.5",
     "node-uuid": "^1.4.3",
     "pure-uuid": "^1.1.0",
