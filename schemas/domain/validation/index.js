@@ -220,10 +220,13 @@ module.exports = function(generatedSchemas) {
 				validateObj.type = "boolean";
 				break;
 			case "Date":
-				validateObj.type = "string"; //TODO
+				//NOTE: schema.org difference between Date and DateTime is not clear
+				_addCannedValidator(validateRulesArr, "isDate");
+				validateObj.type = "string";
 				break;
 			case "DateTime":
-				validateObj.type = "string"; //TODO
+				_addCannedValidator(validateRulesArr, "isDate");
+				validateObj.type = "string";
 				break;
 			case "Number":
 				validateObj.type = "number";
@@ -238,7 +241,8 @@ module.exports = function(generatedSchemas) {
 				validateObj.type = "string";
 				break;
 			case "Time":
-				validateObj.type = "string"; //TODO
+				throw new Error("TODO: _generateDataTypeValidator.Time not validated yet");
+				validateObj.type = "string";
 				break;
 			case "URL":
 				validateObj.type = "string";
