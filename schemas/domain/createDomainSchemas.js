@@ -366,8 +366,6 @@ module.exports = function(configObj) {
 								//get the closest shared root.
 								p.ambiguitySolvedBy.sharedParentDataType = intersection[intersection.length - 1];
 								p.isAmbiguitySolved = true;
-
-								console.log("AAAAAAAAAAAAA", p.id, p.ambiguitySolvedBy.sharedParentDataType);
 							} else {
 								ambiguousStrategyWrong.push(p.id);
 							}
