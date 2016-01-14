@@ -20,20 +20,13 @@ module.exports = {
 	//General logic/behavior for this crawler 
 	semantics: {
 
-		//prune LIST URL if already processed 
-		//options: 
-		//- false: never prune
-		//- true: prune if url already processed
-		//- batch: prune if url already processed for this batch
-		pruneList: "batch",
-
 		//prune ENTITY URL if already processed 
 		//options: 
 		//- false: never prune
 		//- true: prune if url already processed
 		//- batch: prune if url already processed for this batch
 
-		pruneEntity: true,
+		pruneEntity: "batch",
 
 		//
 		//Example of variable pruneEntity which re-processes 
@@ -151,9 +144,6 @@ module.exports = {
 				}
 			}]
 		},
-		headers: { //Default Headers for all requests
-			"Accept-Encoding": 'gzip, deflate'
-		},
 		results: {
 			//WEIRD: selector: ".search-results > li[itemscope]" produces 9 instead of 10 results
 			//We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
@@ -172,12 +162,8 @@ module.exports = {
 					_detail: x("a.tn-frame@href", {
 						name: "[itemprop=name] > span",
 						description: "[itemprop=description]",
-						location: x("[itemprop=location]", [{
-							_ref: "> a@href"
-						}]),
-						performer: x("[itemprop=performer]", [{
-							_ref: "> a@href"
-						}]),
+						location: x("[itemprop=location]", ["> a@href"]),
+						performer: x("[itemprop=performer]", ["> a@href"]),
 					}, undefined, detailObj)
 				};
 			},
