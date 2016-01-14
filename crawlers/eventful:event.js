@@ -46,7 +46,7 @@ module.exports = {
 		//template options: 
 		//- hash: hash of detail contents
 		//- headers: based on cache headers
-		//- db: check against saved SourceObject
+		//- db: check against saved SourceEntity
 		dirtyCheckEntity: "hash",
 
 

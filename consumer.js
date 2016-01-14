@@ -35,9 +35,9 @@ var config = require("./config");
 var redisClient = redis.createClient(config.redis);
 var r = require('rethinkdbdash')(config.rethinkdb);
 
-var domainObjects = require("./schemas/domain/DomainObjects")(generatedSchemas, r);
-var CanonicalObject = domainObjects.CanonicalObject;
-var SourceObject = domainObjects.SourceObject;
+var entities = require("./schemas/domain/entities")(generatedSchemas, r);
+var CanonicalEntity = entities.CanonicalEntity;
+var SourceEntity = entities.SourceEntity;
 
 var domainUtils = require("./schemas/domain/utils");
 
@@ -464,7 +464,7 @@ function processJob(job, done) {
 			if (doc._type) {
 				types = types.concat(_.isArray(doc._type) ? doc._type : [doc._type]);
 			}
-			var domainObject = new SourceObject({
+			var domainObject = new SourceEntity({
 				type: types,
 				batchId: data.batchId,
 				sourceType: crawlConfig.source.name,
@@ -502,13 +502,13 @@ function processJob(job, done) {
 
 
 	if (!argv.test) {
-		promise = promise.then(function commitSourceObjects(sourceObjects) {
+		promise = promise.then(function commitSourceEntitys(SourceEntitys) {
 
 			//Validate and upsert objects. 
 			//We don't fail batch if single item results in a validation error. 
 			//All other errors, still *do* result in a complete batch failure, although at that point some 
 			//objects may have been upserted already. This is not a big deal because idempotence.
-			var promises = _.map(sourceObjects, function(obj) {
+			var promises = _.map(SourceEntitys, function(obj) {
 
 				return new Promise(function(resolve, reject) {
 					obj.commit(function(err) {

@@ -10,14 +10,14 @@ var generatedSchemas = require("../../domain/createDomainSchemas.js")({
 	schemaOrgDef: require("../../domain/_definitions/schemaOrgDef")
 });
 
-var domainObjects = require("../../domain/DomainObjects")(generatedSchemas);
-var CanonicalObject = domainObjects.CanonicalObject;
-var SourceObject = domainObjects.SourceObject;
+var entities = require("../../domain/entities")(generatedSchemas);
+var CanonicalEntity = entities.CanonicalEntity;
+var SourceEntity = entities.SourceEntity;
 
 var domainUtils = require("../../domain/utils");
 
 
-// var domainObject = new SourceObject({
+// var domainObject = new SourceEntity({
 // 	type: ["CreativeWork"],
 // 	sourceType: "eventful",
 // 	sourceUrl: "url of entity as known at source", //required
@@ -33,7 +33,7 @@ var domainUtils = require("../../domain/utils");
 
 
 
-var domainObject = new SourceObject({
+var domainObject = new SourceEntity({
 	type: ["Restaurant", "BarOrPub"],
 	sourceType: "eventful",
 	sourceUrl: "url of entity as known at source", //required

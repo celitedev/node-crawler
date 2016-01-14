@@ -367,7 +367,7 @@ module.exports = function(generatedSchemas) {
 		createSchema: function() {
 			return new Schema(passInTypeClosure(domainUtils.enums.kind.CANONICAL, null));
 		},
-		createSchemaSourceObject: function() {
+		createSchemaSourceEntity: function() {
 			return new Schema(passInTypeClosure(domainUtils.enums.kind.SOURCE, null));
 		}
 	};
