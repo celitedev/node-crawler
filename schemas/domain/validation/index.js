@@ -4,6 +4,7 @@ var validator = require("validator");
 var hogan = require("hogan");
 var Schema = require('async-validate');
 var domainUtils = require("../utils");
+var moment = require('moment');
 
 Schema.plugin([
 	require('async-validate/plugin/object'),
@@ -23,6 +24,13 @@ var customValidators = {
 			err.msg = "_ref object is empty";
 		}
 		return sizeOk;
+	},
+	isDate: function(str, err) {
+		var isValid = moment(str).isValid();
+		if (!isValid) {
+			err.msg = "according to momentJS, string is not a properly formatted iso-86-1 date";
+		}
+		return isValid;
 	}
 };
 
