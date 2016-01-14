@@ -328,6 +328,7 @@ module.exports = function(configObj) {
 									break;
 								case "implicitDataType":
 
+									//all datatypes allowed.
 									p.ambiguitySolvedBy.storage = "sharedField"; //default
 									checkAmbiguousRangeStorageStrategy();
 
