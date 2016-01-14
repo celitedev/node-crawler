@@ -34,7 +34,25 @@ module.exports = {
 
 	},
 	url: {},
-
+	tag: {
+		isMulti: true,
+		isCustom: true,
+		ranges: ["Text"]
+	},
+	fact: {
+		isMulti: true,
+		isCustom: true,
+		ranges: ["Text", "Object"],
+		ambiguitySolvedBy: {
+			type: "implicitDataType",
+			//results in 
+			//- p.ambiguitySolvedBy.storage = "sharedField" -> store values in same field, regardless of datatype
+			//- p.ambiguitySolvedBy.sharedParentDataType = Datatype -> 
+			//which means Any Datatype, so not useful for mapping in ERD at all. 
+			//We don't need this for `fact` since it's split in more fine-grained stuff
+			//on ERD generation (See #134)
+		},
+	},
 
 
 	/////////////////////////////
@@ -65,6 +83,7 @@ module.exports = {
 	ratingCount: {
 		ranges: ["Integer"]
 	},
+	reviewCount: {},
 
 	///////////////////////////////////
 	//http://schema.org/ContactPoint //
@@ -104,6 +123,10 @@ module.exports = {
 	neighborhood: {
 		isCustom: true,
 		ranges: ["Text"]
+	},
+	crossStreets: {
+		isCustom: true,
+		ranges: ["Text"],
 	},
 	postOfficeBoxNumber: {},
 	postalCode: {},
