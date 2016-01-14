@@ -8,5 +8,5 @@ module.exports = {
 			//upvoteCount
 			//downvoteCount
 	},
-	removeProperties: ["sameAs", "alternateName", "description"]
+	removeProperties: ["sameAs", "alternateName", "description", "fact", "tag"]
 };

@@ -1,4 +1,4 @@
 module.exports = {
 	isAbstract: true,
-	removeProperties: ["image"]
+	removeProperties: ["image", "fact", "tag"]
 };
