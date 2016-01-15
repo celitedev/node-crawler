@@ -202,7 +202,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 	// 	return new UUID(5, "ns:URL", arr.join("--")).format();
 	// };
 
-
+	SourceEntity.SOURCETABLE = SOURCETABLE;
 	return SourceEntity;
 
 };
