@@ -92,6 +92,7 @@ module.exports = function(generatedSchemas, r) {
 
 		//load object
 		if (bootstrapObj) {
+
 			//add all properties excluding those starting with '_'
 			//also skip 'id'
 			this.set(_.reduce(bootstrapObj, function(agg, v, k) {

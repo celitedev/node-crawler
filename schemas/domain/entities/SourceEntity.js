@@ -27,8 +27,11 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		this.sourceType = state.sourceType;
 		this.sourceUrl = state.sourceUrl; //optional
 		this.sourceId = state.sourceId;
-		this.batchId = state.batchId;
 		this.detailPageAware = state.detailPageAware;
+
+		this.state = {
+			batchId: state.batchId
+		};
 
 		if (this.detailPageAware && !this.sourceUrl) {
 			throw new Error("SourceEntity with detailPageAware=true but sourceUrl undefined");
@@ -47,7 +50,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					this.sourceType + ", " + bootstrapObj._sourceType);
 			}
 
-			//TBD: temporary check until we're sure we can handle (some) changs here.
+			//TBD: temporary check until we're sure we can handle (some) changs in type.
 			if (!_.eq(this._type, bootstrapObj._type)) {
 				throw new Error("TBD: _type doesn't line up between current and saved object (current, saved): " +
 					this._type + ", " + bootstrapObj._type);
@@ -56,18 +59,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			//Set id. Pretty useful for updating...
 			this.id = bootstrapObj.id;
 
-			//get this value from db. It's later possibly overwritten with true if dirty (never with false!)
-			this.hasUpdatedData = bootstrapObj._hasUpdatedData;
 
-			//createdAt: never modified
-			this.created = bootstrapObj._created;
-
-			//modifiedAt: modified on commit
-			this.modified = bootstrapObj._modified;
-
-			//the batchId as read from the DB. 
-			//Not used ATM?, but could be used for optimistic concurrency control
-			this.batchIdRead = bootstrapObj._batchId;
+			//Extend state with state of bootstap object. 
+			//set old batch id to 'batchIdRead'
+			var bState = bootstrapObj._state;
+			delete bState.batchId;
+			_.extend(this.state, bState);
 
 		}
 	}
@@ -117,10 +114,13 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			//if not dirty -> only upload the meta-properties for perf-reasons
 			var obj = self.toRethinkObject(self.isDirty() ? props : {});
 
-			//set _hasUpdatedData to true if dirty. This signals serverside that it should (re)process
-			//SourceEntity
+			//TODO #141: use (previous) obj._state.modifiedAndDirty as version for OCC (if exists here, i.e. not new)
+			var prevModifiedAndDirty = obj._state.modifiedAndDirty;
+
+			//set modifiedAndDirty to true if dirty. 
+			//This signals serverside that it should (re)process SourceEntity
 			if (self.isDirty()) {
-				obj._hasUpdatedData = true;
+				obj._state.modifiedAndDirty = obj._state.modified; //updated to now
 			}
 
 			//More info: https://www.rethinkdb.com/api/javascript/insert/
@@ -180,13 +180,14 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 			id: this.id, //this.id may not be set in which case it's set by Rethink // DEPRECATED: this.id|| this.getSourceEntityId(),
 			_type: this._type,
+			_sourceType: this.sourceType,
 			_sourceUrl: this.sourceUrl,
 			_sourceId: this.sourceId, //a reasable sourceId like an url or an explicitly created compound-created id by crawler
-			_sourceType: this.sourceType,
-			_batchId: this.batchId,
-			_created: this.created || now,
-			_modified: now,
-			_hasUpdatedData: !!this.hasUpdatedData //turn undefined in false
+			_state: _.defaults({
+				modified: now //set modified to now
+			}, this.state, {
+				created: now //set created to now if not already set
+			})
 		});
 	};
 
