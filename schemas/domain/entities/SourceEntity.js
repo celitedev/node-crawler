@@ -3,7 +3,10 @@ var util = require("util");
 var domainUtils = require("../utils");
 var UUID = require("pure-uuid");
 
-var SOURCETABLE = "sourceEntities";
+
+var excludePropertyKeys = domainUtils.excludePropertyKeys;
+
+
 module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 	var validator = require("../validation")(generatedSchemas);
@@ -28,6 +31,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		this.sourceUrl = state.sourceUrl; //optional
 		this.sourceId = state.sourceId;
 		this.detailPageAware = state.detailPageAware;
+		this._refs = {};
 
 		this.state = {
 			batchId: state.batchId
@@ -59,6 +63,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			//Set id. Pretty useful for updating...
 			this.id = bootstrapObj.id;
 
+			//copy _refs down to SourceEntity
+			this._refs = bootstrapObj._refs;
 
 			//Extend state with state of bootstap object. 
 			//set old batch id to 'batchIdRead'
@@ -75,9 +81,9 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 	//static
 	SourceEntity.getBySourceId = function(id) {
-		return r.table(SOURCETABLE).filter({
+		return r.table(domainUtils.statics.SOURCETABLE).filter({
 			_sourceId: id
-		}).then(function(results) {
+		}).without("_refs").then(function(results) {
 			if (!results || !results.length) {
 				return null;
 			}
@@ -86,6 +92,11 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			}
 			return results[0];
 		});
+	};
+
+	//update refs to _refs
+	SourceEntity.prototype.updateRefs = function() {
+		return _updateRefsRecursive(this._props);
 	};
 
 	SourceEntity.prototype.commit = function(cb) {
@@ -124,7 +135,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			}
 
 			//More info: https://www.rethinkdb.com/api/javascript/insert/
-			r.table(SOURCETABLE).insert(obj, {
+			r.table(domainUtils.statics.SOURCETABLE).insert(obj, {
 					conflict: "update"
 				}).run()
 				.then(function() {
@@ -191,18 +202,55 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		});
 	};
 
-	// SourceEntity.prototype.getSourceEntityId = function() {
-	// 	//TBD: Why did we want to have a regeneratable id again? 
-	// 	//We can 
-	// 	var arr = [
-	// 		this.sourceType,
-	// 		this._type[0], //the type as specified in the crawler
-	// 		this.sourceId
-	// 	];
-	// 	return new UUID(5, "ns:URL", arr.join("--")).format();
-	// };
 
-	SourceEntity.SOURCETABLE = SOURCETABLE;
+
+	function _updateRefsRecursive(properties) {
+
+		var dto = _.reduce(_.clone(properties), function(agg, v, k) {
+
+			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
+
+			function transformSingleItem(v) {
+
+				//if first is range is datatype -> all in range are datatype as per #107
+				//If datatype -> return undefined
+				if (generatedSchemas.datatypes[generatedSchemas.properties[k].ranges[0]]) {
+					return undefined;
+				}
+
+				if (!_.isObject(v)) {
+					return undefined;
+				}
+
+				if (v._ref) {
+					return v._ref;
+				}
+
+				var obj = _updateRefsRecursive(v);
+
+				if (!_.size(obj)) {
+					return undefined;
+				}
+
+				return obj;
+			}
+
+			v = _.isArray(v) ? _.compact(_.map(v, transformSingleItem)) : transformSingleItem(v);
+
+			if (_.isArray(v) && !v.length) {
+				v = undefined;
+			}
+
+			if (v !== undefined) {
+				agg[k] = v;
+			}
+
+			return agg;
+		}, {});
+
+		return dto;
+	}
+
 	return SourceEntity;
 
 };
