@@ -58,6 +58,10 @@ queue.on('error', function(err) {
 	console.log(('TODO: setup logging. #121 ' + err.message).red);
 });
 
+//Sometimes jobs get stuck. This is a known kue-issue. 
+//The workaround is to re-insert/plan stuck jobs.
+//Fixes #148
+queue.watchStuckJobs(5000);
 
 var functionLib = {
 	"float": function(val) {
@@ -381,7 +385,9 @@ function processJob(job, done) {
 
 				var out = _.cloneDeep(result);
 				delete out._htmlDetail;
-				console.log("BEFORE MAPPING COMPOUND DOC", JSON.stringify(out, null, 2));
+				if (!argv.silentTest) {
+					console.log("BEFORE MAPPING COMPOUND DOC", JSON.stringify(out, null, 2));
+				}
 			}
 			return result;
 		})
@@ -431,7 +437,9 @@ function processJob(job, done) {
 
 			var out = _.cloneDeep(obj);
 			delete out._htmlDetail;
-			console.log("AFTER COMPOUND DOC", JSON.stringify(out, null, 2));
+			if (!argv.silentTest) {
+				console.log("AFTER COMPOUND DOC", JSON.stringify(out, null, 2));
+			}
 			return obj;
 		});
 	}
@@ -458,6 +466,22 @@ function processJob(job, done) {
 			} else {
 				return true; //return true when we should NOT prune
 			}
+		})
+		.then(function removeDuplicates(docs) {
+			//Duplicates on sourceId are impossible iff we actually traverse detail pages. 
+			//That's because we automatically do a getBySourceId that merges new doc with old. 
+			//
+			//However, it's possible that multiple docs with same sourceId are processed IN THE SAME BATCH. 
+			//In that case the above check doesn't work, so we have to catch this manually here. 
+
+			var sourceIds = [];
+			return _.filter(docs, function(d) {
+				if (sourceIds.indexOf(d._sourceId) === -1) {
+					sourceIds.push(d._sourceId);
+					return true;
+				}
+				return false;
+			});
 		})
 		.map(function transformToGenericOutput(doc) {
 
@@ -588,52 +612,59 @@ function processJob(job, done) {
 		});
 	} else {
 		promise = promise.map(function(obj) {
-			console.log("BEFORE COMMIT", JSON.stringify(obj.toRethinkObject(obj._propsDirty), null, 2));
+			if (!argv.silentTest) {
+				console.log("BEFORE COMMIT", JSON.stringify(obj.toRethinkObject(obj._propsDirty), null, 2));
+			}
 		});
 	}
 
-	promise.then(function() {
-			done(); //be sure to call done without arguments
-		})
-		// .catch(function(err) {
-		// 	throw err;
-		// })
-		.catch(function catchall(err) {
+	promise = promise.then(function() {
+		done(); //be sure to call done without arguments
+	});
 
-			if (err.outdated) {
-				//remove outdated jobs
-				//logging was done earlier.
-				return done();
-			}
-
-			if (err.halt) {
-				console.log(("halting error encountered!").red);
-				//errors that require immediate halting are thrown
-				throw err;
-			}
-
-			//No validationErrors here since these are not thrown, only logged.
-			crawlerResource.stats.total.nrErrorsNonValidation++;
-
-
-			//Non-200 http codes are treated as errors. 
-			//These error-objects are huge so we extract only the needed info here
-			if (err.status) {
-				var errTmp = new Error(err.message);
-				errTmp.status = err.status;
-				err = errTmp;
-			}
-
-			console.log("ERR", err);
-			done(new Error("job error: orig: " + err.message));
-
-		})
-		.catch(function severe(err) {
-
-			//TODO: we might do some cleanup here?
-			console.log("SEVERE ERR", err);
-			process.exit();
+	if (argv.throwErrors) {
+		promise.catch(function(err) {
+			throw err;
 		});
+	} else {
+
+		promise.catch(function catchall(err) {
+
+				if (err.outdated) {
+					//remove outdated jobs
+					//logging was done earlier.
+					return done();
+				}
+
+				if (err.halt) {
+					console.log(("halting error encountered!").red);
+					//errors that require immediate halting are thrown
+					throw err;
+				}
+
+				//No validationErrors here since these are not thrown, only logged.
+				crawlerResource.stats.total.nrErrorsNonValidation++;
+
+
+				//Non-200 http codes are treated as errors. 
+				//These error-objects are huge so we extract only the needed info here
+				if (err.status) {
+					var errTmp = new Error(err.message);
+					errTmp.status = err.status;
+					err = errTmp;
+				}
+
+				console.log("ERR", err);
+				done(new Error("job error: orig: " + err.message));
+
+			})
+			.catch(function severe(err) {
+
+				//TODO: we might do some cleanup here?
+				console.log("SEVERE ERR", err);
+				process.exit();
+			});
+	}
 }
 
 
