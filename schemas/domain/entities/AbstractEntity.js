@@ -1,7 +1,6 @@
 var _ = require("lodash");
 var util = require("util");
 var domainUtils = require("../utils");
-var urlRegex = require('url-regex');
 
 var UUID = require("pure-uuid");
 
@@ -36,7 +35,7 @@ module.exports = function(generatedSchemas, r) {
 		  ]
 		}
 	 */
-	function AbstractEntity(state, bootstrapObj) {
+	function AbstractEntity(state, bootstrapObj, options) {
 
 		if (!this._kind) {
 			throw new Error("AbstractEntity should be called by subtype");
@@ -100,7 +99,9 @@ module.exports = function(generatedSchemas, r) {
 					agg[k] = v;
 				}
 				return agg;
-			}, {}), true, true);
+			}, {}), true, _.extend({}, options, {
+				isFromDB: true
+			}));
 		}
 
 		this.isInitialized = true;
@@ -123,10 +124,11 @@ module.exports = function(generatedSchemas, r) {
 		return !!this._state.isDirty;
 	};
 
-	AbstractEntity.prototype.set = function(objMutable, doOverwrite, isFromDB) {
+	AbstractEntity.prototype.set = function(objMutable, doOverwrite, options) {
 
+		options = options || {};
 
-		if (isFromDB && this.isInitialized) {
+		if (options.isFromDB && this.isInitialized) {
 			throw new Error("AbstractEntity.set(toPropsDirectly) may only be used on init");
 		}
 		if (!objMutable) {
@@ -139,17 +141,20 @@ module.exports = function(generatedSchemas, r) {
 
 		//delta is supplied delta + _type as included from domainObject. 
 		//This guarantees _type cannot not overwritten.
-		var delta = _.extend(
-			_.cloneDeep(objMutable), //This *might* be needed depending on calling client. For now just be safe.
-			{
-				_type: this._type
-			}
-		);
+		var delta = objMutable;
+		delta._type = this._type;
 
-		var combined = _transformProperties(doOverwrite ? delta : _.extend({}, this._propsDirty, delta), true, [], this._kind, isFromDB);
+		// var delta = _.extend(
+		// 	_.cloneDeep(objMutable), //This *might* be needed depending on calling client. For now just be safe.
+		// 	{
+		// 		_type: this._type
+		// 	}
+		// );
+
+		var combined = _transformProperties(doOverwrite ? delta : _.extend({}, this._propsDirty, delta), true, [], this._kind, options);
 
 		//if loaded from DB -> directly load into into _props
-		if (isFromDB) {
+		if (options.isFromDB) {
 			//only used on init
 			this._props = combined;
 
@@ -258,7 +263,9 @@ module.exports = function(generatedSchemas, r) {
 	//1. transform obj so all values are expanded into objects. 
 	//E.g.: "some value" is expanded to {"_value": "some value"}
 	//2. 
-	function _transformProperties(obj, isTopLevel, ancestors, kind, isFromDB) {
+	function _transformProperties(obj, isTopLevel, ancestors, kind, options) {
+
+		options = options || {};
 
 		if (!_.isObject(obj)) {
 			throw new Error("SANITY CHECK: `obj` passed to _transformProperties should be an object");
@@ -364,7 +371,7 @@ module.exports = function(generatedSchemas, r) {
 			//We don't want this made into an array unless that's already the case.
 			if (fieldtype.isMulti && k !== "val") {
 				v = _.isArray(v) ? v : [v];
-			} else if (!fieldtype.isMulti && isFromDB) {
+			} else if (!fieldtype.isMulti && options.isFromDB) {
 
 				//loading from DB which has all values multivalued. 
 				//Therefore, let's go back to proper single/multivalued-ness on every field
@@ -399,7 +406,7 @@ module.exports = function(generatedSchemas, r) {
 				v = !_.isArray(v) ? expandToRef(v) : _.map(v, expandToRef);
 			}
 
-			obj[k] = !_.isArray(v) ? _transformSingleObject(ancestors, k, kind, isFromDB, v) : _.map(v, _.partial(_transformSingleObject, ancestors, k, kind, isFromDB));
+			obj[k] = !_.isArray(v) ? _transformSingleObject(ancestors, k, kind, options, v) : _.map(v, _.partial(_transformSingleObject, ancestors, k, kind, options));
 
 		}); //end each
 
@@ -424,17 +431,19 @@ module.exports = function(generatedSchemas, r) {
 
 			//add aliasOf properties which weren't set. 
 			//e.g.: populate a if b is set in a.aliasOf(b)
-			_.each(generatedSchemas.properties, function(prop, k) {
-				if (prop.aliasOf && obj[k] === undefined && obj[prop.aliasOf] !== undefined) {
-					obj[k] = obj[prop.aliasOf];
-				}
-			});
+			if (!options.skipAlias) {
+				_.each(generatedSchemas.properties, function(prop, k) {
+					if (prop.aliasOf && obj[k] === undefined && obj[prop.aliasOf] !== undefined) {
+						obj[k] = obj[prop.aliasOf];
+					}
+				});
+			}
 		}
 
 		return obj;
 	}
 
-	function _transformSingleObject(ancestors, k, kind, isFromDB, val) {
+	function _transformSingleObject(ancestors, k, kind, options, val) {
 
 		var fieldtype = generatedSchemas.properties[k]; //guaranteed to exist
 
@@ -450,7 +459,7 @@ module.exports = function(generatedSchemas, r) {
 				_value: val
 			};
 		}
-		return _transformProperties(val, undefined, ancestors.concat([k]), kind, isFromDB);
+		return _transformProperties(val, undefined, ancestors.concat([k]), kind, options);
 	}
 
 	//When shortcut _ref given expand to _ref object. 
@@ -479,7 +488,10 @@ module.exports = function(generatedSchemas, r) {
 	//		name: "Quentin Tarantino"
 	//	}
 	//}
+
+
 	function expandToRef(v) {
+
 		var key;
 		if (!_.isObject(v)) {
 
@@ -488,11 +500,13 @@ module.exports = function(generatedSchemas, r) {
 				_ref: {}
 			};
 
-			key = urlRegex({
-				exact: true
-			}).test(v) ? "_sourceUrl" : "_sourceId";
+			key = isAbsoluteUrl(v) ? "_sourceUrl" : "_sourceId";
 
-			objExpanded._ref[key] = v;
+			if (key === "_sourceUrl") {
+				objExpanded._ref._sourceUrl = v;
+			}
+			objExpanded._ref._sourceId = v; //always add _sourceId
+
 			v = objExpanded;
 		} else {
 
@@ -503,15 +517,22 @@ module.exports = function(generatedSchemas, r) {
 					//transform if we've set item to _ref
 					var val = v._ref;
 
-					key = urlRegex({
-						exact: true
-					}).test(val) ? "_sourceUrl" : "_sourceId";
+					//Incredibly expensive. Using quick check instead which is good enough here.
+					// key = urlRegex({
+					// 	exact: true
+					// }).test(val) ? "_sourceUrl" : "_sourceId";
+
+					key = isAbsoluteUrl(v) ? "_sourceUrl" : "_sourceId";
 
 					v._ref = {};
-					v._ref[key] = val;
+
+					if (key === "_sourceUrl") {
+						v._ref._sourceUrl = v;
+					}
+					v._ref._sourceId = v; //always add _sourceId
 				}
-				//we sometimes mistakingly use _sourceId and _sourceUrl in _ref
-				//Let's transform them to sourceId and sourceUrl resp.
+				//we sometimes mistakingly use sourceId and sourceUrl in _ref
+				//Let's transform them to _sourceId and _sourceUrl resp.
 				if (v._ref.sourceUrl) {
 					v._ref._sourceUrl = v._ref.sourceUrl;
 					delete v._ref.sourceUrl;
@@ -522,6 +543,9 @@ module.exports = function(generatedSchemas, r) {
 				}
 			}
 		}
+
+		//If _sourceId not set yet, it's defaulted to sourceUrl. Think this never happens though but just to be safe
+		v._ref._sourceId = v._ref._sourceId || v._ref._sourceUrl;
 		return v;
 	}
 
@@ -682,3 +706,9 @@ module.exports = function(generatedSchemas, r) {
 	return AbstractEntity;
 
 };
+
+
+function isAbsoluteUrl(str) {
+	//very fast decide if string is url
+	return (str.indexOf("http://") === 0 || str.indexOf("https://") === 0);
+}
