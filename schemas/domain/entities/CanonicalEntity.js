@@ -12,9 +12,9 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		CanonicalEntity.super_.call(this, state);
 	}
 
-	CanonicalEntity.prototype._validationSchema = validator.createSchema();
-
 	util.inherits(CanonicalEntity, AbstractEntity);
+
+	CanonicalEntity.prototype._validationSchema = validator.createSchema();
 
 	return CanonicalEntity;
 

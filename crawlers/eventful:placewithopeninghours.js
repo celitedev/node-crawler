@@ -189,7 +189,7 @@ module.exports = {
 					var index = val.indexOf(needle);
 					if (index === -1) return val;
 					return val.substring(index + needle.length).trim();
-				}
+				},
 			},
 
 		}

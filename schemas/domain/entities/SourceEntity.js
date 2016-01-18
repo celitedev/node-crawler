@@ -3,14 +3,17 @@ var util = require("util");
 var domainUtils = require("../utils");
 var UUID = require("pure-uuid");
 
-var SOURCETABLE = "sourceEntities";
+
+var excludePropertyKeys = domainUtils.excludePropertyKeys;
+
+
 module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 	var validator = require("../validation")(generatedSchemas);
 
-	function SourceEntity(state, bootstrapObj) {
+	function SourceEntity(state, bootstrapObj, options) {
 		this._kind = domainUtils.enums.kind.SOURCE;
-		SourceEntity.super_.call(this, state, bootstrapObj);
+		SourceEntity.super_.call(this, state, bootstrapObj, options);
 		if (!state.sourceType) {
 			throw new Error("'state.sourceType' should be defined on SourceEntity");
 		}
@@ -27,8 +30,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		this.sourceType = state.sourceType;
 		this.sourceUrl = state.sourceUrl; //optional
 		this.sourceId = state.sourceId;
-		this.batchId = state.batchId;
 		this.detailPageAware = state.detailPageAware;
+		this._refs = {};
+
+		this.state = {
+			batchId: state.batchId
+		};
 
 		if (this.detailPageAware && !this.sourceUrl) {
 			throw new Error("SourceEntity with detailPageAware=true but sourceUrl undefined");
@@ -47,7 +54,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					this.sourceType + ", " + bootstrapObj._sourceType);
 			}
 
-			//TBD: temporary check until we're sure we can handle (some) changs here.
+			//TBD: temporary check until we're sure we can handle (some) changs in type.
 			if (!_.eq(this._type, bootstrapObj._type)) {
 				throw new Error("TBD: _type doesn't line up between current and saved object (current, saved): " +
 					this._type + ", " + bootstrapObj._type);
@@ -56,31 +63,27 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			//Set id. Pretty useful for updating...
 			this.id = bootstrapObj.id;
 
-			//get this value from db. It's later possibly overwritten with true if dirty (never with false!)
-			this.hasUpdatedData = bootstrapObj._hasUpdatedData;
+			//copy _refs down to SourceEntity
+			this._refs = bootstrapObj._refs;
 
-			//createdAt: never modified
-			this.created = bootstrapObj._created;
-
-			//modifiedAt: modified on commit
-			this.modified = bootstrapObj._modified;
-
-			//the batchId as read from the DB. 
-			//Not used ATM?, but could be used for optimistic concurrency control
-			this.batchIdRead = bootstrapObj._batchId;
+			//Extend state with state of bootstap object. 
+			//set old batch id to 'batchIdRead'
+			var bState = bootstrapObj._state;
+			delete bState.batchId;
+			_.extend(this.state, bState);
 
 		}
 	}
 
-	SourceEntity.prototype._validationSchema = validator.createSchemaSourceEntity();
-
 	util.inherits(SourceEntity, AbstractEntity);
+
+	SourceEntity.prototype._validationSchema = validator.createSchemaSourceEntity();
 
 	//static
 	SourceEntity.getBySourceId = function(id) {
-		return r.table(SOURCETABLE).filter({
-			_sourceId: id
-		}).then(function(results) {
+		return r.table(domainUtils.statics.SOURCETABLE).getAll(id, {
+			index: "_sourceId"
+		}).without("_refs").then(function(results) {
 			if (!results || !results.length) {
 				return null;
 			}
@@ -89,6 +92,13 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			}
 			return results[0];
 		});
+	};
+
+	//update refs to _refs
+	SourceEntity.prototype.calculateRefs = function(properties) {
+		var out = {};
+		_calcRefsRecursive(properties, out);
+		return out;
 	};
 
 	SourceEntity.prototype.commit = function(cb) {
@@ -110,21 +120,24 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 			//STATE: validated
 
-			//freeze propsDirty to persist. This to be able to check if entity dirty
-			//after save because of in between change.
+			//Freeze propsDirty to persist. 
+			//This to be able to check if entity dirty after save, because of in between change.
 			var props = _.cloneDeep(self._propsDirty);
 
 			//if not dirty -> only upload the meta-properties for perf-reasons
 			var obj = self.toRethinkObject(self.isDirty() ? props : {});
 
-			//set _hasUpdatedData to true if dirty. This signals serverside that it should (re)process
-			//SourceEntity
+			//TODO #141: use (previous) obj._state.modifiedAndDirty as version for OCC (if exists here, i.e. not new)
+			var prevModifiedAndDirty = obj._state.modifiedAndDirty;
+
+			//set modifiedAndDirty to true if dirty. 
+			//This signals serverside that it should (re)process SourceEntity
 			if (self.isDirty()) {
-				obj._hasUpdatedData = true;
+				obj._state.modifiedAndDirty = obj._state.modified; //updated to now
 			}
 
 			//More info: https://www.rethinkdb.com/api/javascript/insert/
-			r.table(SOURCETABLE).insert(obj, {
+			r.table(domainUtils.statics.SOURCETABLE).insert(obj, {
 					conflict: "update"
 				}).run()
 				.then(function() {
@@ -180,27 +193,66 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 			id: this.id, //this.id may not be set in which case it's set by Rethink // DEPRECATED: this.id|| this.getSourceEntityId(),
 			_type: this._type,
+			_sourceType: this.sourceType,
 			_sourceUrl: this.sourceUrl,
 			_sourceId: this.sourceId, //a reasable sourceId like an url or an explicitly created compound-created id by crawler
-			_sourceType: this.sourceType,
-			_batchId: this.batchId,
-			_created: this.created || now,
-			_modified: now,
-			_hasUpdatedData: !!this.hasUpdatedData //turn undefined in false
+			_state: _.defaults({
+				modified: now //set modified to now
+			}, this.state, {
+				created: now //set created to now if not already set
+			})
 		});
 	};
 
-	// SourceEntity.prototype.getSourceEntityId = function() {
-	// 	//TBD: Why did we want to have a regeneratable id again? 
-	// 	//We can 
-	// 	var arr = [
-	// 		this.sourceType,
-	// 		this._type[0], //the type as specified in the crawler
-	// 		this.sourceId
-	// 	];
-	// 	return new UUID(5, "ns:URL", arr.join("--")).format();
-	// };
 
+
+	function _calcRefsRecursive(properties, agg, prefix) {
+
+		prefix = prefix || "";
+
+		_.each(properties, function(v, k) {
+
+			if (excludePropertyKeys.indexOf(k) !== -1) return;
+
+			var compoundKey = prefix ? prefix + "." + k : k;
+
+			function transformSingleItem(v) {
+
+				//if first is range is datatype -> all in range are datatype as per #107
+				//If datatype -> return undefined
+				if (generatedSchemas.datatypes[generatedSchemas.properties[k].ranges[0]]) {
+					return undefined;
+				}
+
+				if (!_.isObject(v)) {
+					return undefined;
+				}
+
+				if (v._ref) {
+					return v._ref;
+				}
+
+				var obj = _calcRefsRecursive(v, agg, compoundKey);
+
+				if (!_.size(obj)) {
+					return undefined;
+				}
+
+				return obj;
+			}
+
+			v = _.isArray(v) ? _.compact(_.map(v, transformSingleItem)) : transformSingleItem(v);
+
+			if (_.isArray(v) && !v.length) {
+				v = undefined;
+			}
+
+			if (v !== undefined) {
+				agg[compoundKey] = v;
+			}
+		});
+
+	}
 
 	return SourceEntity;
 
