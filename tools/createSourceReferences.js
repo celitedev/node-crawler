@@ -2,6 +2,7 @@ var _ = require("lodash");
 var argv = require('yargs').argv;
 var redis = require("redis");
 var Promise = require("bluebird");
+var uuid = require("uuid");
 
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 	checkSoundness: true,
@@ -32,17 +33,21 @@ function getSourceEntityState(result) {
 	};
 }
 
+var total = 0;
+
 Promise.resolve().then(function processNewSources() {
 
-	console.log("processNewSources");
-
-	var batch = 100;
+	var batch = 200;
 	var nrOfResults;
+
+	var tableSourceEntity = r.table(domainUtils.statics.SOURCETABLE);
+	var tableRefNorms = r.table(domainUtils.statics.REFNORMS);
+	var tableRefX = r.table(domainUtils.statics.REFX);
 
 	//Func: Get SourceEntities that haven't been processed by this process yet. 
 	//Tech: Get SourceEntities that don't exist in index 'modifiedMakeRefs'
 	//'modifiedMakeRefs' is created based on field _state.modifiedMakeRefs. See #142 for more.
-	var tableSourceEntity = r.table(domainUtils.statics.SOURCETABLE);
+
 	return tableSourceEntity.getAll(false, {
 			index: 'modifiedMakeRefs'
 		}).limit(batch).run()
@@ -50,15 +55,20 @@ Promise.resolve().then(function processNewSources() {
 
 			nrOfResults = results.length;
 
-			console.log("processing", nrOfResults);
+			total += nrOfResults;
+			console.log("processNewSources", total);
 
 			if (!nrOfResults) {
 				return;
 			}
 
+			var options = {
+				skipAlias: true
+			};
+
 			//format the results into actual SourceEntity domain objects.
 			var sourceObjects = _.map(results, function(result) {
-				return new SourceEntity(getSourceEntityState(result), result);
+				return new SourceEntity(getSourceEntityState(result), result, options);
 			});
 
 			//Pluck the sourceId from each sourceObject
@@ -72,9 +82,7 @@ Promise.resolve().then(function processNewSources() {
 			var refNormIdsFound = {};
 
 			//Fetch all refNorms that have a sourceId in the above list
-			//This should be enough. I.e.: no need to lookup by sourceUrl as well.
-			var tableRefNorms = r.table(domainUtils.statics.REFNORMS);
-
+			//This is enough: no need to lookup by sourceUrl.
 			return tableRefNorms.getAll.apply(tableRefNorms, lookupDocsOnSourceId.concat({
 					index: '_sourceId'
 				})).run()
@@ -82,7 +90,7 @@ Promise.resolve().then(function processNewSources() {
 
 					var refsPerSourceId = _.groupBy(refNorms, "_sourceId");
 
-					//loop each sourceObject and check if Refnorm exist. 
+					//Loop each sourceObject and check if RefNorm exist. 
 					//If it does not -> create
 					//If it does -> update with sourceUrl which may potentially not be set
 					//In both cases update with sourceRefId, which will not be set most of the time. I.e.: it *may*
@@ -103,9 +111,25 @@ Promise.resolve().then(function processNewSources() {
 
 							var err;
 							if (refNormArr.length > 1) {
-								err = new Error("Severe: multiple RefNorms found for sourceId: " + obj.sourceId);
-								err.halt = true;
-								throw err;
+
+								//#146
+								//This can happen when multiple processes fetch/update stuff in parallel. 
+								//It isn't an error as long as sourceRef is the same for all?
+								//For now: we just go with this but still log in all cases.
+
+								var sourceRefs = _.uniq(_.pluck(refNormArr, "_sourceRefId"));
+
+								if (sourceRefs.length > 1) {
+									err = new Error("#146: Severe: multiple RefNorms found for sourceId with different sourceRefs (sourceId, sourceRefs): " +
+										obj.sourceId + ", " + sourceRefs.join(","));
+
+									err.halt = true;
+									throw err;
+
+								} else {
+									console.log(("warn: #146, multiple RefNorms found for sourceId with SAME sourceRef (sourceId, sourceRefs): " +
+										obj.sourceId + ", " + sourceRefs[0]).yellow);
+								}
 							}
 
 							var refNorm = refNormArr[0];
@@ -129,6 +153,7 @@ Promise.resolve().then(function processNewSources() {
 
 					});
 
+					// upsert refNorms
 					return tableRefNorms.insert(refNormsToUpsert, {
 						conflict: "update"
 					}).run();
@@ -140,7 +165,6 @@ Promise.resolve().then(function processNewSources() {
 					//sourceRefId.
 
 					if (_.size(refNormIdsFound)) {
-						var tableRefX = r.table(domainUtils.statics.REFX);
 						return tableRefX.getAll.apply(tableRefX, _.keys(refNormIdsFound).concat({
 							index: 'refNormId'
 						})).update({
@@ -148,26 +172,136 @@ Promise.resolve().then(function processNewSources() {
 						});
 					}
 				})
-				.then(function addNewRefX() {
+				.then(function composeRefs() {
 
+
+
+					//loop all references in the sourceObject to build the _refs-property
+					//This is build by fusing new reference properties with old ones. 
+					//
+					//The structure of the _refs property is as follows: 
+					//
+					//<key.with.nested>: {
+					// _sourceId
+					//}
+					var unlinkedRefsWithSourceId = [];
 					_.each(sourceObjects, function(obj) {
-						var refs = obj.updateRefs();
-						console.log(refs);
+
+						function transformVal(v) {
+							if (!v.id && v._sourceId) {
+								v.id = uuid.v4();
+								unlinkedRefsWithSourceId.push(v);
+							}
+							v._refId = obj.id;
+							return v;
+						}
+
+						//get new refs
+						var refs = obj.calculateRefs(obj._props);
+						_.each(refs, function(refVal) {
+							refVal = _.isArray(refVal) ? _.map(refVal, transformVal) : transformVal(refVal);
+						});
+
 						sourceIdToRefMap[obj.id] = refs;
 					});
+
+					//Fetch all refsNorms given refs with sourceId using 1 call and create new ones if they don't exist 
+					//LATER: #143: do the same for refs without sourceId.                                               
+
+					var sourceIdsToSupport = _.uniq(_.pluck(unlinkedRefsWithSourceId, "_sourceId"));
+					var sourceIdsFound = [];
+					var refNormMap;
+
+					return Promise.resolve()
+						.then(function fetchExistingRefNorms() {
+
+							//fetch refNorms given sourceIds
+							if (sourceIdsToSupport.length) {
+
+								return tableRefNorms.getAll.apply(tableRefNorms, sourceIdsToSupport.concat({
+									index: '_sourceId'
+								})).then(function(refs) {
+
+									//create a map of refNorms with sourceId as key
+									refNormMap = _.zipObject(_.pluck(refs, "_sourceId"), refs);
+
+									//select the sourceIds for which a refNorm is found. 
+									//This is used to know which refNorms should still be created
+									sourceIdsFound = _.pluck(refs, "_sourceId");
+								});
+							}
+
+						})
+						.then(function insertNewRefNorms() {
+
+							//get a list of all sourceIds for which refNorms needs to be created
+							//since no refNorm yet exists...
+							var refNormsWithSourceIdsToCreate = _.difference(sourceIdsToSupport, sourceIdsFound);
+
+							//.. consequently, the refNorms to insert...
+							var refNormsToUpsert = _.map(refNormsWithSourceIdsToCreate, function(sourceId) {
+								return {
+									_sourceId: sourceId
+								};
+							});
+
+							//... as well as the actual inserting
+							return tableRefNorms.insert(refNormsToUpsert, {
+								conflict: "update",
+								returnChanges: true //We want results back from this insert...
+							}).run().then(function(refNorms) {
+
+								//... which are fetched from the changes object.
+								var refNormsNew = _.pluck(refNorms.changes, "new_val");
+
+								//Now, the newly added refNorms are added to the refNorm map
+								_.each(refNormsNew, function(refNormNew) {
+									var sourceId = refNormNew._sourceId;
+									if (refNormMap[sourceId]) {
+										throw new Error("Sanity check: _sourceId found in existing refNormMap, while we just checked it wasn't there: " + sourceId);
+									}
+									refNormMap[sourceId] = refNormNew;
+								});
+							});
+						})
+						.then(function insertRefX() {
+
+							//Now that we've fetched or created RefNorms for all unlinked references, 
+							//it's time to create actual refX-rows for all references. 
+							//A RefX row is an cross-table between References (as stored in SourceEntity._refs) and RefNorms
+
+							//So, let's create the raw refX-objects to insert...
+							var refXCollection = _.map(unlinkedRefsWithSourceId, function(unlinkedRef) {
+
+								var refNorm = refNormMap[unlinkedRef._sourceId];
+
+								if (!refNorm) {
+									throw new Error("sanity check: refNorm must exist for _sourceId at this point: " + unlinkedRef._sourceId);
+								}
+
+								var obj = {
+									refId: unlinkedRef._refId,
+									refNormId: refNorm.id
+								};
+
+								delete unlinkedRef._refId; //not needed anymore, and don't persist
+
+								if (refNorm._sourceRefId) {
+									obj.sourceRefId = refNorm._sourceRefId;
+								}
+								return obj;
+							});
+
+							// ... and actually insert them
+							return tableRefX.insert(refXCollection, {
+								conflict: "update"
+							}).run();
+						});
 
 				})
 				.then(function updateModifiedDateForSourceEntities() {
 
 					// Update 'modifiedMakeRefs' and '_refs' for all processed sourceEntities in this batch. 
-					//
-					// Note: we have to fetch by the exact sourceEntity-ids instead of doing, say, 
-					// tableSourceEntity.getAll(false, {
-					// 	index: 'modifiedMakeRefs'
-					// }).limit(batch)
-					//
-					// Since the latter may have changed in the meantime.
-
 					var d = new Date();
 
 					return tableSourceEntity.getAll.apply(tableSourceEntity, lookupDocsOnId.concat({
@@ -176,7 +310,7 @@ Promise.resolve().then(function processNewSources() {
 						_state: {
 							modifiedMakeRefs: d
 						},
-						// _refs: r.expr(sourceIdToRefMap).getField(r.row("id"))
+						_refs: r.expr(sourceIdToRefMap).getField(r.row("id"))
 					});
 				});
 		})

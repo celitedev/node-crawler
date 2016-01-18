@@ -11,9 +11,9 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 	var validator = require("../validation")(generatedSchemas);
 
-	function SourceEntity(state, bootstrapObj) {
+	function SourceEntity(state, bootstrapObj, options) {
 		this._kind = domainUtils.enums.kind.SOURCE;
-		SourceEntity.super_.call(this, state, bootstrapObj);
+		SourceEntity.super_.call(this, state, bootstrapObj, options);
 		if (!state.sourceType) {
 			throw new Error("'state.sourceType' should be defined on SourceEntity");
 		}
@@ -75,14 +75,14 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		}
 	}
 
-	SourceEntity.prototype._validationSchema = validator.createSchemaSourceEntity();
-
 	util.inherits(SourceEntity, AbstractEntity);
+
+	SourceEntity.prototype._validationSchema = validator.createSchemaSourceEntity();
 
 	//static
 	SourceEntity.getBySourceId = function(id) {
-		return r.table(domainUtils.statics.SOURCETABLE).filter({
-			_sourceId: id
+		return r.table(domainUtils.statics.SOURCETABLE).getAll(id, {
+			index: "_sourceId"
 		}).without("_refs").then(function(results) {
 			if (!results || !results.length) {
 				return null;
@@ -95,8 +95,10 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 	};
 
 	//update refs to _refs
-	SourceEntity.prototype.updateRefs = function() {
-		return _updateRefsRecursive(this._props);
+	SourceEntity.prototype.calculateRefs = function(properties) {
+		var out = {};
+		_calcRefsRecursive(properties, out);
+		return out;
 	};
 
 	SourceEntity.prototype.commit = function(cb) {
@@ -118,8 +120,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 			//STATE: validated
 
-			//freeze propsDirty to persist. This to be able to check if entity dirty
-			//after save because of in between change.
+			//Freeze propsDirty to persist. 
+			//This to be able to check if entity dirty after save, because of in between change.
 			var props = _.cloneDeep(self._propsDirty);
 
 			//if not dirty -> only upload the meta-properties for perf-reasons
@@ -204,11 +206,15 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 
 
-	function _updateRefsRecursive(properties) {
+	function _calcRefsRecursive(properties, agg, prefix) {
 
-		var dto = _.reduce(_.clone(properties), function(agg, v, k) {
+		prefix = prefix || "";
 
-			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
+		_.each(properties, function(v, k) {
+
+			if (excludePropertyKeys.indexOf(k) !== -1) return;
+
+			var compoundKey = prefix ? prefix + "." + k : k;
 
 			function transformSingleItem(v) {
 
@@ -226,7 +232,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					return v._ref;
 				}
 
-				var obj = _updateRefsRecursive(v);
+				var obj = _calcRefsRecursive(v, agg, compoundKey);
 
 				if (!_.size(obj)) {
 					return undefined;
@@ -242,13 +248,10 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			}
 
 			if (v !== undefined) {
-				agg[k] = v;
+				agg[compoundKey] = v;
 			}
+		});
 
-			return agg;
-		}, {});
-
-		return dto;
 	}
 
 	return SourceEntity;
