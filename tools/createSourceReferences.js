@@ -35,45 +35,51 @@ var data = {
 	}
 };
 
-var start = new Date().getTime();
 
-Promise.resolve().then(function processNewSources() {
+Promise.resolve()
+	.then(function processNewSources() {
 
-	//Func: Get SourceEntities that haven't been processed by this process yet. 
-	//Tech: Get SourceEntities that don't exist in index 'modifiedMakeRefs'
-	//'modifiedMakeRefs' is created based on field _state.modifiedMakeRefs. See #142 for more.
+		var start = new Date().getTime();
 
-	return Promise.resolve()
-		.then(toolUtils.getNewSourceEntities(data))
-		.then(function calcStats(sourceEntities) {
-			data.state.nrOfResults = sourceEntities.length;
-			data.state.total += data.state.nrOfResults;
-			console.log("processNewSources", data.state.total);
-			return sourceEntities;
-		})
-		.then(toolUtils.resetDataFromSourceEntities(data))
-		.then(toolUtils.updateExistingAndInsertNewRefNorms(data))
-		.then(toolUtils.addSourceRefIdToExistingRefX(data))
-		.then(toolUtils.composeRefs(data))
-		.then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
-		.then(toolUtils.insertRefX(data))
-		.then(toolUtils.updateModifiedDateForSourceEntities(data))
-		.then(timerStats(data))
-		.then(function() {
-			//process all new sources by recursively fetching and processing all sourceEntities in batches
-			if (data.state.nrOfResults === data.state.batch) {
-				return processNewSources();
-			}
-		});
+		//Func: Get SourceEntities that haven't been processed by this process yet. 
+		//Tech: Get SourceEntities that don't exist in index 'modifiedMakeRefs'
+		//'modifiedMakeRefs' is created based on field _state.modifiedMakeRefs. See #142 for more.
 
-}).finally(function() {
-	console.log("QUITTING");
-	redisClient.quit(); //quit
-	r.getPoolMaster().drain(); //quit
-});
+		return Promise.resolve()
+			.then(function processNewSourcesRecursive() {
+
+				return Promise.resolve()
+					.then(toolUtils.getNewSourceEntities(data))
+					.then(function calcStats(sourceEntities) {
+						data.state.nrOfResults = sourceEntities.length;
+						data.state.total += data.state.nrOfResults;
+						console.log("processNewSources", data.state.total);
+						return sourceEntities;
+					})
+					.then(toolUtils.resetDataFromSourceEntities(data))
+					.then(toolUtils.updateExistingAndInsertNewRefNorms(data))
+					.then(toolUtils.addSourceRefIdToExistingRefX(data))
+					.then(toolUtils.composeRefs(data))
+					.then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
+					.then(toolUtils.insertRefX(data))
+					.then(toolUtils.updateModifiedDateForSourceEntities(data))
+					.then(timerStats(data, start))
+					.then(function() {
+						//process all new sources by recursively fetching and processing all sourceEntities in batches
+						if (data.state.nrOfResults === data.state.batch) {
+							return processNewSourcesRecursive();
+						}
+					});
+			});
+
+	}).finally(function() {
+		console.log("QUITTING");
+		redisClient.quit(); //quit
+		r.getPoolMaster().drain(); //quit
+	});
 
 
-function timerStats(data) {
+function timerStats(data, start) {
 	return function calcStats() {
 		var stats = _.reduce(data.time, function(agg, v, k) {
 			agg[k] = v / 1000;
