@@ -21,10 +21,21 @@ var toolUtils = require("./utils")(generatedSchemas, r, redisClient);
 var data = {
 	state: {
 		total: 0,
-		batch: 200,
+		batch: 1000,
 		nrOfResults: 0
+	},
+	time: {
+		getNewSourceEntities: 0,
+		updateExistingAndInsertNewRefNorms: 0,
+		addSourceRefIdToExistingRefX: 0,
+		composeRefs: 0,
+		fetchExistingAndInsertNewRefNormsForReferences: 0,
+		insertRefX: 0,
+		updateModifiedDateForSourceEntities: 0
 	}
 };
+
+var start = new Date().getTime();
 
 Promise.resolve().then(function processNewSources() {
 
@@ -47,6 +58,7 @@ Promise.resolve().then(function processNewSources() {
 		.then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
 		.then(toolUtils.insertRefX(data))
 		.then(toolUtils.updateModifiedDateForSourceEntities(data))
+		.then(timerStats(data))
 		.then(function() {
 			//process all new sources by recursively fetching and processing all sourceEntities in batches
 			if (data.state.nrOfResults === data.state.batch) {
@@ -59,3 +71,15 @@ Promise.resolve().then(function processNewSources() {
 	redisClient.quit(); //quit
 	r.getPoolMaster().drain(); //quit
 });
+
+
+function timerStats(data) {
+	return function calcStats() {
+		var stats = _.reduce(data.time, function(agg, v, k) {
+			agg[k] = v / 1000;
+			return agg;
+		}, {});
+		stats.TOTAL = (new Date().getTime() - start) / 1000;
+		console.log("Stats", JSON.stringify(stats, undefined, 2));
+	};
+}
