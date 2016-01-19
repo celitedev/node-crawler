@@ -25,8 +25,7 @@ var dataProto = {
 		nrOfResults: 0
 	},
 	time: {
-		getNewSourceEntities: 0,
-		getExistingDirtyEntities: 0,
+		getSourceEntities: 0,
 		updateExistingAndInsertNewRefNorms: 0,
 		addSourceRefIdToExistingRefX: 0,
 		composeRefs: 0,
@@ -51,7 +50,7 @@ Promise.resolve()
 // 		.then(function processNewSourcesRecursive() {
 
 // 			return Promise.resolve()
-// 				.then(toolUtils.getNewSourceEntities(data))
+// 				.then(toolUtils.getSourceEntities(data))
 // 				.then(function calcStats(sourceEntities) {
 // 					data.state.nrOfResults = sourceEntities.length;
 // 					data.state.total += data.state.nrOfResults;
@@ -80,15 +79,16 @@ Promise.resolve()
 		var data = _.cloneDeep(dataProto);
 		var start = new Date().getTime();
 
+		var processExistingButDirty = true;
+
 		//Func: Get SourceEntities that haven't been processed by this process yet. 
 		//Tech: Get SourceEntities that don't exist in index 'modifiedMakeRefs'
 		//'modifiedMakeRefs' is created based on field _state.modifiedMakeRefs. See #142 for more.
 
 		return Promise.resolve()
 			.then(function processExistingSourcesRecursive() {
-
 				return Promise.resolve()
-					.then(toolUtils.getNewSourceEntities(data))
+					.then(toolUtils.getSourceEntities(data, processExistingButDirty))
 					.then(function calcStats(sourceEntities) {
 						data.state.nrOfResults = sourceEntities.length;
 						data.state.total += data.state.nrOfResults;
@@ -97,8 +97,8 @@ Promise.resolve()
 					})
 					.then(toolUtils.resetDataFromSourceEntities(data))
 					.then(toolUtils.composeRefs(data))
-					.then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
-					.then(toolUtils.insertRefX(data))
+					// .then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
+					// .then(toolUtils.insertRefX(data))
 					// .then(toolUtils.updateModifiedDateForSourceEntities(data))
 					.then(timerStats(data, start))
 					.then(function() {

@@ -27,24 +27,43 @@ module.exports = function(generatedSchemas, r, redisClient) {
 	var tableRefX = r.table(domainUtils.statics.REFX);
 
 	//
-	// Get all new SourceEntities in batches. 
+	// Get all new / existing SourceEntities in batches. 
+	// 
 	// NEW SourceEntities are those that don't have _state.modifiedMakeRefs defined. 
+	// Existing are those that have _state.modifiedMakeRefs < _staate.modifiedAndDirty
 	// 
 	// Return: the collection of SourceEntities.
-	function getNewSourceEntities(data) {
+	function getSourceEntities(data, processExistingButDirty) {
 		return function() {
 
 			var start = new Date().getTime();
-			return tableSourceEntity.getAll(false, {
-					index: 'modifiedMakeRefs'
-				}).limit(data.state.batch).run()
+
+			return Promise.resolve()
+				.then(function() {
+
+					if (!processExistingButDirty) {
+
+						//fetch new
+						return tableSourceEntity.getAll(false, {
+							index: 'modifiedMakeRefs'
+						}).limit(data.state.batch).run();
+
+					} else {
+
+						//fetch existing but dirty
+						return tableSourceEntity.getAll(true, {
+							index: 'dirtyForMakeRefs'
+						}).limit(data.state.batch).run();
+					}
+
+				})
 				.then(function fromResultsToSourceEntities(results) {
 
 					var options = {
 						skipAlias: true
 					};
 
-					data.time.getNewSourceEntities += new Date().getTime() - start;
+					data.time.getSourceEntities += new Date().getTime() - start;
 
 					//format the results into actual SourceEntity domain objects.
 					return _.map(results, function(result) {
@@ -53,6 +72,7 @@ module.exports = function(generatedSchemas, r, redisClient) {
 				});
 		};
 	}
+
 
 	//Data-object is loaded based on sourceObjects. 
 	//All other data is reset. 
@@ -253,6 +273,8 @@ module.exports = function(generatedSchemas, r, redisClient) {
 			//}
 			_.each(data.sourceObjects, function(obj) {
 
+				console.log("existing _refs: " + JSON.stringify(obj._refs, null, 2));
+
 				function transformVal(v) {
 					if (!v.id && v._sourceId) {
 						v.id = uuid.v4();
@@ -430,7 +452,7 @@ module.exports = function(generatedSchemas, r, redisClient) {
 	}
 
 	return {
-		getNewSourceEntities: getNewSourceEntities,
+		getSourceEntities: getSourceEntities,
 		resetDataFromSourceEntities: resetDataFromSourceEntities,
 		updateExistingAndInsertNewRefNorms: updateExistingAndInsertNewRefNorms,
 		addSourceRefIdToExistingRefX: addSourceRefIdToExistingRefX,
