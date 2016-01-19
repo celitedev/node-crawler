@@ -16,7 +16,6 @@ function getSourceEntityState(result) {
 	};
 }
 
-
 module.exports = function(generatedSchemas, r, redisClient) {
 
 	var entities = require("../schemas/domain/entities")(generatedSchemas, r);
@@ -34,18 +33,18 @@ module.exports = function(generatedSchemas, r, redisClient) {
 	// Return: the collection of SourceEntities.
 	function getNewSourceEntities(data) {
 		return function() {
+
+			var start = new Date().getTime();
 			return tableSourceEntity.getAll(false, {
 					index: 'modifiedMakeRefs'
 				}).limit(data.state.batch).run()
 				.then(function fromResultsToSourceEntities(results) {
 
-					// if (!results.length) {
-					// 	return;
-					// }
-
 					var options = {
 						skipAlias: true
 					};
+
+					data.time.getNewSourceEntities += new Date().getTime() - start;
 
 					//format the results into actual SourceEntity domain objects.
 					return _.map(results, function(result) {
@@ -113,6 +112,9 @@ module.exports = function(generatedSchemas, r, redisClient) {
 	//
 	function updateExistingAndInsertNewRefNorms(data) {
 		return function() {
+
+			var start = new Date().getTime();
+
 			return Promise.resolve()
 				.then(function fetchExistingRefNorms() {
 					return tableRefNorms.getAll.apply(tableRefNorms, data.sourceidsToLookup.concat({
@@ -134,13 +136,17 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 						var newRefNorm = {
 							_sourceId: obj.sourceId,
-							_sourceUrl: obj.sourceUrl,
 							_sourceRefId: obj.id
 						};
 
+						if (obj.sourceUrl) {
+							newRefNorm._sourceUrl = obj.sourceUrl;
+						}
+
+
 						var refNormArr = existingRefNormsPerSourceid[obj.sourceId];
 
-						if (refNormArr) {
+						if (refNormArr) { //existing RefForm
 
 							var err;
 							if (refNormArr.length > 1) {
@@ -181,16 +187,31 @@ module.exports = function(generatedSchemas, r, redisClient) {
 							//This is later used to add sourceRefId to all existing refX that point to said refNorm.
 							data.refNormIdToSourceRefIdMap[newRefNorm.id] = obj.id;
 
+							//If is the same as old -> no need to update
+							return _.eq(newRefNorm, refNormOld) ? undefined : newRefNorm;
+
+						} else { //new RefNorm:
+
+							return newRefNorm;
+
+							// TODO: %150: do not save refNorm if we explicitly don't want to. 
+							// For instance, MovieShowings are a dime a dozen and we can expect that 
+							// no other entity will every reference it. If we know this we can optimize for it. 
+							// This saves us a bunch of RefNorms that we don't ever use.
+							// return undefined;
+
 						}
-
-						return newRefNorm;
-
 					});
+
+
+					refNormsToUpsert = _.compact(refNormsToUpsert);
 
 					// upsert refNorms
 					return tableRefNorms.insert(refNormsToUpsert, {
 						conflict: "update"
-					}).run();
+					}).then(function() {
+						data.time.updateExistingAndInsertNewRefNorms += new Date().getTime() - start;
+					});
 				});
 		};
 	}
@@ -199,11 +220,15 @@ module.exports = function(generatedSchemas, r, redisClient) {
 	// with a sourceRefId
 	function addSourceRefIdToExistingRefX(data) {
 		return function() {
+			var start = new Date().getTime();
+
 			if (_.size(data.refNormIdToSourceRefIdMap)) {
 				return tableRefX.getAll.apply(tableRefX, _.keys(data.refNormIdToSourceRefIdMap).concat({
 					index: 'refNormId'
 				})).update({
 					sourceRefId: r.expr(data.refNormIdToSourceRefIdMap).getField(r.row('refNormId')) //lookup sourceRefId in <refNormId -> sourceRefId> map
+				}).then(function() {
+					data.time.addSourceRefIdToExistingRefX += new Date().getTime() - start;
 				});
 			}
 		};
@@ -213,6 +238,8 @@ module.exports = function(generatedSchemas, r, redisClient) {
 	// This consists of creating / updating based on all references occuring in the source. 
 	function composeRefs(data) {
 		return function() {
+
+			var start = new Date().getTime();
 
 			//loop all references in the sourceObject to build the _refs-property
 			//This is build by fusing new reference properties with old ones. 
@@ -242,6 +269,9 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 				data.sourceIdToRefMap[obj.id] = refs;
 			});
+
+			data.time.composeRefs += new Date().getTime() - start;
+
 		};
 	}
 
@@ -251,6 +281,8 @@ module.exports = function(generatedSchemas, r, redisClient) {
 		//LATER: #143: do the same for refs without sourceId.                                               
 
 		return function() {
+
+			var start = new Date().getTime();
 
 			return Promise.resolve()
 				.then(function fetchRefNormsForReferences() {
@@ -292,22 +324,25 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 					//... as well as the actual inserting
 					return tableRefNorms.insert(refNormsToUpsert, {
-						conflict: "update",
-						returnChanges: true //We want results back from this insert...
-					}).run().then(function(refNorms) {
+							conflict: "update",
+							returnChanges: true //We want results back from this insert...
+						})
+						.then(function(refNorms) {
 
-						//... which are fetched from the changes object.
-						var refNormsNew = _.pluck(refNorms.changes, "new_val");
+							//... which are fetched from the changes object.
+							var refNormsNew = _.pluck(refNorms.changes, "new_val");
 
-						//Now, the newly added refNorms are added to the refNorm map
-						_.each(refNormsNew, function(refNormNew) {
-							var sourceId = refNormNew._sourceId;
-							if (data.refNormMap[sourceId]) {
-								throw new Error("Sanity check: _sourceId found in existing refNormMap, while we just checked it wasn't there: " + sourceId);
-							}
-							data.refNormMap[sourceId] = refNormNew;
+							//Now, the newly added refNorms are added to the refNorm map
+							_.each(refNormsNew, function(refNormNew) {
+								var sourceId = refNormNew._sourceId;
+								if (data.refNormMap[sourceId]) {
+									throw new Error("Sanity check: _sourceId found in existing refNormMap, while we just checked it wasn't there: " + sourceId);
+								}
+								data.refNormMap[sourceId] = refNormNew;
+							});
+						}).then(function() {
+							data.time.fetchExistingAndInsertNewRefNormsForReferences += new Date().getTime() - start;
 						});
-					});
 				});
 		};
 	}
@@ -317,6 +352,8 @@ module.exports = function(generatedSchemas, r, redisClient) {
 	//This is checked by reference not having an id. 
 	function insertRefX(data) {
 		return function() {
+
+			var start = new Date().getTime();
 
 			//Now that we've fetched or created RefNorms for all unlinked references, 
 			//it's time to create actual refX-rows for all references. 
@@ -351,7 +388,9 @@ module.exports = function(generatedSchemas, r, redisClient) {
 			// ... and actually insert them
 			return tableRefX.insert(refXCollection, {
 				conflict: "update"
-			}).run();
+			}).then(function() {
+				data.time.insertRefX += new Date().getTime() - start;
+			});
 		};
 	}
 
@@ -362,16 +401,28 @@ module.exports = function(generatedSchemas, r, redisClient) {
 	function updateModifiedDateForSourceEntities(data) {
 		return function() {
 
+			var start = new Date().getTime();
+
 			// Update 'modifiedMakeRefs' and '_refs' for all processed sourceEntities in this batch. 
 			var d = new Date();
 
-			return tableSourceEntity.getAll.apply(tableSourceEntity, data.sourceEntityIdsToLookup.concat({
-				index: 'id'
-			})).update({
-				_state: {
-					modifiedMakeRefs: d
-				},
-				_refs: r.expr(data.sourceIdToRefMap).getField(r.row("id"))
+			//Tech: note: only updates _state.modifiedMakeRefs and doesn't touch any other part
+			//of _state. This is hugely important to guarantee no stale writes/reads on _state-object. 
+			//Pretty cool of RethinkDB
+			var updatedSourceEntityDTO = _.map(data.sourceIdToRefMap, function(v, k) {
+				return {
+					id: k,
+					_refs: v,
+					_state: {
+						modifiedMakeRefs: d
+					}
+				};
+			});
+
+			return tableSourceEntity.insert(updatedSourceEntityDTO, {
+				conflict: "update"
+			}).then(function() {
+				data.time.updateModifiedDateForSourceEntities += new Date().getTime() - start;
 			});
 		};
 	}
