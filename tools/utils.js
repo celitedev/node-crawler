@@ -117,9 +117,11 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 			return Promise.resolve()
 				.then(function fetchExistingRefNorms() {
-					return tableRefNorms.getAll.apply(tableRefNorms, data.sourceidsToLookup.concat({
-						index: '_sourceId'
-					}));
+					if (data.sourceidsToLookup.length) {
+						return tableRefNorms.getAll.apply(tableRefNorms, data.sourceidsToLookup.concat({
+							index: '_sourceId'
+						}));
+					}
 				})
 				.then(function(existingRefNorms) {
 
