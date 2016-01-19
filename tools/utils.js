@@ -369,8 +369,8 @@ module.exports = function(generatedSchemas, r, redisClient) {
 				}
 
 				var obj = {
-					referrer: unlinkedRef._sourceEntityId, //the sourceEntity referring
-					refId: unlinkedRef.id, //the actual references without the sourceEntity referring
+					id: unlinkedRef.id, //the actual reference within the sourceEntity
+					sourceAnchorId: unlinkedRef._sourceEntityId, //the sourceEntity referring
 					refNormId: refNorm.id //the refNormId referred to
 				};
 
