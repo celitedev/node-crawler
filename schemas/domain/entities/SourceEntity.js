@@ -96,7 +96,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 	//update refs to _refs
 	SourceEntity.prototype.calculateRefs = function(properties) {
-		var out = {};
+		var out = [];
 		_calcRefsRecursive(properties, out);
 		return out;
 	};
@@ -241,15 +241,22 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				return obj;
 			}
 
-			v = _.isArray(v) ? _.compact(_.map(v, transformSingleItem)) : transformSingleItem(v);
+			var arr = _.compact(_.map(_.isArray(v) ? v : [v], transformSingleItem));
 
-			if (_.isArray(v) && !v.length) {
+			//add the dot-separated ref-path
+			_.map(arr, function(v) {
+				v.key = compoundKey;
+			});
+
+			if (!v.length) {
 				v = undefined;
+				return;
 			}
 
-			if (v !== undefined) {
-				agg[compoundKey] = v;
-			}
+			_.each(arr, function(v) {
+				agg.push(v); //can't do concat because array-ref not maintained
+			});
+
 		});
 
 	}

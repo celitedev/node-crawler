@@ -37,84 +37,84 @@ var dataProto = {
 
 
 Promise.resolve()
-	// .then(function processNewSources() {
-
-// 	var data = _.cloneDeep(dataProto);
-// 	var start = new Date().getTime();
-
-// 	//Func: Get SourceEntities that haven't been processed by this process yet. 
-// 	//Tech: Get SourceEntities that don't exist in index 'modifiedMakeRefs'
-// 	//'modifiedMakeRefs' is created based on field _state.modifiedMakeRefs. See #142 for more.
-
-// 	return Promise.resolve()
-// 		.then(function processNewSourcesRecursive() {
-
-// 			return Promise.resolve()
-// 				.then(toolUtils.getSourceEntities(data))
-// 				.then(function calcStats(sourceEntities) {
-// 					data.state.nrOfResults = sourceEntities.length;
-// 					data.state.total += data.state.nrOfResults;
-// 					console.log("processNewSources", data.state.total);
-// 					return sourceEntities;
-// 				})
-// 				.then(toolUtils.resetDataFromSourceEntities(data))
-// 				.then(toolUtils.updateExistingAndInsertNewRefNorms(data))
-// 				.then(toolUtils.addSourceRefIdToExistingRefX(data))
-// 				.then(toolUtils.composeRefs(data))
-// 				.then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
-// 				.then(toolUtils.insertRefX(data))
-// 				.then(toolUtils.updateModifiedDateForSourceEntities(data))
-// 				.then(timerStats(data, start))
-// 				.then(function() {
-// 					//process all new sources by recursively fetching and processing all sourceEntities in batches
-// 					if (data.state.nrOfResults === data.state.batch) {
-// 						return processNewSourcesRecursive();
-// 					}
-// 				});
-// 		});
-
-// })
-.then(function processExistingSources() {
+	.then(function processNewSources() {
 
 		var data = _.cloneDeep(dataProto);
 		var start = new Date().getTime();
-
-		var processExistingButDirty = true;
 
 		//Func: Get SourceEntities that haven't been processed by this process yet. 
 		//Tech: Get SourceEntities that don't exist in index 'modifiedMakeRefs'
 		//'modifiedMakeRefs' is created based on field _state.modifiedMakeRefs. See #142 for more.
 
 		return Promise.resolve()
-			.then(function processExistingSourcesRecursive() {
+			.then(function processNewSourcesRecursive() {
+
 				return Promise.resolve()
-					.then(toolUtils.getSourceEntities(data, processExistingButDirty))
+					.then(toolUtils.getSourceEntities(data))
 					.then(function calcStats(sourceEntities) {
 						data.state.nrOfResults = sourceEntities.length;
 						data.state.total += data.state.nrOfResults;
-						console.log("processExistingSources", data.state.total);
+						console.log("processNewSources", data.state.total);
 						return sourceEntities;
 					})
 					.then(toolUtils.resetDataFromSourceEntities(data))
+					.then(toolUtils.updateExistingAndInsertNewRefNorms(data))
+					.then(toolUtils.addSourceRefIdToExistingRefX(data))
 					.then(toolUtils.composeRefs(data))
-					// .then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
+					.then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
 					// .then(toolUtils.insertRefX(data))
-					// .then(toolUtils.updateModifiedDateForSourceEntities(data))
+					.then(toolUtils.updateModifiedDateForSourceEntities(data))
 					.then(timerStats(data, start))
 					.then(function() {
 						//process all new sources by recursively fetching and processing all sourceEntities in batches
 						if (data.state.nrOfResults === data.state.batch) {
-							return processExistingSourcesRecursive();
+							return processNewSourcesRecursive();
 						}
 					});
 			});
 
 	})
-	.finally(function() {
-		console.log("QUITTING");
-		redisClient.quit(); //quit
-		r.getPoolMaster().drain(); //quit
-	});
+	// .then(function processExistingSources() {
+
+// 		var data = _.cloneDeep(dataProto);
+// 		var start = new Date().getTime();
+
+// 		var processExistingButDirty = true;
+
+// 		//Func: Get SourceEntities that haven't been processed by this process yet. 
+// 		//Tech: Get SourceEntities that don't exist in index 'modifiedMakeRefs'
+// 		//'modifiedMakeRefs' is created based on field _state.modifiedMakeRefs. See #142 for more.
+
+// 		return Promise.resolve()
+// 			.then(function processExistingSourcesRecursive() {
+// 				return Promise.resolve()
+// 					.then(toolUtils.getSourceEntities(data, processExistingButDirty))
+// 					.then(function calcStats(sourceEntities) {
+// 						data.state.nrOfResults = sourceEntities.length;
+// 						data.state.total += data.state.nrOfResults;
+// 						console.log("processExistingSources", data.state.total);
+// 						return sourceEntities;
+// 					})
+// 					.then(toolUtils.resetDataFromSourceEntities(data))
+// 					.then(toolUtils.composeRefs(data))
+// 					// .then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
+// 					// .then(toolUtils.insertRefX(data))
+// 					// .then(toolUtils.updateModifiedDateForSourceEntities(data))
+// 					.then(timerStats(data, start))
+// 					.then(function() {
+// 						//process all new sources by recursively fetching and processing all sourceEntities in batches
+// 						if (data.state.nrOfResults === data.state.batch) {
+// 							return processExistingSourcesRecursive();
+// 						}
+// 					});
+// 			});
+
+// 	})
+.finally(function() {
+	console.log("QUITTING");
+	redisClient.quit(); //quit
+	r.getPoolMaster().drain(); //quit
+});
 
 
 function timerStats(data, start) {
