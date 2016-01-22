@@ -273,25 +273,28 @@ module.exports = function(generatedSchemas, r, redisClient) {
 			//}
 			_.each(data.sourceObjects, function(obj) {
 
-				console.log("existing _refs: " + JSON.stringify(obj._refs, null, 2));
+				// console.log("existing _refs: " + JSON.stringify(obj._refs, null, 2));
 
-				function transformVal(v) {
+				function transformNewRef(v) {
 					if (!v.id && v._sourceId) {
 						v.id = uuid.v4();
 						data.unlinkedRefsWithSourceId.push(v);
 					}
-					v._sourceEntityId = obj.id;
 					return v;
 				}
 
 				//get new refs
 				var refs = obj.calculateRefs(obj._props);
+
 				_.each(refs, function(refVal) {
-					refVal = _.isArray(refVal) ? _.map(refVal, transformVal) : transformVal(refVal);
+					refVal = transformNewRef(refVal);
 				});
 
+				//make object from array by using 'id' as key. 
+				//Once we do we no longer need 'id' as attribute 
+				var d = _.zipObject(_.pluck(refs, "id"), _.map(refs, _.partialRight(_.omit, "id")));
 
-				data.sourceIdToRefMap[obj.id] = refs;
+				data.sourceIdToRefMap[obj.id] = d;
 			});
 
 			data.time.composeRefs += new Date().getTime() - start;
