@@ -268,33 +268,37 @@ module.exports = function(generatedSchemas, r, redisClient) {
 			//
 			//The structure of the _refs property is as follows: 
 			//
-			//<key.with.nested>: {
-			// _sourceId
+			//{
+			// .....
+			// "f37c6b8c-04bc-4a98-8046-ded9146c3763": {
+			//   "sourceRefId": ....
+			//   "val": [
+			//     {
+			//       "_sourceId": "http://www.fandango.com/theboy_187439/movieoverview",
+			//       "_sourceUrl": "http://www.fandango.com/theboy_187439/movieoverview",
+			//       "_path": "workFeatured",
+			//       "_refNormId": "f37c6b8c-04bc-4a98-8046-ded9146c3763"
+			//     }
+			//   ]
+			// }, 
+			// ...
 			//}
+
 			_.each(data.sourceObjects, function(obj) {
 
 				// console.log("existing _refs: " + JSON.stringify(obj._refs, null, 2));
 
-				function transformNewRef(v) {
-					if (!v.id && v._sourceId) {
-						v.id = uuid.v4();
-						data.unlinkedRefsWithSourceId.push(v);
-					}
-					return v;
-				}
-
 				//get new refs
 				var refs = obj.calculateRefs(obj._props);
 
+				//for all refs that don't link to refNorm yet, add them to unlinkedRefsWithSourceId
 				_.each(refs, function(refVal) {
-					refVal = transformNewRef(refVal);
+					if (!refVal._refNormId && refVal._sourceId) {
+						data.unlinkedRefsWithSourceId.push(refVal);
+					}
 				});
 
-				//make object from array by using 'id' as key. 
-				//Once we do we no longer need 'id' as attribute 
-				var d = _.zipObject(_.pluck(refs, "id"), _.map(refs, _.partialRight(_.omit, "id")));
-
-				data.sourceIdToRefMap[obj.id] = d;
+				data.sourceIdToRefMap[obj.id] = refs;
 			});
 
 			data.time.composeRefs += new Date().getTime() - start;
@@ -302,7 +306,7 @@ module.exports = function(generatedSchemas, r, redisClient) {
 		};
 	}
 
-	//For all references for all sourceEntities, fetch RefNorms and create if not exists.
+	//For all references for all sourceEntities that don't link to refNorms yet, fetch RefNorms and create if not exists.
 	function fetchExistingAndInsertNewRefNormsForReferences(data) {
 
 		//LATER: #143: do the same for refs without sourceId.                                               
@@ -374,54 +378,6 @@ module.exports = function(generatedSchemas, r, redisClient) {
 		};
 	}
 
-
-	//Insert an RefX-object for each reference that doesn't have one already. 
-	//This is checked by reference not having an id. 
-	function insertRefX(data) {
-		return function() {
-
-			var start = new Date().getTime();
-
-			//Now that we've fetched or created RefNorms for all unlinked references, 
-			//it's time to create actual refX-rows for all references. 
-			//A RefX row is an cross-table between References (as stored in SourceEntity._refs) and RefNorms
-
-			//So, let's create the raw refX-objects to insert...
-			var refXCollection = _.map(data.unlinkedRefsWithSourceId, function(unlinkedRef) {
-
-				var refNorm = data.refNormMap[unlinkedRef._sourceId];
-
-				if (!refNorm) {
-					throw new Error("sanity check: refNorm must exist for _sourceId at this point: " + unlinkedRef._sourceId);
-				}
-
-				var obj = {
-					id: unlinkedRef.id, //the actual reference within the sourceEntity
-					sourceAnchorId: unlinkedRef._sourceEntityId, //the sourceEntity referring
-					refNormId: refNorm.id //the refNormId referred to
-				};
-
-				// .. and optionally, the sourceRefId referred to. 
-				// If it doesn't exist yet, it will be added once the SourceEntity to which the RefNorm points is added.
-				if (refNorm._sourceRefId) {
-					obj.sourceRefId = refNorm._sourceRefId;
-				}
-
-				delete unlinkedRef._sourceEntityId; //not needed anymore, and don't persist
-
-				return obj;
-			});
-
-			// ... and actually insert them
-			return tableRefX.insert(refXCollection, {
-				conflict: "update"
-			}).then(function() {
-				data.time.insertRefX += new Date().getTime() - start;
-			});
-		};
-	}
-
-
 	//Now that we're done processing SourceEntities, save 
 	//- new _refs including ids, so we know we don't have to process these anymore (for RefNorm and RefX creation)
 	//- updated state. 
@@ -430,16 +386,43 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 			var start = new Date().getTime();
 
+			//Now that we've fetched or created RefNorms for all *unlinked* references, let's hook them up. 
+			_.each(data.unlinkedRefsWithSourceId, function(unlinkedRef) {
+				var refNorm = data.refNormMap[unlinkedRef._sourceId];
+
+				if (!refNorm) {
+					throw new Error("sanity check: refNorm must exist for _sourceId at this point: " + unlinkedRef._sourceId);
+				}
+
+				//add refnormId
+				unlinkedRef._refNormId = refNorm.id;
+
+				//if sourceRefId already exists -> persist this as well.
+				if (refNorm._sourceRefId) {
+					unlinkedRef._sourceRefId = refNorm._sourceRefId;
+				}
+			});
+
 			// Update 'modifiedMakeRefs' and '_refs' for all processed sourceEntities in this batch. 
 			var d = new Date();
 
 			//Tech: note: only updates _state.modifiedMakeRefs and doesn't touch any other part
 			//of _state. This is hugely important to guarantee no stale writes/reads on _state-object. 
-			//Pretty cool of RethinkDB
+			//Thank you RethinkDB
 			var updatedSourceEntityDTO = _.map(data.sourceIdToRefMap, function(v, k) {
+
+				var refsObj = _.reduce(_.groupBy(v, "_refNormId"), function(agg, arr, k) {
+					agg[k] = {
+						sourceRefId: arr[0]._sourceRefId, //May not exist. Guarenteed to be the same for all refs that point to same refNormId
+						val: _.map(arr, _.partialRight(_.omit, ["_sourceRefId", "_refNormId"]))
+					};
+					return agg;
+				}, {});
+
 				return {
 					id: k,
-					_refs: v,
+					_refNormIds: _.uniq(_.pluck(v, "_refNormId")),
+					_refs: refsObj,
 					_state: {
 						modifiedMakeRefs: d
 					}
@@ -461,7 +444,6 @@ module.exports = function(generatedSchemas, r, redisClient) {
 		addSourceRefIdToExistingRefX: addSourceRefIdToExistingRefX,
 		composeRefs: composeRefs,
 		fetchExistingAndInsertNewRefNormsForReferences: fetchExistingAndInsertNewRefNormsForReferences,
-		insertRefX: insertRefX,
 		updateModifiedDateForSourceEntities: updateModifiedDateForSourceEntities,
 	};
 };

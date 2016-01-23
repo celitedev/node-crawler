@@ -62,7 +62,6 @@ Promise.resolve()
 					.then(toolUtils.addSourceRefIdToExistingRefX(data))
 					.then(toolUtils.composeRefs(data))
 					.then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
-					// .then(toolUtils.insertRefX(data))
 					.then(toolUtils.updateModifiedDateForSourceEntities(data))
 					.then(timerStats(data, start))
 					.then(function() {
