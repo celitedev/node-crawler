@@ -46,14 +46,14 @@ module.exports = function(generatedSchemas, r, redisClient) {
 						//fetch new
 						return tableSourceEntity.getAll(false, {
 							index: 'modifiedMakeRefs'
-						}).without("_refs").limit(data.state.batch).run();
+						}).without("_refToSourceRefIdMap").limit(data.state.batch).run();
 
 					} else {
 
 						//fetch existing but dirty
 						return tableSourceEntity.getAll(true, {
 							index: 'dirtyForMakeRefs'
-						}).without("_refs").limit(data.state.batch).run();
+						}).without("_refToSourceRefIdMap").limit(data.state.batch).run();
 					}
 
 				})
@@ -254,17 +254,64 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 				var normids = _.keys(data.refNormIdToSourceRefIdMap);
 
+
+				//SEE BELOW
+				//WE WANT TO IDEALLY BE ABLE TO UPDATE SOURCEENTITIES IN PARTIAL (ATOMIC) WAY 
+				//BY UPDATING SEPARATE PROPERTY `_refToSourceRefIdMap` WHICH IS SOLDELY MANAGED BY THIS PARTICULAR
+				//SUBPROCESS. (I.E.: addSourceRefIdToExistingRefs) 
+				//IS THIS POSSIBLE EVENT IF WE POSSIBLY WANT TO UPDATE MULTIPLE PROPERTIES OF addSourceRefIdToExistingRefs AT ONCE? 
+				//
+				//ALTERNATIVE: 
+				//KEEP LIST (MUST BE ABLE TO UPDATE PARTIAL/ATOMIC) ON REFNORMS ON LINKING SOURCEENTITIES. THEN AS PART OF 
+				//updateExistingAndInsertNewRefNorms WE HAVE THE LISTS OF ALL REFNORMS AND CAN FORMAT PIVOT THEM TO GROUP BY 
+				//SOURCEENTITIES. THEN WE CAN DO THE PARTIAL UPDATE ABOVE IN 1 SWEEP. I.E.: A MAP FROM SOURCEENTITY -> 
+				//PARTIAL/DELTA OBJECT TO BE INJECTED IN  addSourceRefIdToExistingRefs. 
+				//
+				// BUT THEN THIS LIST CAN GET REALLY LONG, ETC AND PAIN TO MANAGE / KEEP UNIQUE, ETC. 
+				// SO WHY NOT USE REFX AGAIN? 
+				// 
+				//  TBD 
+				// 
+
+
+				///////////////////////////////////////////////////////////////////////////////////////////
+				//SOLUTION JUST DO THE FETCH + INTERESECT NOW 100% EQUAL TO IMPLEMENTED IN COMMENT BELOW //
+				//JUST NOT UPDATE _REFS BUT NEW FIELD _refToSourceRefIdMap SO #153 IS STILL COVERED.     //
+				//WE SHOULD THEN BE GOOD FOR NOW.                                                        //
+				//LATER ON WE CAN ALWAYS OPTIMIZE WHEN NEEDED. TIME TO MOVE ON.  
+				//THIS SHOULD ALSO BE OK UNDER MULTI-WORKER RIGHT? (I.E.: THIS PROCESS RUN IN PARALLEL)
+				//YEAH THINK SO: THIS COULD RESULT IN MULTIPLE PROCESSES UPDATING _refToSourceRefIdMap 
+				//AT SAME TIME. STILL, BECAUSE 
+				// - IT'S A PARTIAL UPDATE
+				// - UPDATES TO THE SAME KEY *MUST* RESULT IN THE SAME VALUE -> IDEMPOTENT
+				// => THIS MUST BE STABLE
+				///////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+				///OLD
+				// if (_.size(data.refNormIdToSourceRefIdMap)) {
+				// 	return tableSourceEntity.getAll.apply(tableSourceEntity, normids.concat({
+				// 		index: '_refNormIds'
+				// 	})).update({
+				// 		sourceRefId: r.expr(data.refNormIdToSourceRefIdMap).getField(r.row('refNormId')) //lookup sourceRefId in <refNormId -> sourceRefId> map
+				// 	}).then(function() {
+				// 		data.time.addSourceRefIdToExistingRefs += new Date().getTime() - start;
+				// 	});
+				// }
+
+				//NEW
 				return Promise.resolve()
 					.then(function fetchSourceEntitiesWithRefAnchors() {
 
 						return tableSourceEntity.getAll.apply(tableSourceEntity, normids.concat({
 							index: '_refNormIds'
-						})).pluck("id", "_refNormIds", "_refs"); //pluck: save bandwidth, possible because partial update works
+						})).pluck("id", "_refNormIds", "_refToSourceRefIdMap"); //pluck: save bandwidth, possible because partial update works
 
 					})
 					.then(function updateSourceEntitiesWithRefAnchors(docs) {
 
-						var sourceEntitiesToUpdate = _.compact(_.map(docs, function(d) {
+						var sourceEntitiesToPartiallyUpdate = _.compact(_.map(docs, function(d) {
 
 							//for the given doc get the refs pointing to the refNormids that *might* need updating. 
 							var intersectNormIds = _.intersection(d._refNormIds, normids);
@@ -275,35 +322,28 @@ module.exports = function(generatedSchemas, r, redisClient) {
 								throw err;
 							}
 
-							//For this document create a updateDelta for the _refs property. 
-							//This is done by iterating each refNormId that's present in both (a ref in) this doc as well as in the currenntly 
-							//processed refNormIds. For these combinations the appropriate sourceRefId as added if not already done so. 
-							//If sourceRefId already added for all refNormIds processed on this doc and in this batch, we can skip the update on this
-							//doc altogether. 
-							var refsUpdateDelta = _.reduce(intersectNormIds, function(agg, normId) {
+							//init _refToSourceRefIdMap
+							d._refToSourceRefIdMap = d._refToSourceRefIdMap || {};
 
-								if (!d._refs[normId]._sourceRefId) { //only need to update if _sourceRefId not already present
-
-									//this will result in a PARTIAL update: THe 'val' property is left untouched. We only add the _sourceRefId
-									agg[normId] = {
-										_sourceRefId: data.refNormIdToSourceRefIdMap[normId]
-									};
+							var refToSourceRefIdMapDelta = _.reduce(intersectNormIds, function(agg, normId) {
+								if (!d._refToSourceRefIdMap[normId]) { //only need to update if key/value not already present
+									agg[normId] = data.refNormIdToSourceRefIdMap[normId];
 								}
 								return agg;
 							}, {});
 
-							if (!_.size(refsUpdateDelta)) {
+							if (!_.size(refToSourceRefIdMapDelta)) {
 								return undefined; // there's nothing to update on this doc. 
 							}
 
 							return {
 								id: d.id,
-								_refs: refsUpdateDelta
+								_refToSourceRefIdMap: refToSourceRefIdMapDelta
 							};
 
 						}));
 
-						return tableSourceEntity.insert(sourceEntitiesToUpdate, {
+						return tableSourceEntity.insert(sourceEntitiesToPartiallyUpdate, {
 							conflict: "update",
 							returnChanges: false
 						});
@@ -346,38 +386,23 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 			var sourceIds = _.pluck(data.sourceObjects, "id");
 
-			return Promise.resolve()
-				.then(function fetchTheRefs() {
+			_.each(data.sourceObjects, function(obj) {
 
-					//we need to fetch the refs only here because it could have been altered in `sourceEntitiesToUpdate`
-					return tableSourceEntity.getAll.apply(tableSourceEntity, sourceIds).pluck("id", "_refs");
-				})
-				.then(function calculateTheRefs(docs) {
-					var docMap = _.zipObject(_.pluck(docs, "id"), docs);
+				//Calc new refs
+				//TODO: not useful/clear to have this on SourceEntity prototype
+				//only keep refs for which _sourceId is defined
+				var refs = data.sourceIdToRefMap[obj.id] = _.filter(obj.calculateRefs(obj._props), "_sourceId");
 
-					_.each(data.sourceObjects, function(d) {
-						d._refs = docMap[d.id]._refs; //add the fetched _refs now
-					});
-
-					_.each(data.sourceObjects, function(obj) {
-
-						//calc new refs
-						//TODO: not useful/clear to have this on SourceEntity prototype
-						var refs = obj.calculateRefs(obj._props);
-
-						//for all refs that don't link to refNorm yet, add them to unlinkedRefsWithSourceId
-						_.each(refs, function(refVal) {
-							if (!refVal._refNormId && refVal._sourceId) {
-								data.unlinkedRefsWithSourceId.push(refVal);
-							}
-						});
-
-						data.sourceIdToRefMap[obj.id] = refs;
-					});
-
-					data.time.composeRefs += new Date().getTime() - start;
-
+				//for all refs that don't link to refNorm yet, add them to unlinkedRefsWithSourceId
+				_.each(refs, function(refVal) {
+					if (!refVal._refNormId) {
+						data.unlinkedRefsWithSourceId.push(refVal);
+					}
 				});
+			});
+
+			data.time.composeRefs += new Date().getTime() - start;
+
 		};
 	}
 
@@ -496,7 +521,7 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 				return {
 					id: k,
-					_refNormIds: _.uniq(_.pluck(v, "_refNormId")),
+					_refNormIds: _.uniq(_.pluck(v, "_refNormId")), //RefNormids that need resolved. Used for lookup
 					_refs: refsObj,
 					_state: {
 						modifiedMakeRefs: d
@@ -505,11 +530,11 @@ module.exports = function(generatedSchemas, r, redisClient) {
 			});
 
 			return Promise.resolve()
-				// .then(function() {
-				// 	return tableSourceEntity.insert(updatedSourceEntityDTO, {
-				// 		conflict: "update"
-				// 	});
-				// })
+				.then(function() {
+					return tableSourceEntity.insert(updatedSourceEntityDTO, {
+						conflict: "update"
+					});
+				})
 				.then(function() {
 					data.time.updateModifiedDataForSourceEntities += new Date().getTime() - start;
 				});
