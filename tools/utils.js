@@ -254,53 +254,6 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 				var normids = _.keys(data.refNormIdToSourceRefIdMap);
 
-
-				//SEE BELOW
-				//WE WANT TO IDEALLY BE ABLE TO UPDATE SOURCEENTITIES IN PARTIAL (ATOMIC) WAY 
-				//BY UPDATING SEPARATE PROPERTY `_refToSourceRefIdMap` WHICH IS SOLDELY MANAGED BY THIS PARTICULAR
-				//SUBPROCESS. (I.E.: addSourceRefIdToExistingRefs) 
-				//IS THIS POSSIBLE EVENT IF WE POSSIBLY WANT TO UPDATE MULTIPLE PROPERTIES OF addSourceRefIdToExistingRefs AT ONCE? 
-				//
-				//ALTERNATIVE: 
-				//KEEP LIST (MUST BE ABLE TO UPDATE PARTIAL/ATOMIC) ON REFNORMS ON LINKING SOURCEENTITIES. THEN AS PART OF 
-				//updateExistingAndInsertNewRefNorms WE HAVE THE LISTS OF ALL REFNORMS AND CAN FORMAT PIVOT THEM TO GROUP BY 
-				//SOURCEENTITIES. THEN WE CAN DO THE PARTIAL UPDATE ABOVE IN 1 SWEEP. I.E.: A MAP FROM SOURCEENTITY -> 
-				//PARTIAL/DELTA OBJECT TO BE INJECTED IN  addSourceRefIdToExistingRefs. 
-				//
-				// BUT THEN THIS LIST CAN GET REALLY LONG, ETC AND PAIN TO MANAGE / KEEP UNIQUE, ETC. 
-				// SO WHY NOT USE REFX AGAIN? 
-				// 
-				//  TBD 
-				// 
-
-
-				///////////////////////////////////////////////////////////////////////////////////////////
-				//SOLUTION JUST DO THE FETCH + INTERESECT NOW 100% EQUAL TO IMPLEMENTED IN COMMENT BELOW //
-				//JUST NOT UPDATE _REFS BUT NEW FIELD _refToSourceRefIdMap SO #153 IS STILL COVERED.     //
-				//WE SHOULD THEN BE GOOD FOR NOW.                                                        //
-				//LATER ON WE CAN ALWAYS OPTIMIZE WHEN NEEDED. TIME TO MOVE ON.  
-				//THIS SHOULD ALSO BE OK UNDER MULTI-WORKER RIGHT? (I.E.: THIS PROCESS RUN IN PARALLEL)
-				//YEAH THINK SO: THIS COULD RESULT IN MULTIPLE PROCESSES UPDATING _refToSourceRefIdMap 
-				//AT SAME TIME. STILL, BECAUSE 
-				// - IT'S A PARTIAL UPDATE
-				// - UPDATES TO THE SAME KEY *MUST* RESULT IN THE SAME VALUE -> IDEMPOTENT
-				// => THIS MUST BE STABLE
-				///////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-				///OLD
-				// if (_.size(data.refNormIdToSourceRefIdMap)) {
-				// 	return tableSourceEntity.getAll.apply(tableSourceEntity, normids.concat({
-				// 		index: '_refNormIds'
-				// 	})).update({
-				// 		sourceRefId: r.expr(data.refNormIdToSourceRefIdMap).getField(r.row('refNormId')) //lookup sourceRefId in <refNormId -> sourceRefId> map
-				// 	}).then(function() {
-				// 		data.time.addSourceRefIdToExistingRefs += new Date().getTime() - start;
-				// 	});
-				// }
-
-				//NEW
 				return Promise.resolve()
 					.then(function fetchSourceEntitiesWithRefAnchors() {
 
@@ -486,6 +439,8 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 			var start = new Date().getTime();
 
+			var refNormToSourceRefMap = {};
+
 			//Now that we've fetched or created RefNorms for all *unlinked* references, let's hook them up. 
 			_.each(data.unlinkedRefsWithSourceId, function(unlinkedRef) {
 				var refNorm = data.refNormMap[unlinkedRef._sourceId];
@@ -497,9 +452,8 @@ module.exports = function(generatedSchemas, r, redisClient) {
 				//add refnormId
 				unlinkedRef._refNormId = refNorm.id;
 
-				//if sourceRefId already exists -> persist this as well.
 				if (refNorm._sourceRefId) {
-					unlinkedRef._sourceRefId = refNorm._sourceRefId;
+					refNormToSourceRefMap[refNorm.id] = refNorm._sourceRefId;
 				}
 			});
 
@@ -511,17 +465,17 @@ module.exports = function(generatedSchemas, r, redisClient) {
 			//Thank you RethinkDB
 			var updatedSourceEntityDTO = _.map(data.sourceIdToRefMap, function(v, k) {
 
-				var refsObj = _.reduce(_.groupBy(v, "_refNormId"), function(agg, arr, k) {
-					agg[k] = {
-						sourceRefId: arr[0]._sourceRefId, //May not exist. Guaranteed to be the same for all refs that point to same refNormId
-						val: _.map(arr, _.partialRight(_.omit, ["_sourceRefId", "_refNormId"]))
-					};
+				var refsObj = _.reduce(_.groupBy(v, "_path"), function(agg, arr, k) {
+					agg[k] = _.map(arr, _.partialRight(_.omit, ["_path"]));
 					return agg;
 				}, {});
 
+				var refNormIdsForSourceEntity = _.uniq(_.pluck(v, "_refNormId"));
+
 				return {
 					id: k,
-					_refNormIds: _.uniq(_.pluck(v, "_refNormId")), //RefNormids that need resolved. Used for lookup
+					_refNormIds: refNormIdsForSourceEntity, //RefNormids that need resolved. Used for lookup
+					_refToSourceRefIdMap: _.pick(refNormToSourceRefMap, refNormIdsForSourceEntity), //partial map
 					_refs: refsObj,
 					_state: {
 						modifiedMakeRefs: d
