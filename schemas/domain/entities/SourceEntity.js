@@ -245,7 +245,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 			//add the dot-separated ref-path
 			_.map(arr, function(v) {
-				v.key = compoundKey;
+				v._path = compoundKey;
 			});
 
 			if (!v.length) {
