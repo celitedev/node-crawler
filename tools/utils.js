@@ -46,14 +46,14 @@ module.exports = function(generatedSchemas, r, redisClient) {
 						//fetch new
 						return tableSourceEntity.getAll(false, {
 							index: 'modifiedMakeRefs'
-						}).limit(data.state.batch).run();
+						}).without("_refs").limit(data.state.batch).run();
 
 					} else {
 
 						//fetch existing but dirty
 						return tableSourceEntity.getAll(true, {
 							index: 'dirtyForMakeRefs'
-						}).limit(data.state.batch).run();
+						}).without("_refs").limit(data.state.batch).run();
 					}
 
 				})
@@ -338,6 +338,8 @@ module.exports = function(generatedSchemas, r, redisClient) {
 			// ...
 			//}
 
+			var sourceIds = _.pluck(data.sourceObjects, "id");
+			console.log(sourceIds);
 			_.each(data.sourceObjects, function(obj) {
 
 				// console.log("existing _refs: " + JSON.stringify(obj._refs, null, 2));
