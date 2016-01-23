@@ -238,20 +238,74 @@ module.exports = function(generatedSchemas, r, redisClient) {
 		};
 	}
 
-	// All existing RefX-objects (that reference any of the above processed RefNorms) are updated
-	// with a sourceRefId
-	function addSourceRefIdToExistingRefX(data) {
+	//Other sourceEntities may refer to a sourceEntity in this batch.
+	//Tag this in SourceEntity._tags -> set `sourceRefId` 
+	function addSourceRefIdToExistingRefs(data) {
 		return function() {
 			var start = new Date().getTime();
 
 			if (_.size(data.refNormIdToSourceRefIdMap)) {
-				return tableRefX.getAll.apply(tableRefX, _.keys(data.refNormIdToSourceRefIdMap).concat({
-					index: 'refNormId'
-				})).update({
-					sourceRefId: r.expr(data.refNormIdToSourceRefIdMap).getField(r.row('refNormId')) //lookup sourceRefId in <refNormId -> sourceRefId> map
-				}).then(function() {
-					data.time.addSourceRefIdToExistingRefX += new Date().getTime() - start;
-				});
+
+				var normids = _.keys(data.refNormIdToSourceRefIdMap);
+
+				return Promise.resolve()
+					.then(function fetchSourceEntitiesWithRefAnchors() {
+
+						return tableSourceEntity.getAll.apply(tableSourceEntity, normids.concat({
+							index: '_refNormIds'
+						})).pluck("id", "_refNormIds", "_refs"); //pluck: save bandwidth, possible because partial update works
+
+					})
+					.then(function updateSourceEntitiesWithRefAnchors(docs) {
+
+						var sourceEntitiesToUpdate = _.compact(_.map(docs, function(d) {
+
+							//for the given doc get the refs pointing to the refNormids that *might* need updating. 
+							var intersectNormIds = _.intersection(d._refNormIds, normids);
+
+							if (!intersectNormIds.length) {
+								var err = new Error("refNormid instersection is length zero. Should not happen?");
+								err.halt = true;
+								throw err;
+							}
+
+							//For this document create a updateDelta for the _refs property. 
+							//This is done by iterating each refNormId that's present in both (a ref in) this doc as well as in the currenntly 
+							//processed refNormIds. For these combinations the appropriate sourceRefId as added if not already done so. 
+							//If sourceRefId already added for all refNormIds processed on this doc and in this batch, we can skip the update on this
+							//doc altogether. 
+							var refsUpdateDelta = _.reduce(intersectNormIds, function(agg, normId) {
+
+								if (!d._refs[normId]._sourceRefId) { //only need to update if _sourceRefId not already present
+
+									//this will result in a PARTIAL update: THe 'val' property is left untouched. We only add the _sourceRefId
+									agg[normId] = {
+										_sourceRefId: data.refNormIdToSourceRefIdMap[normId]
+									};
+								}
+								return agg;
+							}, {});
+
+							if (!_.size(refsUpdateDelta)) {
+								return undefined; // there's nothing to update on this doc. 
+							}
+
+							return {
+								id: d.id,
+								_refs: refsUpdateDelta
+							};
+
+						}));
+
+						return tableSourceEntity.insert(sourceEntitiesToUpdate, {
+							conflict: "update",
+							returnChanges: false
+						});
+
+					})
+					.then(function() {
+						data.time.addSourceRefIdToExistingRefs += new Date().getTime() - start;
+					});
 			}
 		};
 	}
@@ -381,7 +435,7 @@ module.exports = function(generatedSchemas, r, redisClient) {
 	//Now that we're done processing SourceEntities, save 
 	//- new _refs including ids, so we know we don't have to process these anymore (for RefNorm and RefX creation)
 	//- updated state. 
-	function updateModifiedDateForSourceEntities(data) {
+	function updateModifiedDataForSourceEntities(data) {
 		return function() {
 
 			var start = new Date().getTime();
@@ -413,7 +467,7 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 				var refsObj = _.reduce(_.groupBy(v, "_refNormId"), function(agg, arr, k) {
 					agg[k] = {
-						sourceRefId: arr[0]._sourceRefId, //May not exist. Guarenteed to be the same for all refs that point to same refNormId
+						sourceRefId: arr[0]._sourceRefId, //May not exist. Guaranteed to be the same for all refs that point to same refNormId
 						val: _.map(arr, _.partialRight(_.omit, ["_sourceRefId", "_refNormId"]))
 					};
 					return agg;
@@ -429,11 +483,15 @@ module.exports = function(generatedSchemas, r, redisClient) {
 				};
 			});
 
-			return tableSourceEntity.insert(updatedSourceEntityDTO, {
-				conflict: "update"
-			}).then(function() {
-				data.time.updateModifiedDateForSourceEntities += new Date().getTime() - start;
-			});
+			return Promise.resolve()
+				// .then(function() {
+				// 	return tableSourceEntity.insert(updatedSourceEntityDTO, {
+				// 		conflict: "update"
+				// 	});
+				// })
+				.then(function() {
+					data.time.updateModifiedDataForSourceEntities += new Date().getTime() - start;
+				});
 		};
 	}
 
@@ -441,9 +499,9 @@ module.exports = function(generatedSchemas, r, redisClient) {
 		getSourceEntities: getSourceEntities,
 		resetDataFromSourceEntities: resetDataFromSourceEntities,
 		updateExistingAndInsertNewRefNorms: updateExistingAndInsertNewRefNorms,
-		addSourceRefIdToExistingRefX: addSourceRefIdToExistingRefX,
+		addSourceRefIdToExistingRefs: addSourceRefIdToExistingRefs,
 		composeRefs: composeRefs,
 		fetchExistingAndInsertNewRefNormsForReferences: fetchExistingAndInsertNewRefNormsForReferences,
-		updateModifiedDateForSourceEntities: updateModifiedDateForSourceEntities,
+		updateModifiedDataForSourceEntities: updateModifiedDataForSourceEntities,
 	};
 };

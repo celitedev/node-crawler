@@ -27,11 +27,10 @@ var dataProto = {
 	time: {
 		getSourceEntities: 0,
 		updateExistingAndInsertNewRefNorms: 0,
-		addSourceRefIdToExistingRefX: 0,
+		addSourceRefIdToExistingRefs: 0,
 		composeRefs: 0,
 		fetchExistingAndInsertNewRefNormsForReferences: 0,
-		insertRefX: 0,
-		updateModifiedDateForSourceEntities: 0
+		updateModifiedDataForSourceEntities: 0
 	}
 };
 
@@ -59,10 +58,10 @@ Promise.resolve()
 					})
 					.then(toolUtils.resetDataFromSourceEntities(data))
 					.then(toolUtils.updateExistingAndInsertNewRefNorms(data))
-					.then(toolUtils.addSourceRefIdToExistingRefX(data))
+					.then(toolUtils.addSourceRefIdToExistingRefs(data))
 					.then(toolUtils.composeRefs(data))
 					.then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
-					.then(toolUtils.updateModifiedDateForSourceEntities(data))
+					.then(toolUtils.updateModifiedDataForSourceEntities(data))
 					.then(timerStats(data, start))
 					.then(function() {
 						//process all new sources by recursively fetching and processing all sourceEntities in batches
