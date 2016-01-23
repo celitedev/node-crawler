@@ -6,6 +6,9 @@ var UUID = require("pure-uuid");
 
 var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
+function getSourceId(sourceType, sourceId) {
+	return new UUID(5, "ns:URL", sourceType + "--" + sourceId).format();
+}
 
 module.exports = function(generatedSchemas, AbstractEntity, r) {
 
@@ -41,6 +44,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			throw new Error("SourceEntity with detailPageAware=true but sourceUrl undefined");
 		}
 
+		this.id = getSourceId(this.sourceType, this.sourceId);
+
 		//bootstrapObject: the object from DB
 		if (bootstrapObj) {
 
@@ -60,9 +65,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					this._type + ", " + bootstrapObj._type);
 			}
 
-			//Set id. Pretty useful for updating...
-			this.id = bootstrapObj.id;
-
 			//copy _refs down to SourceEntity
 			this._refs = bootstrapObj._refs;
 
@@ -80,10 +82,11 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 	SourceEntity.prototype._validationSchema = validator.createSchemaSourceEntity();
 
 	//static
-	SourceEntity.getBySourceId = function(id) {
-		return r.table(domainUtils.statics.SOURCETABLE).getAll(id, {
-			index: "_sourceId"
-		}).without("_refs").then(function(results) {
+	SourceEntity.getSourceEntity = function(sourceType, sourceId) {
+
+		var id = getSourceId(sourceType, sourceId);
+
+		return r.table(domainUtils.statics.SOURCETABLE).getAll(id).without("_refs").then(function(results) {
 			if (!results || !results.length) {
 				return null;
 			}
@@ -185,13 +188,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		return _.extend(AbstractEntity._toRethinkObjectRecursive(props || this._props, true), {
 
-			//the lazy or is not strictly needed since the created id frmo `getSourceEntityId` will still be the same as this.id (the id
-			//generated the last time and coming from the db). However we might change getSourceEntityId to generate uuid4 or just leave it 
-			//to rethinkDb entirely, so this is future proof.
-			//
-			//getSourceEntityId is BS. Deprecating.
-
-			id: this.id, //this.id may not be set in which case it's set by Rethink // DEPRECATED: this.id|| this.getSourceEntityId(),
+			id: this.id, //set by client based on uuidv5
 			_type: this._type,
 			_sourceType: this.sourceType,
 			_sourceUrl: this.sourceUrl,
