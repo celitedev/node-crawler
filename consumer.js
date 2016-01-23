@@ -486,7 +486,7 @@ function processJob(job, done) {
 		.map(function transformToGenericOutput(doc) {
 
 			//fetch item by doc._sourceId
-			return SourceEntity.getBySourceId(doc._sourceId)
+			return SourceEntity.getSourceEntity(crawlConfig.source.name, doc._sourceId)
 				.then(function(result) {
 
 					var types = _.isArray(crawlConfig.entity.type) ? crawlConfig.entity.type : [crawlConfig.entity.type];
@@ -501,7 +501,7 @@ function processJob(job, done) {
 						sourceId: doc._sourceId, //required
 						sourceUrl: doc._sourceUrl, //optional
 						detailPageAware: crawlConfig.schema.results.detailPageAware
-					}, result);
+					}, result); //result may be null
 
 					delete doc._sourceId;
 					delete doc._sourceUrl;
