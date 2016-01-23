@@ -205,6 +205,16 @@ module.exports = {
 					}
 					return sourceUrl;
 				},
+				location: function(location) {
+
+					//NOT: http://www.fandango.com/amcloewslincolnsquare13_aabqi/theaterpage?date=01%2f24%2f2016"
+					//YES: http://www.fandango.com/amcloewslincolnsquare13_aabqi/theaterpage
+					var needle = location.lastIndexOf("?");
+					if (needle !== -1) {
+						return location.substring(0, needle);
+					}
+					return location;
+				}
 			},
 		}
 	}

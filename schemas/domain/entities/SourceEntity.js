@@ -66,7 +66,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			}
 
 			//copy _refs down to SourceEntity
-			this._refs = bootstrapObj._refs || {}; //with default empty obj since we sometimes omit fetching it
+			this._refs = bootstrapObj._refs;
 
 			//Extend state with state of bootstap object. 
 			//set old batch id to 'batchIdRead'
