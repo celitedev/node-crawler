@@ -63,12 +63,18 @@ module.exports = function(generatedSchemas, r, redisClient) {
 						skipAlias: true
 					};
 
-					data.time.getSourceEntities += new Date().getTime() - start;
 
 					//format the results into actual SourceEntity domain objects.
-					return _.map(results, function(result) {
-						return new SourceEntity(getSourceEntityState(result), result, options);
-					});
+					return Promise.resolve()
+						.then(function() {
+							return _.map(results, function(result) {
+								return new SourceEntity(getSourceEntityState(result), result, options);
+							});
+						})
+						.then(function(results) {
+							data.time.getSourceEntities += new Date().getTime() - start;
+							return results;
+						});
 				});
 		};
 	}
@@ -339,26 +345,39 @@ module.exports = function(generatedSchemas, r, redisClient) {
 			//}
 
 			var sourceIds = _.pluck(data.sourceObjects, "id");
-			console.log(sourceIds);
-			_.each(data.sourceObjects, function(obj) {
 
-				// console.log("existing _refs: " + JSON.stringify(obj._refs, null, 2));
+			return Promise.resolve()
+				.then(function fetchTheRefs() {
 
-				//get new refs
-				var refs = obj.calculateRefs(obj._props);
+					//we need to fetch the refs only here because it could have been altered in `sourceEntitiesToUpdate`
+					return tableSourceEntity.getAll.apply(tableSourceEntity, sourceIds).pluck("id", "_refs");
+				})
+				.then(function calculateTheRefs(docs) {
+					var docMap = _.zipObject(_.pluck(docs, "id"), docs);
 
-				//for all refs that don't link to refNorm yet, add them to unlinkedRefsWithSourceId
-				_.each(refs, function(refVal) {
-					if (!refVal._refNormId && refVal._sourceId) {
-						data.unlinkedRefsWithSourceId.push(refVal);
-					}
+					_.each(data.sourceObjects, function(d) {
+						d._refs = docMap[d.id]._refs; //add the fetched _refs now
+					});
+
+					_.each(data.sourceObjects, function(obj) {
+
+						//calc new refs
+						//TODO: not useful/clear to have this on SourceEntity prototype
+						var refs = obj.calculateRefs(obj._props);
+
+						//for all refs that don't link to refNorm yet, add them to unlinkedRefsWithSourceId
+						_.each(refs, function(refVal) {
+							if (!refVal._refNormId && refVal._sourceId) {
+								data.unlinkedRefsWithSourceId.push(refVal);
+							}
+						});
+
+						data.sourceIdToRefMap[obj.id] = refs;
+					});
+
+					data.time.composeRefs += new Date().getTime() - start;
+
 				});
-
-				data.sourceIdToRefMap[obj.id] = refs;
-			});
-
-			data.time.composeRefs += new Date().getTime() - start;
-
 		};
 	}
 
