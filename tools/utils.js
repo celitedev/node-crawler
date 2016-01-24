@@ -143,6 +143,10 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 			var start = new Date().getTime();
 
+			var sourceObjectsThatNeedRefNorms = _.filter(data.sourceObjects, function(obj) {
+				return !obj.state.skipRefNormCreation;
+			});
+
 			return Promise.resolve()
 				.then(function lookupExistingRefNormsBySourceIds() {
 
@@ -150,7 +154,8 @@ module.exports = function(generatedSchemas, r, redisClient) {
 					//RefNorms that already exist (1-to-1) for these SourceEntities.
 					//
 					//Note: Although an edge-case, there may be multiple RefNorms for a single SourceEntity.
-					var sourceidsToLookup = _.pluck(data.sourceObjects, "sourceId");
+
+					var sourceidsToLookup = _.pluck(sourceObjectsThatNeedRefNorms, "sourceId");
 
 					if (sourceidsToLookup.length) {
 						return tableRefNorms.getAll.apply(tableRefNorms, sourceidsToLookup.concat({
@@ -166,7 +171,7 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 					//Construct RefNorms to upsert: a combination of existing and to-be-created RefNorms.
 					//For existing RefNorms, we add the _sourceRefId pointing back to the SourceEntity.
-					var refNormsToUpsert = _.map(data.sourceObjects, function(obj) {
+					var refNormsToUpsert = _.map(sourceObjectsThatNeedRefNorms, function(obj) {
 
 						var newRefNorm = {
 							_sourceId: obj.sourceId,
@@ -218,6 +223,10 @@ module.exports = function(generatedSchemas, r, redisClient) {
 
 							//Add <refNorm,sourceRefId> for each existing refNorm. 
 							//This is used to populate sourceEntity._refToSourceRefIdMap
+							//
+							//NOTE: would appear to make sense for perf reasons to only store entry 
+							//if below eq-rule results in false. However, that results in wrong data
+							//in case of worker-errors. (i.e.: 'transaction' not complete -> will never complete)
 							data.refNormIdToSourceRefIdMap[newRefNorm.id] = obj.id;
 
 							//If is the same as old -> no need to update
