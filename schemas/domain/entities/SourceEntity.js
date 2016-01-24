@@ -97,12 +97,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		});
 	};
 
-	//update refs to _refs
-	SourceEntity.prototype.calculateRefs = function(properties) {
-		var out = [];
-		_calcRefsRecursive(properties, out);
-		return out;
-	};
 
 	SourceEntity.prototype.commit = function(cb) {
 
@@ -202,61 +196,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 	};
 
 
-
-	function _calcRefsRecursive(properties, agg, prefix) {
-
-		prefix = prefix || "";
-
-		_.each(properties, function(v, k) {
-
-			if (excludePropertyKeys.indexOf(k) !== -1) return;
-
-			var compoundKey = prefix ? prefix + "." + k : k;
-
-			function transformSingleItem(v) {
-
-				//if first is range is datatype -> all in range are datatype as per #107
-				//If datatype -> return undefined
-				if (generatedSchemas.datatypes[generatedSchemas.properties[k].ranges[0]]) {
-					return undefined;
-				}
-
-				if (!_.isObject(v)) {
-					return undefined;
-				}
-
-				if (v._ref) {
-					return v._ref;
-				}
-
-				var obj = _calcRefsRecursive(v, agg, compoundKey);
-
-				if (!_.size(obj)) {
-					return undefined;
-				}
-
-				return obj;
-			}
-
-			var arr = _.compact(_.map(_.isArray(v) ? v : [v], transformSingleItem));
-
-			//add the dot-separated ref-path
-			_.map(arr, function(v) {
-				v._path = compoundKey;
-			});
-
-			if (!v.length) {
-				v = undefined;
-				return;
-			}
-
-			_.each(arr, function(v) {
-				agg.push(v); //can't do concat because array-ref not maintained
-			});
-
-		});
-
-	}
 
 	return SourceEntity;
 
