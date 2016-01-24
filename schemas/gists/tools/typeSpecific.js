@@ -51,7 +51,7 @@ switch (command) {
 			delete prop.label;
 			return prop;
 		});
-		console.log(type);
+		console.log(JSON.stringify(type, null, 2));
 		break;
 	case "inbound":
 		inbound();
