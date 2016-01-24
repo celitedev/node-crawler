@@ -526,8 +526,8 @@ module.exports = function(generatedSchemas, r, redisClient) {
 					//RefNormids that *are* resolved, including sourceRefId to which they resolve. 
 					_refToSourceRefIdMap: refToSourceRefMap,
 
-					//RefNormids that need or are resolved. Used for lookup in index.
-					_refNormIds: refNormIdsForSourceEntity,
+					//RefNormids that *still need* resolving. Used for lookup in index.
+					_refNormIds: _.difference(refNormIdsForSourceEntity, _.keys(refToSourceRefMap)),
 
 					//add _refs object calculated above
 					_refs: refsObj,
