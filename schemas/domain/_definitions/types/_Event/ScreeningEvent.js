@@ -3,5 +3,6 @@ module.exports = {
 		subtitleLanguage: false,
 		videoFormat: false,
 		workPresented: false,
-	}
+	},
+	skipRefNormCreation: true
 };

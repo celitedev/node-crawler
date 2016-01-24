@@ -44,6 +44,17 @@ var colors = require("colors");
 var utils = require("./utils");
 var validator = require("validator");
 
+//type directives to inherit
+var typeDirectivesToInherit = [
+
+	//inherited for ease. NOTE: an Entity can never be a child of a valueObject. That wouldn't make sense anyway
+	"isValueObject",
+
+	//certain entitytypes, e.g.: movieShowings will never be referenced by other sourceEntity. 
+	//#150: Make this explicit for perf reasons
+	"skipRefNormCreation"
+];
+
 module.exports = function(configObj) {
 
 	var schemaOrgDef = configObj.schemaOrgDef;
@@ -557,9 +568,6 @@ module.exports = function(configObj) {
 
 		//Traverseing hierary tree to set inherited properties, etc. 
 		//This required running `extendTypes` and `extendProperties` and `extendTypesWithProperties` first. 
-
-		//type directives to inherit
-		var typeDirectivesToInherit = ["isValueObject"];
 
 		//NOTE: this is hopelessly inefficient, but gets the job done
 		//Better would be to process types in Dag-order and apply down. This is linear instead of quadratic. 
