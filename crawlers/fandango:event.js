@@ -135,6 +135,14 @@ module.exports = {
 
 			detailPageAware: false,
 
+			//Indicate screeningEVents should not create refNorms. 
+			//This prohibits other sourceEntities from ever linking to it which is okay here. 
+			//This saves: 
+			//- mem/disk: by not having to create/ maintain refnorms
+			//- time: by not having to find sourceEntities that refer to a refNorm that this
+			//screeningEvent completes (since this never happens.)
+			skipRefNormCreation: true,
+
 			schema: function(x) { //schema for each individual result
 
 				return {

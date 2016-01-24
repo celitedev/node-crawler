@@ -500,7 +500,8 @@ function processJob(job, done) {
 						sourceType: crawlConfig.source.name,
 						sourceId: doc._sourceId, //required
 						sourceUrl: doc._sourceUrl, //optional
-						detailPageAware: crawlConfig.schema.results.detailPageAware
+						detailPageAware: crawlConfig.schema.results.detailPageAware,
+						skipRefNormCreation: crawlConfig.schema.results.skipRefNormCreation,
 					}, result); //result may be null
 
 					delete doc._sourceId;
