@@ -17,6 +17,8 @@ var redisClient = redis.createClient(config.redis);
 var r = require('rethinkdbdash')(config.rethinkdb);
 
 var toolUtils = require("./utils")(generatedSchemas, r, redisClient);
+var domainUtils = require("../schemas/domain/utils");
+var tableSourceEntity = r.table(domainUtils.statics.SOURCETABLE);
 
 var dataProto = {
 	state: {
@@ -27,87 +29,51 @@ var dataProto = {
 	time: {
 		getSourceEntities: 0,
 		updateExistingAndInsertNewRefNorms: 0,
-		addSourceRefIdToExistingRefX: 0,
+		addSourceRefIdToExistingRefs: 0,
 		composeRefs: 0,
 		fetchExistingAndInsertNewRefNormsForReferences: 0,
-		insertRefX: 0,
-		updateModifiedDateForSourceEntities: 0
+		updateModifiedDataForSourceEntities: 0
 	}
 };
 
 
 Promise.resolve()
-	// .then(function processNewSources() {
+	.then(function processNewSources() {
 
-// 	var data = _.cloneDeep(dataProto);
-// 	var start = new Date().getTime();
 
-// 	//Func: Get SourceEntities that haven't been processed by this process yet. 
-// 	//Tech: Get SourceEntities that don't exist in index 'modifiedMakeRefs'
-// 	//'modifiedMakeRefs' is created based on field _state.modifiedMakeRefs. See #142 for more.
+		//Func: Process SourceEntities that haven't been processed here yet. 
 
-// 	return Promise.resolve()
-// 		.then(function processNewSourcesRecursive() {
-
-// 			return Promise.resolve()
-// 				.then(toolUtils.getSourceEntities(data))
-// 				.then(function calcStats(sourceEntities) {
-// 					data.state.nrOfResults = sourceEntities.length;
-// 					data.state.total += data.state.nrOfResults;
-// 					console.log("processNewSources", data.state.total);
-// 					return sourceEntities;
-// 				})
-// 				.then(toolUtils.resetDataFromSourceEntities(data))
-// 				.then(toolUtils.updateExistingAndInsertNewRefNorms(data))
-// 				.then(toolUtils.addSourceRefIdToExistingRefX(data))
-// 				.then(toolUtils.composeRefs(data))
-// 				.then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
-// 				.then(toolUtils.insertRefX(data))
-// 				.then(toolUtils.updateModifiedDateForSourceEntities(data))
-// 				.then(timerStats(data, start))
-// 				.then(function() {
-// 					//process all new sources by recursively fetching and processing all sourceEntities in batches
-// 					if (data.state.nrOfResults === data.state.batch) {
-// 						return processNewSourcesRecursive();
-// 					}
-// 				});
-// 		});
-
-// })
-.then(function processExistingSources() {
+		//Note: don't include _refToSourceRefIdMap. 
+		//This property is written-to by subprocess `addSourceRefIdToExistingRefs`. 
+		//Excluding it here pre-empts any possibility for race conditions on write of
+		//this property. 
 
 		var data = _.cloneDeep(dataProto);
-		var start = new Date().getTime();
+		var fetchQuery = function() {
+			return tableSourceEntity.getAll(false, {
+				index: 'modifiedMakeRefs'
+			}).without("_refToSourceRefIdMap").limit(data.state.batch).run();
+		};
 
-		var processExistingButDirty = true;
+		return processStack(data, fetchQuery);
 
-		//Func: Get SourceEntities that haven't been processed by this process yet. 
-		//Tech: Get SourceEntities that don't exist in index 'modifiedMakeRefs'
-		//'modifiedMakeRefs' is created based on field _state.modifiedMakeRefs. See #142 for more.
+	})
+	.then(function processExistingSources() {
 
-		return Promise.resolve()
-			.then(function processExistingSourcesRecursive() {
-				return Promise.resolve()
-					.then(toolUtils.getSourceEntities(data, processExistingButDirty))
-					.then(function calcStats(sourceEntities) {
-						data.state.nrOfResults = sourceEntities.length;
-						data.state.total += data.state.nrOfResults;
-						console.log("processExistingSources", data.state.total);
-						return sourceEntities;
-					})
-					.then(toolUtils.resetDataFromSourceEntities(data))
-					.then(toolUtils.composeRefs(data))
-					// .then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
-					// .then(toolUtils.insertRefX(data))
-					// .then(toolUtils.updateModifiedDateForSourceEntities(data))
-					.then(timerStats(data, start))
-					.then(function() {
-						//process all new sources by recursively fetching and processing all sourceEntities in batches
-						if (data.state.nrOfResults === data.state.batch) {
-							return processExistingSourcesRecursive();
-						}
-					});
-			});
+		//Func: Process SourceEntities that have been processed but have become dirty since. 
+
+		var data = _.cloneDeep(dataProto);
+
+		var doProcessExisting = true;
+
+		var fetchQuery = function() {
+			//fetch existing but dirty
+			return tableSourceEntity.getAll(true, {
+				index: 'dirtyForMakeRefs'
+			}).without("_refToSourceRefIdMap").limit(data.state.batch).run();
+		};
+
+		return processStack(data, fetchQuery, doProcessExisting);
 
 	})
 	.finally(function() {
@@ -115,6 +81,39 @@ Promise.resolve()
 		redisClient.quit(); //quit
 		r.getPoolMaster().drain(); //quit
 	});
+
+
+function processStack(data, fetchQuery, doProcessExisting) {
+
+
+	var start = new Date().getTime();
+
+	return Promise.resolve()
+		.then(function processSourcesRecursive() {
+			return Promise.resolve()
+				.then(toolUtils.getSourceEntities(data, fetchQuery))
+				.then(function calcStats(sourceEntities) {
+					data.state.nrOfResults = sourceEntities.length;
+					data.state.total += data.state.nrOfResults;
+					console.log(!doProcessExisting ? "processNewSources" : "processExistingSources", data.state.total);
+					return sourceEntities;
+				})
+				.then(toolUtils.resetDataFromSourceEntities(data))
+				.then(toolUtils.updateExistingAndInsertNewRefNorms(data))
+				.then(toolUtils.addSourceRefIdToExistingRefs(data))
+				.then(toolUtils.composeRefs(data))
+				.then(toolUtils.fetchExistingAndInsertNewRefNormsForReferences(data))
+				.then(toolUtils.updateModifiedDataForSourceEntities(data))
+				.then(timerStats(data, start))
+				.then(function() {
+					//process all new sources by recursively fetching and processing all sourceEntities in batches
+					if (data.state.nrOfResults === data.state.batch) {
+						return processSourcesRecursive();
+					}
+				});
+		});
+}
+
 
 
 function timerStats(data, start) {

@@ -59,6 +59,7 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 	excludePropertyKeys: ["_type", "_value", "_isBogusType", "_ref"],
 	statics: {
 		SOURCETABLE: "sourceEntities",
+		CANONICALTABLE: "entities",
 		REFNORMS: "refNorms",
 		REFX: "refX"
 	}

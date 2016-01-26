@@ -1,10 +1,8 @@
 var _ = require("lodash");
 var util = require("util");
-var domainUtils = require("../utils");
 var UUID = require("pure-uuid");
 
-
-var excludePropertyKeys = domainUtils.excludePropertyKeys;
+var domainUtils = require("../utils");
 
 function getSourceId(sourceType, sourceId) {
 	return new UUID(5, "ns:URL", sourceType + "--" + sourceId).format();
@@ -12,10 +10,12 @@ function getSourceId(sourceType, sourceId) {
 
 module.exports = function(generatedSchemas, AbstractEntity, r) {
 
+	var entityUtils = require("./utils")(generatedSchemas);
 	var validator = require("../validation")(generatedSchemas);
 
 	function SourceEntity(state, bootstrapObj, options) {
 		this._kind = domainUtils.enums.kind.SOURCE;
+		this._sourceTable = domainUtils.statics.SOURCETABLE;
 		SourceEntity.super_.call(this, state, bootstrapObj, options);
 		if (!state.sourceType) {
 			throw new Error("'state.sourceType' should be defined on SourceEntity");
@@ -67,6 +67,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 			//copy _refs down to SourceEntity
 			this._refs = bootstrapObj._refs;
+			this._refNormIds = bootstrapObj._refNormIds;
+			this._refToSourceRefIdMap = bootstrapObj._refToSourceRefIdMap;
 
 			//Extend state with state of bootstap object. 
 			//set old batch id to 'batchIdRead'
@@ -97,96 +99,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		});
 	};
 
-	//update refs to _refs
-	SourceEntity.prototype.calculateRefs = function(properties) {
-		var out = {};
-		_calcRefsRecursive(properties, out);
-		return out;
-	};
-
-	SourceEntity.prototype.commit = function(cb) {
-
-		var self = this;
-		this.validate(function(err) {
-			if (err) {
-				return cb(err);
-			}
-			if (!self.isValidOrUnchecked()) {
-				err = new Error(self._state.errors);
-				err.validationError = self._state.errors;
-				// console.log(self._state.errors);
-				// err = new Error("Cannot commit because of validation errors in item: " + self._kind + " - " + self.sourceId +
-				// 	" - " + self._type + " - " + JSON.stringify(self.getErrors(), null, 2));
-				err.isValidationError = true;
-				return cb(err);
-			}
-
-			//STATE: validated
-
-			//Freeze propsDirty to persist. 
-			//This to be able to check if entity dirty after save, because of in between change.
-			var props = _.cloneDeep(self._propsDirty);
-
-			//if not dirty -> only upload the meta-properties for perf-reasons
-			var obj = self.toRethinkObject(self.isDirty() ? props : {});
-
-			//TODO #141: use (previous) obj._state.modifiedAndDirty as version for OCC (if exists here, i.e. not new)
-			var prevModifiedAndDirty = obj._state.modifiedAndDirty;
-
-			//set modifiedAndDirty to true if dirty. 
-			//This signals serverside that it should (re)process SourceEntity
-			if (self.isDirty()) {
-				obj._state.modifiedAndDirty = obj._state.modified; //updated to now
-			}
-
-			//More info: https://www.rethinkdb.com/api/javascript/insert/
-			r.table(domainUtils.statics.SOURCETABLE).insert(obj, {
-					conflict: "update"
-				}).run()
-				.then(function() {
-
-					///////////////////////////
-					//FOR NOW: Latest wins. 
-					//
-					//NOTE: THERE'S NO CODE TO UPDATE PROCESS WITH ENTITY UPDATED OUT-OF-PROCESS.
-					//NOT A PROB SINCE THAT SHOULDNT HAPPEN FOR NOW
-					//
-					//PERHAPS LATER: Rethinkdb returns optimisticVersion, this should be set and used when doing update
-					//On optimisticLockIssue we should reload data from DB (returning latest version) and 
-					//see if diff works out. 
-					/////////////////////////////
-
-					//on success -> set props = propsDirty
-					self._props = props;
-
-					//in meantime _propsDirty may have changed..
-					self._state.isDirty = !_.eq(self._propsDirty, self._props);
-
-					if (!self.isDirty()) {
-						self._state.recommitCount = 0;
-						return cb();
-					}
-
-					if (++self._state.recommitCount >= 3) {
-						//we don't anticpiate this error yet. Seeing this is trouble...
-						return cb(new Error("recommitCount reached for item! Can only happen on REAL high congestion"));
-					}
-
-					//do a re-commit, until success.
-					self.commit(cb);
-
-				})
-				.catch(cb); //this passes an error back to the callback
-
-		});
-	};
-
 
 	SourceEntity.prototype.toRethinkObject = function(props) {
 
 		var now = new Date();
 
-		return _.extend(AbstractEntity._toRethinkObjectRecursive(props || this._props, true), {
+		return _.extend(entityUtils._toRethinkObjectRecursive(props || this._props, true), {
 
 			id: this.id, //set by client based on uuidv5
 			_type: this._type,
@@ -202,54 +120,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 	};
 
 
-
-	function _calcRefsRecursive(properties, agg, prefix) {
-
-		prefix = prefix || "";
-
-		_.each(properties, function(v, k) {
-
-			if (excludePropertyKeys.indexOf(k) !== -1) return;
-
-			var compoundKey = prefix ? prefix + "." + k : k;
-
-			function transformSingleItem(v) {
-
-				//if first is range is datatype -> all in range are datatype as per #107
-				//If datatype -> return undefined
-				if (generatedSchemas.datatypes[generatedSchemas.properties[k].ranges[0]]) {
-					return undefined;
-				}
-
-				if (!_.isObject(v)) {
-					return undefined;
-				}
-
-				if (v._ref) {
-					return v._ref;
-				}
-
-				var obj = _calcRefsRecursive(v, agg, compoundKey);
-
-				if (!_.size(obj)) {
-					return undefined;
-				}
-
-				return obj;
-			}
-
-			v = _.isArray(v) ? _.compact(_.map(v, transformSingleItem)) : transformSingleItem(v);
-
-			if (_.isArray(v) && !v.length) {
-				v = undefined;
-			}
-
-			if (v !== undefined) {
-				agg[compoundKey] = v;
-			}
-		});
-
-	}
 
 	return SourceEntity;
 
