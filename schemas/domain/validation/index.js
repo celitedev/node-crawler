@@ -47,9 +47,14 @@ module.exports = function(generatedSchemas) {
 
 		var fn = function passInSchema(rule, value) {
 
-			var fieldtype = generatedSchemas.properties[rule.field]; //NOTE: ok to use instead of generatedSchemas.properties
+			var fieldName = rule.fieldName;
+			var fieldtype = generatedSchemas.properties[fieldName]; //NOTE: ok to use instead of generatedSchemas.properties
 
 			var isToplevel = !parentTypeNames;
+
+			if (!fieldtype && !isToplevel) {
+				throw new Error("fieldtype not found for rule.field: " + fieldName);
+			}
 
 			//we explicitly allow an array value to come through here so we can properly raise a 
 			//validation error. 
@@ -72,7 +77,7 @@ module.exports = function(generatedSchemas) {
 
 					//field specific validator
 					return _generateDataTypeValidator({
-						fieldName: rule.field,
+						fieldName: fieldName,
 						ranges: [typeName],
 						validate: fieldtype ? fieldtype.validate : undefined
 					});
@@ -80,7 +85,7 @@ module.exports = function(generatedSchemas) {
 			}
 
 			//////////////////////////////////////////////////
-			//STATE: non-datetype, toplevel OR non-toplevel //
+			//STATE: non-datatype, toplevel OR non-toplevel //
 			//////////////////////////////////////////////////
 			var typenames = isToplevel ? value._type : [value._type];
 
@@ -121,10 +126,11 @@ module.exports = function(generatedSchemas) {
 
 						var prop = generatedSchemas.properties[pName];
 						var fn = passInTypeClosure(kindOfEntity, typenames);
+						fn.fieldName = pName; //use this instead of rule.field, since the latter shows array-indices in case of multi-valued.
 
 						var fieldValidatorObj = !prop.isMulti ? fn : {
 							type: "array",
-							values: fn,
+							values: [fn],
 							min: 1 //if array defined it must have minLength of 1. (or otherwise don't supply)
 						};
 
@@ -159,7 +165,6 @@ module.exports = function(generatedSchemas) {
 				//}
 				//
 				//Moreover, CANONICAL contains a string of type UUID if ref IS resolved. 
-
 
 				if (_.isString(value._value) && kindOfEntity === domainUtils.enums.kind.CANONICAL) {
 					return _generateDataTypeValidator({
