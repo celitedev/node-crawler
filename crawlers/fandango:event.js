@@ -135,6 +135,14 @@ module.exports = {
 
 			detailPageAware: false,
 
+			//Indicate screeningEVents should not create refNorms. 
+			//This prohibits other sourceEntities from ever linking to it which is okay here. 
+			//This saves: 
+			//- mem/disk: by not having to create/ maintain refnorms
+			//- time: by not having to find sourceEntities that refer to a refNorm that this
+			//screeningEvent completes (since this never happens.)
+			skipRefNormCreation: true,
+
 			schema: function(x) { //schema for each individual result
 
 				return {
@@ -205,6 +213,16 @@ module.exports = {
 					}
 					return sourceUrl;
 				},
+				location: function(location) {
+
+					//NOT: http://www.fandango.com/amcloewslincolnsquare13_aabqi/theaterpage?date=01%2f24%2f2016"
+					//YES: http://www.fandango.com/amcloewslincolnsquare13_aabqi/theaterpage
+					var needle = location.lastIndexOf("?");
+					if (needle !== -1) {
+						return location.substring(0, needle);
+					}
+					return location;
+				}
 			},
 		}
 	}
