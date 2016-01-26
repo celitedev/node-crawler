@@ -35,33 +35,13 @@ module.exports = function(generatedSchemas, r, redisClient) {
 	// Existing are those that have _state.modifiedMakeRefs < _staate.modifiedAndDirty
 	// 
 	// Return: the collection of SourceEntities.
-	function getSourceEntities(data, processExistingButDirty) {
+	function getSourceEntities(data, fetchQuery) {
 		return function() {
-
 			var start = new Date().getTime();
 
 			return Promise.resolve()
 				.then(function() {
-
-					if (!processExistingButDirty) {
-
-						//fetch new
-						return tableSourceEntity.getAll(false, {
-							index: 'modifiedMakeRefs'
-						}).without("_refToSourceRefIdMap").limit(data.state.batch).run();
-
-					} else {
-
-						//fetch existing but dirty
-						return tableSourceEntity.getAll(true, {
-							index: 'dirtyForMakeRefs'
-						}).without("_refToSourceRefIdMap").limit(data.state.batch).run();
-					}
-
-					//NOTE: entities are returned without `_refToSourceRefIdMap`-property. 
-					//This property is written-to by subprocess `addSourceRefIdToExistingRefs`. 
-					//Excluding it here pre-empts any possibility for race conditions on write of
-					//this property. 
+					return fetchQuery();
 				})
 				.then(function fromResultsToSourceEntities(results) {
 
@@ -559,7 +539,6 @@ module.exports = function(generatedSchemas, r, redisClient) {
 		};
 	}
 
-
 	//Calc references
 	function _calcRefs(properties) {
 		var out = [];
@@ -630,6 +609,6 @@ module.exports = function(generatedSchemas, r, redisClient) {
 		addSourceRefIdToExistingRefs: addSourceRefIdToExistingRefs,
 		composeRefs: composeRefs,
 		fetchExistingAndInsertNewRefNormsForReferences: fetchExistingAndInsertNewRefNormsForReferences,
-		updateModifiedDataForSourceEntities: updateModifiedDataForSourceEntities,
+		updateModifiedDataForSourceEntities: updateModifiedDataForSourceEntities
 	};
 };
