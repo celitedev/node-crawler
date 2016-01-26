@@ -131,7 +131,7 @@ module.exports = function(generatedSchemas) {
 						var fieldValidatorObj = !prop.isMulti ? fn : {
 							type: "array",
 							values: [fn],
-							min: 1 //if array defined it must have minLength of 1. (or otherwise don't supply)
+							min: 1 //fixes 155: if array defined it must have minLength of 1. (or otherwise don't supply)
 						};
 
 						fieldValidatorObj.required = !!~propsRequired.indexOf(pName);

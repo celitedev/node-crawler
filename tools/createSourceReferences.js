@@ -17,6 +17,8 @@ var redisClient = redis.createClient(config.redis);
 var r = require('rethinkdbdash')(config.rethinkdb);
 
 var toolUtils = require("./utils")(generatedSchemas, r, redisClient);
+var domainUtils = require("../schemas/domain/utils");
+var tableSourceEntity = r.table(domainUtils.statics.SOURCETABLE);
 
 var dataProto = {
 	state: {
@@ -34,21 +36,44 @@ var dataProto = {
 	}
 };
 
+
 Promise.resolve()
 	.then(function processNewSources() {
 
-		//Func: Process SourceEntities that haven't been processed here yet. 
-		//Tech: Process SourceEntities that don't exist in index 'modifiedMakeRefs'
 
-		return processStack();
+		//Func: Process SourceEntities that haven't been processed here yet. 
+
+		//Note: don't include _refToSourceRefIdMap. 
+		//This property is written-to by subprocess `addSourceRefIdToExistingRefs`. 
+		//Excluding it here pre-empts any possibility for race conditions on write of
+		//this property. 
+
+		var data = _.cloneDeep(dataProto);
+		var fetchQuery = function() {
+			return tableSourceEntity.getAll(false, {
+				index: 'modifiedMakeRefs'
+			}).without("_refToSourceRefIdMap").limit(data.state.batch).run();
+		};
+
+		return processStack(data, fetchQuery);
 
 	})
 	.then(function processExistingSources() {
 
 		//Func: Process SourceEntities that have been processed but have become dirty since. 
-		//Tech: Process SourceEntities that exist in index 'dirtyForMakeRefs'
-		var processExistingButDirty = true;
-		return processStack(processExistingButDirty);
+
+		var data = _.cloneDeep(dataProto);
+
+		var doProcessExisting = true;
+
+		var fetchQuery = function() {
+			//fetch existing but dirty
+			return tableSourceEntity.getAll(true, {
+				index: 'dirtyForMakeRefs'
+			}).without("_refToSourceRefIdMap").limit(data.state.batch).run();
+		};
+
+		return processStack(data, fetchQuery, doProcessExisting);
 
 	})
 	.finally(function() {
@@ -58,15 +83,15 @@ Promise.resolve()
 	});
 
 
-function processStack(doProcessExisting) {
+function processStack(data, fetchQuery, doProcessExisting) {
 
-	var data = _.cloneDeep(dataProto);
+
 	var start = new Date().getTime();
 
 	return Promise.resolve()
 		.then(function processSourcesRecursive() {
 			return Promise.resolve()
-				.then(toolUtils.getSourceEntities(data, doProcessExisting))
+				.then(toolUtils.getSourceEntities(data, fetchQuery))
 				.then(function calcStats(sourceEntities) {
 					data.state.nrOfResults = sourceEntities.length;
 					data.state.total += data.state.nrOfResults;
