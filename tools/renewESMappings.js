@@ -16,9 +16,35 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 
 var client = new elasticsearch.Client(config.elasticsearch);
 
-var promises = _.map(domainConfig.domain.roots, function(root) {
 
-	var indexName = root.toLowerCase();
+var indexMapping = {
+	"settings": {
+		"number_of_shards": 1
+	},
+	"mappings": {
+		"type1": {
+
+			//no source
+			"_source": {
+				"enabled": false
+			},
+
+			//timestamp probably useful for Kibana: 
+			//https://www.elastic.co/guide/en/elasticsearch/reference/1.4/mapping-timestamp-field.html
+			"_timestamp": {
+				"enabled": true
+			}
+		}
+	}
+};
+
+function getAllIndexNames() {
+	return _.map(domainConfig.domain.roots, function(root) {
+		return "kwhen-" + root.toLowerCase();
+	});
+}
+
+var promises = _.map(getAllIndexNames(), function(indexName) {
 
 	return Promise.resolve()
 		.then(function deleteIndex() {
@@ -39,7 +65,8 @@ var promises = _.map(domainConfig.domain.roots, function(root) {
 		.then(function createIndex() {
 			return client.indices.create({
 				method: "PUT",
-				index: indexName
+				index: indexName,
+				body: indexMapping
 			});
 		});
 });
@@ -47,7 +74,7 @@ var promises = _.map(domainConfig.domain.roots, function(root) {
 
 Promise.all(promises)
 	.then(function(result) {
-		console.log("indices created: ", domainConfig.domain.roots.join(","));
+		console.log("indices created: ", getAllIndexNames().join(","));
 	})
 	.catch(function(err) {
 		console.trace(err);
