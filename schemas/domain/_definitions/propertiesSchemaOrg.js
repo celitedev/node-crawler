@@ -578,7 +578,7 @@ module.exports = {
 			type: "implicitType",
 			storage: "thingIndex"
 		},
-		isMulti: true
+		// isMulti: true
 	},
 	member: { //e.g.: org or persons
 		ambiguitySolvedBy: {

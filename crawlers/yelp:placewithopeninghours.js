@@ -235,7 +235,7 @@ module.exports = {
 
 				//It's important to get the type straight now, to allow added properties. 
 				//The rest (tags, facts) are stored to those catch-all properties. 
-				//Later on we can translate these tags and facts to more semantic-rich structures.
+				//Later on we can translate these tags and facts to more semantic-rich structures such as `subtypes`
 				var yelpTypes = {
 					"Restaurants": "Restaurant",
 					"Pubs": "BarOrPub",

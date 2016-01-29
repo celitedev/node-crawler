@@ -1,10 +1,16 @@
 var _ = require("lodash");
 
 var domainUtils = require("../utils");
+var domainConfig = require("../_definitions/config");
+var utilsForSchemaGeneration = require("../utils/utilsForSchemaGeneration");
 
 module.exports = function(generatedSchemas, r) {
 
 	var entityUtils = require("./utils")(generatedSchemas);
+
+	var roots = domainConfig.domain.roots;
+	var typesInOrder = utilsForSchemaGeneration.getTypesInDAGOrder(generatedSchemas.types);
+
 
 	/**
 	 * Example: 
@@ -195,6 +201,7 @@ module.exports = function(generatedSchemas, r) {
 			//This to be able to check if entity dirty after save, because of in between change.
 			var props = _.cloneDeep(self._propsDirty);
 
+
 			//if not dirty -> only upload the meta-properties for perf-reasons
 			var obj = self.toRethinkObject(self.isDirty() ? props : {});
 
@@ -249,6 +256,23 @@ module.exports = function(generatedSchemas, r) {
 		});
 	};
 
+	AbstractEntity.prototype.getRootAndSubtypes = function() {
+		var entityTypesInOrder = _.intersection(typesInOrder, this._type);
+
+		//Get typechain in order, this may contain duplicates. 
+		//The root to return is the LAST root found in the typechain
+		var typechain = _.reduce(entityTypesInOrder, function(arr, tName) {
+			var type = generatedSchemas.types[tName];
+			return arr.concat(type.ancestors).concat([tName]);
+		}, []);
+
+		var root = _.intersection(_.clone(typechain).reverse(), roots)[0];
+		var subtypeIndex = typechain.lastIndexOf(root) + 1;
+		return {
+			root: root,
+			subtypes: subtypeIndex < typechain.length ? typechain.slice(subtypeIndex) : []
+		};
+	};
 
 
 	AbstractEntity.prototype.validate = function(cb) {

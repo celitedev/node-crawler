@@ -18,7 +18,7 @@ function getSourceEntityState(result) {
 	};
 }
 
-module.exports = function(generatedSchemas, r, redisClient) {
+module.exports = function(generatedSchemas, r) {
 
 	var entities = require("../schemas/domain/entities")(generatedSchemas, r);
 	var CanonicalEntity = entities.CanonicalEntity;

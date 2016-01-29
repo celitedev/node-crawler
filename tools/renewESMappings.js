@@ -26,7 +26,7 @@ var indexMapping = {
 
 			//no source
 			"_source": {
-				"enabled": false
+				"enabled": true //for now
 			},
 
 			//timestamp probably useful for Kibana: 
