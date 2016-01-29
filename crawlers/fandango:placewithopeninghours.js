@@ -124,7 +124,22 @@ module.exports = {
 						addressLocality: "[itemprop=addressLocality]@content",
 						addressRegion: "[itemprop=addressRegion]@content",
 						addressCountry: "[itemprop=addressCountry]@content",
-					}
+					},
+					geo: x(function(el) {
+						return el.next().find(".showtimes-theater-map").attr("href");
+					}, {
+						_latLon: function(el, cb) {
+							var html = el.html();
+							var latLonIndex = html.indexOf("latLon");
+							if (latLonIndex == -1) {
+								return undefined;
+							}
+							var snippet = html.substring(latLonIndex, html.indexOf(";", latLonIndex));
+							snippet = snippet.substring(snippet.indexOf("'") + 1, snippet.lastIndexOf("'"));
+							cb(undefined, snippet); //format: 40.7333, -73.7946
+						}
+					})
+
 				};
 			},
 
@@ -132,7 +147,20 @@ module.exports = {
 				_type: function(val) {
 					return ["MovieTheater"];
 				}
+			},
+
+			reducer: function(obj) {
+				if (obj.geo._latLon) {
+					var split = obj.geo._latLon.split(",");
+					obj.geo.latitude = parseFloat(split[0]);
+					obj.geo.longitude = parseFloat(split[1]);
+					delete obj.geo._latLon;
+				} else {
+					delete obj.geo;
+				}
+				return obj;
 			}
+
 		}
 	}
 };

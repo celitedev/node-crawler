@@ -43,7 +43,7 @@
     "uuid": "^2.0.1",
     "valid-url": "^1.0.9",
     "validator": "^4.4.0",
-    "x-ray": "git+https://github.com/Kwhen/x-ray.git#bugfix/nested-crawling",
+    "x-ray": "git+https://github.com/Kwhen/x-ray.git#gebrits-patch-1",
     "x-ray-phantom": "^1.0.1",
     "yargs": "^3.30.0"
   }
