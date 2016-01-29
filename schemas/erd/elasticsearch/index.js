@@ -12,9 +12,15 @@ module.exports = {
 	//fetch all fields. The fields fetched here should include all the 
 	//fields that you ever want to use while expanding refs of any kind
 	refExpandWithFields: [
+
+		//thing
 		"name",
-		"address",
-		"geo"
+
+		//place
+		"address", "geo",
+
+		//creative work
+		"aggregateRating", "genre"
 	],
 
 	properties: {
@@ -28,41 +34,67 @@ module.exports = {
 				return [geoObj.longitude, geoObj.latitude]; //long first -> bit weird but this is the GeoJSON compliant way.
 			}
 		},
-		location: { //ref
-			//creates a new property `location--expanded`
-			//If multivalued this is of type 'nested' otherwise of type 'object'
-			mappingExpanded: {
-				"name": {
+		"name": {
 
-					type: "string",
+			mapping: {
 
-					//example of multi-fields
-					//https://www.elastic.co/guide/en/elasticsearch/reference/current/_multi_fields.html
-					"fields": {
-						"raw": {
-							"type": "string",
-							"index": "not_analyzed"
-						}
+				type: "string",
+
+				//example of multi-fields
+				//https://www.elastic.co/guide/en/elasticsearch/reference/current/_multi_fields.html
+				"fields": {
+					"raw": {
+						"type": "string",
+						"index": "not_analyzed"
 					}
-				},
-				"geo": {
-					type: "geo_point",
 				}
-			},
-			//goal is to return the properties as defined in mappingExpanded
-			//Input: 
-			//- v: value before transforming
-			//- ref: resolved ref
-			transformExpanded: function(v, ref) {
+			}
+		},
+		location: {
 
-				var out = {
-					name: ref.name
-				};
+			//exclude value from indexing. 
+			//This doesn't prevent expanded and/or derived fields from being indexed
+			exclude: true,
 
-				if (ref.geo) {
-					out.geo = [ref.geo.longitude, ref.geo.latitude];
+			//creates a new property `location--expand`
+			//If multivalued this is of type 'nested' otherwise of type 'object'
+			expand: {
+				fields: ["name", "geo"],
+				includeId: true, //include id in expanded objects. Useful for multivalued fields
+
+				transform: { //transform in object-notation
+					geo: function(geo) {
+						return [geo.longitude, geo.latitude];
+					}
 				}
-				return out;
+
+				//EXAMPLE: transform in function-notation
+				// transform: function(ref) {
+
+				// 	var out = {
+				// 		name: ref.name
+				// 	};
+
+				// 	if (ref.geo) {
+				// 		out.geo = [ref.geo.longitude, ref.geo.latitude];
+				// 	}
+				// 	return out;
+				// }
+				// 
+			}
+		},
+		workFeatured: {
+
+			//exclude value from indexing. 
+			//This doesn't prevent expanded and/or derived fields from being indexed
+			exclude: true,
+
+			//creates a new property `workFeatured--expand`
+			//If multivalued this is of type 'nested' otherwise of type 'object'
+			expand: {
+				fields: ["name", "aggregateRating", "genre"],
+				includeId: true, //include id in expanded objects. Useful for multivalued fields
+				//transform: is optional and defaults to `_.pick(ref,expand.fields)`
 			}
 		}
 	}

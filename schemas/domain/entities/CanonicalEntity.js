@@ -116,6 +116,31 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		return refs;
 	}
 
+	//transform a value by either 
+	//- object-notation -> <k,v> map where values are functions with sig function(val)
+	//  missing keys are passed along untouched
+	//- function-notation -> one function with the value passed.
+	function doValueTransform(v, transformer) {
+		if (!transformer || !v) {
+			return v;
+		}
+
+		if (_.isFunction(transformer)) {
+			return transformer(v);
+		}
+
+		if (_.isObject(transformer)) {
+			if (!_.isObject(v)) {
+				throw new Error("object-transformer selected but value not an object: " + v);
+			}
+			return _.reduce(v, function(agg, value, k) {
+				agg[k] = transformer[k] ? transformer[k](value) : value;
+				return agg;
+			}, {});
+		}
+
+		throw new Error("transformer needs to be function or object:" + transformer);
+	}
 
 	function _toESRecursive(properties, resolvedRefMap) {
 
@@ -125,9 +150,9 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		var dto = _.reduce(origProps, function(agg, v, k) {
 
-			var isPartOfArray = _.isArray(v);
-
 			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
+
+			var isTotalValueMultiValued = _.isArray(v);
 
 			var propertySchema = generatedSchemas.properties[k];
 
@@ -160,30 +185,40 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					return v;
 				}
 
-				if (esMappingProperties[k]) {
+				var esMappingObj = esMappingProperties[k];
+				if (esMappingObj) {
 
 					//Transform to ES
-					if (esMappingProperties[k].transform) {
-						v = esMappingProperties[k].transform(v);
-					}
+					v = doValueTransform(v, esMappingObj.transform);
 
 					//Add new, possibly multivalued, field named: <prop>#expanded. E.g.: location#expanded
-					if (esMappingProperties[k].transformExpanded) {
-						var key = k + "--expanded";
+					var expandObj = esMappingObj.expand;
+					if (expandObj) {
+						var key = k + "--expand";
 
 						var ref = resolvedRefMap[v];
 						if (!ref) {
 							throw new Error("resolved ref couldn't be resolved: " + v);
 						}
 
-						var objExpanded = esMappingProperties[k].transformExpanded(v, ref);
+						var objExpanded = _.pick(doValueTransform(ref, expandObj.transform), expandObj.fields);
 
-						if (!isPartOfArray) {
+						if (expandObj.includeId) {
+							objExpanded.id = v;
+						}
+
+						if (!isTotalValueMultiValued) {
 							expandMapToInclude[key] = objExpanded;
 						} else {
 							var arr = expandMapToInclude[key] = expandMapToInclude[key] || [];
 							arr.push(objExpanded);
 						}
+					}
+
+					//Exclude value from ES-index. 
+					//Note: it's still possible to have derived/calcualted and expanded values indexed. 
+					if (esMappingObj.exclude) {
+						v = undefined;
 					}
 				}
 
@@ -202,7 +237,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			if (out !== undefined) {
 				agg[k] = out;
 			}
-
 
 			return agg;
 		}, {});
