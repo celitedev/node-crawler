@@ -4,6 +4,8 @@ var argv = require("yargs").argv;
 
 var config = require("../config");
 var domainConfig = require("../schemas/domain/_definitions/config");
+var esMappingConfig = require("../schemas/erd/elasticsearch");
+var esMappingProperties = esMappingConfig.properties;
 
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 	checkSoundness: true,
@@ -15,7 +17,6 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 
 
 var client = new elasticsearch.Client(config.elasticsearch);
-
 
 var indexMapping = {
 	"settings": {
@@ -38,13 +39,20 @@ var indexMapping = {
 	}
 };
 
+
 function getAllIndexNames() {
 	return _.map(domainConfig.domain.roots, function(root) {
-		return "kwhen-" + root.toLowerCase();
+		return {
+			root: root,
+			indexName: "kwhen-" + root.toLowerCase()
+		};
 	});
 }
 
-var promises = _.map(getAllIndexNames(), function(indexName) {
+var promises = _.map(getAllIndexNames(), function(obj) {
+
+	var root = obj.root,
+		indexName = obj.indexName;
 
 	return Promise.resolve()
 		.then(function deleteIndex() {
@@ -66,15 +74,56 @@ var promises = _.map(getAllIndexNames(), function(indexName) {
 			return client.indices.create({
 				method: "PUT",
 				index: indexName,
-				body: indexMapping
+				body: createIndexMapping(indexMapping, root)
 			});
 		});
 });
 
 
+function createIndexMapping(indexMapping, root) {
+	var mapping = _.cloneDeep(indexMapping);
+
+	//get root + all subtypes
+	var typesForRoot = _.filter(generatedSchemas.types, {
+		rootName: root
+	});
+
+	//Get all properties that can exist in index. 
+	//This is the aggregate of all properties defined on the above types.
+	var propNames = _.uniq(_.reduce(typesForRoot, function(arr, type) {
+		return arr.concat(_.keys(type.properties));
+	}, []));
+
+	mapping.mappings.type1.properties = _.reduce(propNames, function(agg, propName) {
+
+		var propType = generatedSchemas.properties[propName];
+
+		if (esMappingProperties[propName]) {
+
+			if (esMappingProperties[propName].mapping) {
+				agg[propName] = esMappingProperties[propName].mapping;
+			}
+
+			//Extend with mappingExpanded, i.e.: a bunch of fields to include/expand a reference with
+			if (esMappingProperties[propName].mappingExpanded) {
+				var obj = {};
+				obj[propName + "--expanded"] = {
+					type: propType.isMulti ? "nested" : "object",
+					properties: esMappingProperties[propName].mappingExpanded
+				};
+				_.extend(agg, obj);
+			}
+		}
+
+		return agg;
+	}, {});
+
+	return mapping;
+}
+
 Promise.all(promises)
 	.then(function(result) {
-		console.log("indices created: ", getAllIndexNames().join(","));
+		console.log("indices created: ", _.pluck(getAllIndexNames(), "indexName").join(","));
 	})
 	.catch(function(err) {
 		console.trace(err);

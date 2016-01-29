@@ -16,6 +16,8 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 var config = require("../config");
 var r = require('rethinkdbdash')(config.rethinkdb);
 
+var esMappingConfig = require("../schemas/erd/elasticsearch");
+
 var domainUtils = require("../schemas/domain/utils");
 var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
 
@@ -80,11 +82,53 @@ Promise.resolve()
 			.then(function resetDataObject(entities) {
 				data.entities = entities;
 			})
-			.then(function populateES() {
+			.then(function fetchRefs() {
+
+				var fieldsToFetch = _.uniq(esMappingConfig.refExpandWithFields.concat(["id", "_type"]));
+
+				var refs = _.uniq(_.reduce(data.entities, function(arr, entity) {
+
+					var refs = entity.fetchResolvedRefs();
+					entity._refsResolved = refs;
+
+					return arr.concat(refs);
+				}, []));
+
+				if (!refs.length) {
+					return {};
+				}
+
+				return Promise.resolve().then(function() {
+					return tableCanonicalEntity.getAll.apply(tableCanonicalEntity, refs).pluck(fieldsToFetch);
+				}).then(function(results) {
+
+					//skip building aliases since that's not needed
+					var options = {
+						skipAlias: true
+					};
+
+					return _.reduce(results, function(agg, result) {
+
+						var entity = new CanonicalEntity({
+							id: result.id,
+							type: result._type
+						}, result, options);
+
+						var simpleDTO = entity.toSimple();
+						delete simpleDTO._type;
+						agg[entity.id] = simpleDTO;
+
+						return agg;
+					}, {});
+				});
+
+			})
+			.then(function populateES(refMap) {
+
 				var start = new Date().getTime();
 
 				var bulk = _.reduce(data.entities, function(arr, entity) {
-					var dto = entity.toElasticsearchObject();
+					var dto = entity.toElasticsearchObject(undefined, _.pick(refMap, entity._refsResolved));
 					var meta = {
 						index: {
 							_index: "kwhen-" + dto._root.toLowerCase(),

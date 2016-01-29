@@ -257,6 +257,7 @@ module.exports = function(generatedSchemas, r) {
 	};
 
 	AbstractEntity.prototype.getRootAndSubtypes = function() {
+		//NOTE: _type is array
 		var entityTypesInOrder = _.intersection(typesInOrder, this._type);
 
 		//Get typechain in order, this may contain duplicates. 
