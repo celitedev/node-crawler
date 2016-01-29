@@ -98,20 +98,31 @@ function createIndexMapping(indexMapping, root) {
 
 		var propType = generatedSchemas.properties[propName];
 
-		if (esMappingProperties[propName]) {
+		var propESObj = esMappingProperties[propName];
+		if (propESObj) {
 
-			if (esMappingProperties[propName].mapping) {
-				agg[propName] = esMappingProperties[propName].mapping;
+			if (propESObj.mapping) {
+				agg[propName] = propESObj.mapping;
 			}
 
 			//Extend with mappingExpanded, i.e.: a bunch of fields to include/expand a reference with
-			if (esMappingProperties[propName].mappingExpanded) {
-				var obj = {};
-				obj[propName + "--expanded"] = {
-					type: propType.isMulti ? "nested" : "object",
-					properties: esMappingProperties[propName].mappingExpanded
+			var expandObj = propESObj.expand;
+			if (expandObj) {
+
+				var out = {};
+				var obj = out[propName + "--expand"] = {
+					type: propType.isMulti ? "nested" : "object"
 				};
-				_.extend(agg, obj);
+
+				obj.properties = _.reduce(expandObj.fields, function(agg, fieldName) {
+					var fieldESObj = esMappingProperties[fieldName];
+					if (fieldESObj && fieldESObj.mapping) {
+						agg[fieldName] = fieldESObj.mapping;
+					}
+					return agg;
+				}, {});
+
+				_.extend(agg, out);
 			}
 		}
 
