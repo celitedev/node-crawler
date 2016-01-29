@@ -420,6 +420,8 @@ module.exports = function(generatedSchemas) {
 		return dto;
 	}
 
+
+
 	function _toSimpleRecursive(properties) {
 
 		var dto = _.reduce(_.clone(properties), function(agg, v, k) {
