@@ -662,7 +662,7 @@ module.exports = {
 	//Specific subproperties are available for workPerformed (e.g. a play), 
 	//or a workPresented (a Movie at a ScreeningEvent).
 	workFeatured: {
-		isMulti: true
+		// isMulti: true
 	},
 
 	//A work performed in some event, for example a play performed in a TheaterEvent.

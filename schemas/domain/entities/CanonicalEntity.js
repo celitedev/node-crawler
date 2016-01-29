@@ -5,6 +5,9 @@ var UUID = require("pure-uuid");
 
 var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
+var esMappingConfig = require("../../erd/elasticsearch");
+var esMappingProperties = esMappingConfig.properties;
+
 module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 	var entityUtils = require("./utils")(generatedSchemas);
@@ -47,13 +50,15 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		});
 	};
 
-	CanonicalEntity.prototype.toElasticsearchObject = function(props) {
+	CanonicalEntity.prototype.toElasticsearchObject = function(props, resolvedRefMap) {
+
+		resolvedRefMap = resolvedRefMap || {};
 
 		//Get DTO: 
 		//1. skip _refs (unresolved refs)
-		//2. skip all resolved refs FOR NOW. Might replace with a couple of properties per ref? 
+		//2. should we add couple of ref properties as well? 
 		//3. correct single/multi as per schema
-		var dto = _toESRecursive(props || this._props);
+		var dto = _toESRecursive(props || this._props, resolvedRefMap);
 
 		//TODO: Parse 'tag' and 'fact' to more rich semantic structures such as 'subtypes' based on Controlled Vocab lookup
 		//TODO: #100 - Controlled Vocab filtering for all defined fields.
@@ -76,9 +81,52 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		});
 	};
 
-	function _toESRecursive(properties) {
+	CanonicalEntity.prototype.fetchResolvedRefs = function(props) {
+		return _fetchResolvedRefsRecursive(props || this._props);
+	};
 
-		var dto = _.reduce(_.clone(properties), function(agg, v, k) {
+
+	function _fetchResolvedRefsRecursive(properties) {
+		var refs = _.reduce(_.clone(properties), function(arr, v, k) {
+			if (excludePropertyKeys.indexOf(k) !== -1) return arr;
+
+			function transformSingleItem(v) {
+
+				//if first is range is datatype -> all in range are datatype as per #107
+				//If datatype -> return undefined
+				if (generatedSchemas.datatypes[generatedSchemas.properties[k].ranges[0]]) {
+					return undefined;
+				}
+
+				if (v.isValueObject) {
+					return arr.concat(_fetchResolvedRefsRecursive(v));
+				}
+
+				if (v._value) {
+					arr.push(v._value);
+				}
+			}
+
+			_.each(_.isArray(v) ? v : [v], transformSingleItem);
+
+			return arr;
+		}, []);
+
+
+		return refs;
+	}
+
+
+	function _toESRecursive(properties, resolvedRefMap) {
+
+		var expandMapToInclude = {};
+
+		var origProps = _.clone(properties);
+
+		var dto = _.reduce(origProps, function(agg, v, k) {
+
+			var isPartOfArray = _.isArray(v);
+
 			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
 
 			var propertySchema = generatedSchemas.properties[k];
@@ -101,12 +149,44 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
 				if (propType.isValueObject) {
-					v = _toESRecursive(v); //recurse non-datatypes
+					v = _toESRecursive(v, resolvedRefMap); //recurse non-datatypes
 				} else if (v._ref) {
 					v = undefined; //skip all non-resolved refs. 
 				} else {
 					v = v._value; //simplify all datatypes and object-references to their value
 				}
+
+				if (v === undefined) {
+					return v;
+				}
+
+				if (esMappingProperties[k]) {
+
+					//Transform to ES
+					if (esMappingProperties[k].transform) {
+						v = esMappingProperties[k].transform(v);
+					}
+
+					//Add new, possibly multivalued, field named: <prop>#expanded. E.g.: location#expanded
+					if (esMappingProperties[k].transformExpanded) {
+						var key = k + "--expanded";
+
+						var ref = resolvedRefMap[v];
+						if (!ref) {
+							throw new Error("resolved ref couldn't be resolved: " + v);
+						}
+
+						var objExpanded = esMappingProperties[k].transformExpanded(v, ref);
+
+						if (!isPartOfArray) {
+							expandMapToInclude[key] = objExpanded;
+						} else {
+							var arr = expandMapToInclude[key] = expandMapToInclude[key] || [];
+							arr.push(objExpanded);
+						}
+					}
+				}
+
 				return v;
 			}
 
@@ -122,9 +202,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			if (out !== undefined) {
 				agg[k] = out;
 			}
+
+
 			return agg;
 		}, {});
 
+		_.extend(dto, expandMapToInclude);
 
 		return dto;
 	}
