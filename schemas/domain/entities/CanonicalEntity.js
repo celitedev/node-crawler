@@ -120,8 +120,19 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 	//- object-notation -> <k,v> map where values are functions with sig function(val)
 	//  missing keys are passed along untouched
 	//- function-notation -> one function with the value passed.
+	//
+	//Note: when transformer not defined we recurse the possibly nested object. 
+	//When transformer IS defined, we cannot do that anymore, since the transformer
+	//might (read: is likely to) have changed the 'property-schema' on which recursing relies.
 	function doValueTransform(v, transformer) {
-		if (!transformer || !v) {
+		if (v === undefined) {
+			return undefined;
+		}
+
+		if (!transformer) {
+			if (_.isObject(v)) {
+				v = _toESRecursive(v, {}, true); //recurse
+			}
 			return v;
 		}
 
@@ -142,7 +153,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		throw new Error("transformer needs to be function or object:" + transformer);
 	}
 
-	function _toESRecursive(properties, resolvedRefMap) {
+	function _toESRecursive(properties, resolvedRefMap, isRef) {
 
 		var expandMapToInclude = {};
 
@@ -164,25 +175,21 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			//NOTE: at this point _type is guaranteed NOT an array anymore. That was only at toplevel
 			function transformSingleItem(v) {
 
-				//if first is range is datatype -> all in range are datatype. As per #107
-				//If datatype -> just grab _value
-				//Needed for Datatype: Object
-				if (generatedSchemas.datatypes[propertySchema.ranges[0]]) {
-					return v._value;
-				}
+				if (!isRef) {
 
-				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
+					var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
-				if (propType.isValueObject) {
-					v = _toESRecursive(v, resolvedRefMap); //recurse non-datatypes
-				} else if (v._ref) {
-					v = undefined; //skip all non-resolved refs. 
-				} else {
-					v = v._value; //simplify all datatypes and object-references to their value
-				}
+					if (propType.isValueObject) {
+						v = _toESRecursive(v, resolvedRefMap, isRef); //recurse non-datatypes
+					} else if (v._ref) {
+						v = undefined; //skip all non-resolved refs. 
+					} else {
+						v = v._value; //simplify all datatypes and object-references to their value
+					}
 
-				if (v === undefined) {
-					return v;
+					if (v === undefined) {
+						return v;
+					}
 				}
 
 				var esMappingObj = esMappingProperties[k];

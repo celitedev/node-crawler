@@ -22,6 +22,11 @@ var indexMapping = {
 	"settings": {
 		"number_of_shards": 1
 	},
+	"settings": {
+		//We don't coerce since we want everything to be explicit. 
+		//This is needed since we want to transform all queries through the same pipeline as indexing
+		"index.mapping.coerce": false
+	},
 	"mappings": {
 		"type1": {
 
@@ -96,35 +101,7 @@ function createIndexMapping(indexMapping, root) {
 
 	mapping.mappings.type1.properties = _.reduce(propNames, function(agg, propName) {
 
-		var propType = generatedSchemas.properties[propName];
-
-		var propESObj = esMappingProperties[propName];
-		if (propESObj) {
-
-			if (propESObj.mapping) {
-				agg[propName] = propESObj.mapping;
-			}
-
-			//Extend with mappingExpanded, i.e.: a bunch of fields to include/expand a reference with
-			var expandObj = propESObj.expand;
-			if (expandObj) {
-
-				var out = {};
-				var obj = out[propName + "--expand"] = {
-					type: propType.isMulti ? "nested" : "object"
-				};
-
-				obj.properties = _.reduce(expandObj.fields, function(agg, fieldName) {
-					var fieldESObj = esMappingProperties[fieldName];
-					if (fieldESObj && fieldESObj.mapping) {
-						agg[fieldName] = fieldESObj.mapping;
-					}
-					return agg;
-				}, {});
-
-				_.extend(agg, out);
-			}
-		}
+		addPropertyMapping(propName, agg);
 
 		return agg;
 	}, {});
@@ -139,3 +116,49 @@ Promise.all(promises)
 	.catch(function(err) {
 		console.trace(err);
 	});
+
+
+var nestedTypes = ["object", "nested"];
+
+function addPropertyMapping(propName, agg) {
+
+	var propType = generatedSchemas.properties[propName];
+	var propESObj = esMappingProperties[propName];
+	if (propESObj) {
+
+		if (propESObj.mapping) {
+			agg[propName] = propESObj.mapping;
+
+			//no mapping defined on a nested object, so recurse
+			//NOTE: this deliberately doesn't use clone, so this code will automatically inject
+			//the updated mapping to 'expand' mappings below
+			if (!agg[propName].properties && ~nestedTypes.indexOf(agg[propName].type)) {
+				var nestedPropNames = _.pluck(generatedSchemas.types[propType.ranges[0]].properties, "id");
+				agg[propName].properties = _.reduce(nestedPropNames, function(agg, propName) {
+					addPropertyMapping(propName, agg);
+					return agg;
+				}, {});
+			}
+		}
+
+		//Extend with mappingExpanded, i.e.: a bunch of fields to include/expand a reference with
+		var expandObj = propESObj.expand;
+		if (expandObj) {
+
+			var out = {};
+			var obj = out[propName + "--expand"] = {
+				type: propType.isMulti ? "nested" : "object"
+			};
+
+			obj.properties = _.reduce(expandObj.fields, function(agg, fieldName) {
+				var fieldESObj = esMappingProperties[fieldName];
+				if (fieldESObj && fieldESObj.mapping) {
+					agg[fieldName] = fieldESObj.mapping;
+				}
+				return agg;
+			}, {});
+
+			_.extend(agg, out);
+		}
+	}
+}

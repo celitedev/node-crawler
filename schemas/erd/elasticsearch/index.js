@@ -24,6 +24,32 @@ module.exports = {
 	],
 
 	properties: {
+
+		ratingValue: {
+			mapping: {
+				type: "double"
+			},
+			transform: function(val) {
+				return parseFloat(val);
+			}
+		},
+
+		ratingCount: {
+			mapping: {
+				type: "long"
+			},
+			transform: function(val) {
+				return parseFloat(val);
+			}
+		},
+
+		aggregateRating: {
+			mapping: {
+				type: "object",
+			}
+		},
+
+
 		//https://www.elastic.co/guide/en/elasticsearch/guide/current/lat-lon-formats.html
 		//Geo is of type geo_point
 		geo: {
@@ -34,8 +60,8 @@ module.exports = {
 				return [geoObj.longitude, geoObj.latitude]; //long first -> bit weird but this is the GeoJSON compliant way.
 			}
 		},
-		"name": {
 
+		name: {
 			mapping: {
 
 				type: "string",
@@ -50,50 +76,37 @@ module.exports = {
 				}
 			}
 		},
+
 		location: {
 
-			//exclude value from indexing. 
+			//exclude=true: exclude value from indexing. 
 			//This doesn't prevent expanded and/or derived fields from being indexed
-			exclude: true,
+			exclude: false,
 
 			//creates a new property `location--expand`
 			//If multivalued this is of type 'nested' otherwise of type 'object'
 			expand: {
 				fields: ["name", "geo"],
-				includeId: true, //include id in expanded objects. Useful for multivalued fields
+				// includeId: true, //include id in expanded objects. Useful for multivalued fields
 
 				transform: { //transform in object-notation
 					geo: function(geo) {
 						return [geo.longitude, geo.latitude];
 					}
 				}
-
-				//EXAMPLE: transform in function-notation
-				// transform: function(ref) {
-
-				// 	var out = {
-				// 		name: ref.name
-				// 	};
-
-				// 	if (ref.geo) {
-				// 		out.geo = [ref.geo.longitude, ref.geo.latitude];
-				// 	}
-				// 	return out;
-				// }
-				// 
 			}
 		},
 		workFeatured: {
 
-			//exclude value from indexing. 
+			//exclude=true: exclude value from indexing. 
 			//This doesn't prevent expanded and/or derived fields from being indexed
-			exclude: true,
+			exclude: false,
 
 			//creates a new property `workFeatured--expand`
 			//If multivalued this is of type 'nested' otherwise of type 'object'
 			expand: {
 				fields: ["name", "aggregateRating", "genre"],
-				includeId: true, //include id in expanded objects. Useful for multivalued fields
+				// includeId: true, //include id in expanded objects. Useful for multivalued fields
 				//transform: is optional and defaults to `_.pick(ref,expand.fields)`
 			}
 		}
