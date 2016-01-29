@@ -55,6 +55,10 @@ module.exports = {
 		geo: {
 			mapping: { //mappings are to be passed verbatim to ES mapping endpoint.
 				type: "geo_point",
+
+				//geopoints are expensive. We'll store them on disk instead of mem
+				//https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-memory.html#geo-memory
+				"doc_values": true
 			},
 			transform: function(geoObj) {
 				return [geoObj.longitude, geoObj.latitude]; //long first -> bit weird but this is the GeoJSON compliant way.
@@ -91,7 +95,7 @@ module.exports = {
 
 				transform: { //transform in object-notation
 					geo: function(geo) {
-						return [geo.longitude, geo.latitude];
+						return [geo.longitude, geo.latitude]; //GEOJSON format
 					}
 				}
 			}

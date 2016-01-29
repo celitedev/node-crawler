@@ -54,12 +54,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		resolvedRefMap = resolvedRefMap || {};
 
+
 		//Get DTO: 
-		//1. skip _refs (unresolved refs)
-		//2. should we add couple of ref properties as well? 
-		//3. correct single/multi as per schema
 		var dto = _toESRecursive(props || this._props, resolvedRefMap);
 
+		//TODO: move in `subtypes` BEFORE call to _toESRecursive. See next TODO for why
+		//TODO: controlled vocab, etc. INSIDE _toESRecursive
 		//TODO: Parse 'tag' and 'fact' to more rich semantic structures such as 'subtypes' based on Controlled Vocab lookup
 		//TODO: #100 - Controlled Vocab filtering for all defined fields.
 		// NOTE: types define which values are possible on a controlled vocab field. (i.e.: isExtensible = true)
