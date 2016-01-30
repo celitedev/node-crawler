@@ -50,55 +50,79 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		});
 	};
 
-	CanonicalEntity.prototype.toElasticsearchObject = function(props, resolvedRefMap) {
+	CanonicalEntity.prototype.toElasticsearchObject = function(resolvedRefMap) {
 
-		resolvedRefMap = resolvedRefMap || {};
-
-
-		//Get DTO: 
-		var dto = _toESRecursive(props || this._props, resolvedRefMap);
-
-		//TODO: move in `subtypes` BEFORE call to _toESRecursive. See next TODO for why
-		//TODO: controlled vocab, etc. INSIDE _toESRecursive
-		//TODO: Parse 'tag' and 'fact' to more rich semantic structures such as 'subtypes' based on Controlled Vocab lookup
-		//TODO: #100 - Controlled Vocab filtering for all defined fields.
-		// NOTE: types define which values are possible on a controlled vocab field. (i.e.: isExtensible = true)
+		var props = _.cloneDeep(this._props);
 
 		//get the root, which will tell in which index to store, as well as the subtypes: 
 		//i.e. the typechain sitting below the root.
 		var rootAndSubtypes = this.getRootAndSubtypes();
 
+		var root = rootAndSubtypes.root;
+
 		//subtypes-property is the union of: 
 		//- official subtypes 
 		//- other subtypes which were free to be manually assigned. They *must* adhere to Controlled Vocabulary through
 		//  - subtypes *might* also be populated from the 'tag'-property
-		var subtypes = _.union(rootAndSubtypes.subtypes, dto.subtypes);
+		props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
 
-		return _.extend(dto, {
-			_root: rootAndSubtypes.root,
-			subtypes: subtypes,
-			id: this.id, //Elasticsearch id <= Rethink id
-		});
+
+		(function populate() {
+
+			//get root + all subtypes
+			var typesForRoot = _.filter(generatedSchemas.types, {
+				rootName: root
+			});
+
+			//Get all properties that can exist in index on toplevel. 
+			//This is the aggregate of all properties defined on the above types.
+			var propNames = _.uniq(_.reduce(typesForRoot, function(arr, type) {
+				return arr.concat(_.keys(type.properties));
+			}, []));
+
+			//add possible calculated fields
+			propNames = _.reduce(esMappingConfig.propertiesCalculated, function(arr, prop, propName) {
+				var roots = _.isArray(prop.roots) ? prop.roots : [prop.roots];
+				if (prop.roots === true || ~roots.indexOf(root)) {
+					arr.push(propName);
+				}
+				return arr;
+			}, propNames);
+
+			//TODO: 
+			//1. find subset of propnames that have `populate` defined. 
+			//2. use that to make DAG
+			//3. iterate all propNames according to DAG, and execute `populate` IF exists on prop
+
+			// console.log(propNames);
+
+		}());
+
+
+		//TODO: #162
+		//Populate/copy data between properties using the `populate--directive. 
+		//Tech: we populate following a DAG
+		return _.extend({
+			id: this.id,
+			_root: root,
+		}, _toESRecursive(props, resolvedRefMap || {}));
 	};
 
-	function _toESRecursive(properties, resolvedRefMap, isTransformed) {
+	function _toESRecursive(properties, resolvedRefMap) {
+
+		//TODO: #100
+		//Vocabulary lookup: values are looked-up / pruned / aliases added based on Vocabulary
+
 
 		var expandMapToInclude = {};
-
 		var dto = _.reduce(properties, function(agg, v, k) {
 
 			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
-
-			//remove aliasOf properties. They have no place in ERD creation
-			if (generatedSchemas.properties[k].aliasOf) {
-				return agg;
-			}
 
 			var argObj = {
 				isTotalValueMultiValued: _.isArray(v),
 				k: k,
 				expandMapToInclude: expandMapToInclude,
-				isTransformed: isTransformed,
 				resolvedRefMap: resolvedRefMap
 			};
 
@@ -141,7 +165,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		var isTotalValueMultiValued = argObj.isTotalValueMultiValued;
 		var k = argObj.k;
 		var expandMapToInclude = argObj.expandMapToInclude;
-		var isTransformed = argObj.isTransformed;
 		var resolvedRefMap = argObj.resolvedRefMap;
 
 		function applyTransformOrInspectNestedAttribs(v, transformer) {
@@ -149,7 +172,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				if (esMappingObj.transform) {
 					v = _doESTransform(v, esMappingObj.transform);
 				} else if (_.isObject(v)) {
-					v = _toESRecursive(v, resolvedRefMap, true); //recurse
+					v = _toESRecursive(v, resolvedRefMap);
 				}
 			}
 			return v;
@@ -157,12 +180,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		//Translate only original values coming from DB. 
 		//This means no Elasticsearch transformed values.
-		if (!isTransformed) {
+		if (v._type) {
 
 			var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
 			if (propType.isValueObject) {
-				v = _toESRecursive(v, resolvedRefMap, isTransformed); //recurse non-datatypes
+				v = _toESRecursive(v, resolvedRefMap); //recurse non-datatypes
 			} else if (v._ref) {
 				v = undefined; //skip all non-resolved refs. 
 			} else {
