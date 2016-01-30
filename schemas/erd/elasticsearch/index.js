@@ -23,15 +23,6 @@ module.exports = {
 		"aggregateRating", "genre"
 	],
 
-	propertiesCalculated: {
-		subtypesAll: {
-			roots: true, //true (all) or (array of) rootNames
-			mapping: {
-				type: "string",
-				"index": "not_analyzed"
-			}
-		},
-	},
 
 	properties: {
 
@@ -140,6 +131,17 @@ module.exports = {
 				//transform: is optional and defaults to `_.pick(ref,expand.fields)`
 			}
 		}
-	}
+	},
+
+	propertiesCalculated: {
+		subtypesAll: {
+			roots: true, //true (all) or (array of) rootNames
+			mapping: {
+				type: "string",
+				"index": "not_analyzed"
+			}
+		},
+	},
+
 
 };
