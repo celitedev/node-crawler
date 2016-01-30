@@ -83,6 +83,12 @@ module.exports = {
 
 		location: {
 
+			//each ref should be like this, since it allows term filter
+			mapping: {
+				type: "string",
+				"index": "not_analyzed"
+			},
+
 			//exclude=true: exclude value from indexing. 
 			//This doesn't prevent expanded and/or derived fields from being indexed
 			exclude: false,
@@ -101,6 +107,11 @@ module.exports = {
 			}
 		},
 		workFeatured: {
+
+			mapping: {
+				type: "string",
+				"index": "not_analyzed"
+			},
 
 			//exclude=true: exclude value from indexing. 
 			//This doesn't prevent expanded and/or derived fields from being indexed
