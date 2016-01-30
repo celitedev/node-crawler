@@ -81,6 +81,170 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		});
 	};
 
+	function _toESRecursive(properties, resolvedRefMap, isTransformed) {
+
+		var expandMapToInclude = {};
+
+		var dto = _.reduce(properties, function(agg, v, k) {
+
+			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
+
+			//remove aliasOf properties. They have no place in ERD creation
+			if (generatedSchemas.properties[k].aliasOf) {
+				return agg;
+			}
+
+			var argObj = {
+				isTotalValueMultiValued: _.isArray(v),
+				k: k,
+				expandMapToInclude: expandMapToInclude,
+				isTransformed: isTransformed,
+				resolvedRefMap: resolvedRefMap
+			};
+
+			var out;
+			if (_.isArray(v)) {
+
+				//Apply single transform to map. 
+				out = _.map(v, function(singleVal) {
+					return _toESRecursiveSingleItem(singleVal, argObj);
+				});
+
+				//A result may return undefined, which is removed using compact. 
+				out = _.compact(out);
+
+				//if the remaining size is zero, return undefined.
+				if (!_.size(out)) {
+					out = undefined;
+				}
+			} else {
+				//apply single transform to single item. Result may be undefined
+				out = _toESRecursiveSingleItem(v, argObj);
+			}
+
+			//add result to output object if not undefined.
+			if (out !== undefined) {
+				agg[k] = out;
+			}
+
+			return agg;
+		}, {});
+
+		_.extend(dto, expandMapToInclude);
+
+		return dto;
+	}
+
+
+	function _toESRecursiveSingleItem(v, argObj) {
+
+		var isTotalValueMultiValued = argObj.isTotalValueMultiValued;
+		var k = argObj.k;
+		var expandMapToInclude = argObj.expandMapToInclude;
+		var isTransformed = argObj.isTransformed;
+		var resolvedRefMap = argObj.resolvedRefMap;
+
+		function applyTransformOrInspectNestedAttribs(v, transformer) {
+			if (v !== undefined) {
+				if (esMappingObj.transform) {
+					v = _doESTransform(v, esMappingObj.transform);
+				} else if (_.isObject(v)) {
+					v = _toESRecursive(v, resolvedRefMap, true); //recurse
+				}
+			}
+			return v;
+		}
+
+		//Translate only original values coming from DB. 
+		//This means no Elasticsearch transformed values.
+		if (!isTransformed) {
+
+			var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
+
+			if (propType.isValueObject) {
+				v = _toESRecursive(v, resolvedRefMap, isTransformed); //recurse non-datatypes
+			} else if (v._ref) {
+				v = undefined; //skip all non-resolved refs. 
+			} else {
+				v = v._value; //simplify all datatypes and object-references to their value
+			}
+
+			if (v === undefined) {
+				return undefined;
+			}
+		}
+
+		//Apply Elasticsearch mapping if it exists for the current key.
+		var esMappingObj = esMappingProperties[k];
+		if (esMappingObj) {
+
+			//If mapping contains a `expand` directive, create a new, possibly multivalued, field named: <prop>#expanded. 
+			//E.g.: location#expanded
+			var expandObj = esMappingObj.expand;
+			if (expandObj) {
+
+				//fetch the reference and only keep the `fields` defined.
+				var ref = _.pick(resolvedRefMap[v], expandObj.fields);
+				if (!ref) {
+					throw new Error("resolved ref couldn't be resolved: " + v);
+				}
+
+				//Apply transform on the reference if exists, or inspect nested attributes for needed transforms recursively.
+				var objExpanded = applyTransformOrInspectNestedAttribs(ref, expandObj.transform);
+
+				if (expandObj.includeId) {
+					objExpanded.id = v;
+				}
+
+				var key = k + "--expand";
+				expandMapToInclude[key] = isTotalValueMultiValued ?
+					(expandMapToInclude[key] || []).concat(objExpanded) :
+					objExpanded;
+			}
+
+
+			if (esMappingObj.exclude) { //Exclude value from ES-index.  
+				v = undefined;
+			} else {
+				//apply transform if exists, or inspect nested attributes for needed transforms recursively.
+				v = applyTransformOrInspectNestedAttribs(v, esMappingObj.transform);
+			}
+		}
+
+		return v;
+	}
+
+
+
+	//transform a value to it's ES-counterpart by either 
+	//- object-notation -> <k,v> map where values are functions with sig function(val)
+	//  missing keys are passed along untouched
+	//- function-notation -> one function with the value passed.
+	//
+	//Note: when transformer not defined we recurse the possibly nested object. 
+	//When transformer IS defined, we cannot do that anymore, since the transformer
+	//might (read: is likely to) have changed the 'property-schema' on which recursing relies.
+	function _doESTransform(v, transformer) {
+
+		if (_.isFunction(transformer)) {
+			return transformer(v);
+		}
+
+		if (_.isObject(transformer)) {
+			if (!_.isObject(v)) {
+				throw new Error("object-transformer selected but value not an object: " + v);
+			}
+			return _.reduce(v, function(agg, value, k) {
+				agg[k] = transformer[k] ? transformer[k](value) : value;
+				return agg;
+			}, {});
+		}
+
+		throw new Error("transformer needs to be function or object:" + transformer);
+	}
+
+
+	//fetch a deduped array of resolved reference ids
 	CanonicalEntity.prototype.fetchResolvedRefs = function(props) {
 		return _fetchResolvedRefsRecursive(props || this._props);
 	};
@@ -116,142 +280,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		return refs;
 	}
 
-	//transform a value by either 
-	//- object-notation -> <k,v> map where values are functions with sig function(val)
-	//  missing keys are passed along untouched
-	//- function-notation -> one function with the value passed.
-	//
-	//Note: when transformer not defined we recurse the possibly nested object. 
-	//When transformer IS defined, we cannot do that anymore, since the transformer
-	//might (read: is likely to) have changed the 'property-schema' on which recursing relies.
-	function doValueTransform(v, transformer) {
-		if (v === undefined) {
-			return undefined;
-		}
-
-		if (!transformer) {
-			if (_.isObject(v)) {
-				v = _toESRecursive(v, {}, true); //recurse
-			}
-			return v;
-		}
-
-		if (_.isFunction(transformer)) {
-			return transformer(v);
-		}
-
-		if (_.isObject(transformer)) {
-			if (!_.isObject(v)) {
-				throw new Error("object-transformer selected but value not an object: " + v);
-			}
-			return _.reduce(v, function(agg, value, k) {
-				agg[k] = transformer[k] ? transformer[k](value) : value;
-				return agg;
-			}, {});
-		}
-
-		throw new Error("transformer needs to be function or object:" + transformer);
-	}
-
-	function _toESRecursive(properties, resolvedRefMap, isRef) {
-
-		var expandMapToInclude = {};
-
-		var origProps = _.clone(properties);
-
-		var dto = _.reduce(origProps, function(agg, v, k) {
-
-			if (excludePropertyKeys.indexOf(k) !== -1) return agg;
-
-			var isTotalValueMultiValued = _.isArray(v);
-
-			var propertySchema = generatedSchemas.properties[k];
-
-			//remove aliasOf properties. They have no place in ERD
-			if (propertySchema.aliasOf) {
-				return agg;
-			}
-
-			//NOTE: at this point _type is guaranteed NOT an array anymore. That was only at toplevel
-			function transformSingleItem(v) {
-
-				if (!isRef) {
-
-					var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
-
-					if (propType.isValueObject) {
-						v = _toESRecursive(v, resolvedRefMap, isRef); //recurse non-datatypes
-					} else if (v._ref) {
-						v = undefined; //skip all non-resolved refs. 
-					} else {
-						v = v._value; //simplify all datatypes and object-references to their value
-					}
-
-					if (v === undefined) {
-						return v;
-					}
-				}
-
-				var esMappingObj = esMappingProperties[k];
-				if (esMappingObj) {
-
-					//Transform to ES
-					v = doValueTransform(v, esMappingObj.transform);
-
-					//Add new, possibly multivalued, field named: <prop>#expanded. E.g.: location#expanded
-					var expandObj = esMappingObj.expand;
-					if (expandObj) {
-						var key = k + "--expand";
-
-						var ref = resolvedRefMap[v];
-						if (!ref) {
-							throw new Error("resolved ref couldn't be resolved: " + v);
-						}
-
-						var objExpanded = _.pick(doValueTransform(ref, expandObj.transform), expandObj.fields);
-
-						if (expandObj.includeId) {
-							objExpanded.id = v;
-						}
-
-						if (!isTotalValueMultiValued) {
-							expandMapToInclude[key] = objExpanded;
-						} else {
-							var arr = expandMapToInclude[key] = expandMapToInclude[key] || [];
-							arr.push(objExpanded);
-						}
-					}
-
-					//Exclude value from ES-index. 
-					//Note: it's still possible to have derived/calcualted and expanded values indexed. 
-					if (esMappingObj.exclude) {
-						v = undefined;
-					}
-				}
-
-				return v;
-			}
-
-			var out;
-			if (_.isArray(v)) {
-				out = _.compact(_.map(v, transformSingleItem));
-				if (!_.size(out)) {
-					out = undefined;
-				}
-			} else {
-				out = transformSingleItem(v);
-			}
-			if (out !== undefined) {
-				agg[k] = out;
-			}
-
-			return agg;
-		}, {});
-
-		_.extend(dto, expandMapToInclude);
-
-		return dto;
-	}
 
 
 	return CanonicalEntity;

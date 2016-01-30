@@ -26,9 +26,14 @@ module.exports = {
 	properties: {
 
 		ratingValue: {
+
+			//mapping: used during mapping process (tools/renewESMappings)
+			//mappings are to be passed verbatim to ES mapping endpoint.
 			mapping: {
 				type: "double"
 			},
+
+			//transform: used on indexing as well as quering
 			transform: function(val) {
 				return parseFloat(val);
 			}
@@ -50,10 +55,10 @@ module.exports = {
 		},
 
 
-		//https://www.elastic.co/guide/en/elasticsearch/guide/current/lat-lon-formats.html
 		//Geo is of type geo_point
+		//https://www.elastic.co/guide/en/elasticsearch/guide/current/lat-lon-formats.html
 		geo: {
-			mapping: { //mappings are to be passed verbatim to ES mapping endpoint.
+			mapping: {
 				type: "geo_point",
 
 				//geopoints are expensive. We'll store them on disk instead of mem
@@ -89,11 +94,11 @@ module.exports = {
 				"index": "not_analyzed"
 			},
 
-			//exclude=true: exclude value from indexing. 
-			//This doesn't prevent expanded and/or derived fields from being indexed
+			//Exclude=true: exclude value from indexing. 
+			//Note: This doesn't prevent expanded and/or derived fields from being indexed
 			exclude: false,
 
-			//creates a new property `location--expand`
+			//Creates a new property `location--expand`
 			//If multivalued this is of type 'nested' otherwise of type 'object'
 			expand: {
 				fields: ["name", "geo"],
