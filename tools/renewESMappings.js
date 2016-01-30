@@ -45,14 +45,6 @@ var indexMapping = {
 };
 
 
-function getAllIndexNames() {
-	return _.map(domainConfig.domain.roots, function(root) {
-		return {
-			root: root,
-			indexName: "kwhen-" + root.toLowerCase()
-		};
-	});
-}
 
 var promises = _.map(getAllIndexNames(), function(obj) {
 
@@ -81,9 +73,33 @@ var promises = _.map(getAllIndexNames(), function(obj) {
 				index: indexName,
 				body: createIndexMapping(indexMapping, root)
 			});
+		})
+		.catch(function(err) {
+			throw err;
 		});
 });
 
+
+Promise.all(promises)
+	.then(function(result) {
+		console.log("indices created: ", _.pluck(getAllIndexNames(), "indexName").join(","));
+	})
+	.catch(function(err) {
+		setTimeout(function() { //throw already
+			throw err;
+		});
+	});
+
+
+
+function getAllIndexNames() {
+	return _.map(domainConfig.domain.roots, function(root) {
+		return {
+			root: root,
+			indexName: "kwhen-" + root.toLowerCase()
+		};
+	});
+}
 
 function createIndexMapping(indexMapping, root) {
 	var mapping = _.cloneDeep(indexMapping);
@@ -93,46 +109,63 @@ function createIndexMapping(indexMapping, root) {
 		rootName: root
 	});
 
+
 	//Get all properties that can exist in index. 
 	//This is the aggregate of all properties defined on the above types.
 	var propNames = _.uniq(_.reduce(typesForRoot, function(arr, type) {
 		return arr.concat(_.keys(type.properties));
 	}, []));
 
+	//add mappings for properties that exist on root
 	mapping.mappings.type1.properties = _.reduce(propNames, function(agg, propName) {
-
 		addPropertyMapping(propName, agg);
-
 		return agg;
 	}, {});
+
+
+	//Add mappings for isCalculated properties that should exist on this root. 
+	//This is defined by directive `roots`, with options: 
+	//- true -> belong to any root
+	//- string || [string]  
+	var allPropertyNames = _.keys(generatedSchemas.properties);
+	var calculatedProps = esMappingConfig.propertiesCalculated;
+
+	var existingProps = _.intersection(allPropertyNames, _.keys(calculatedProps));
+	if (existingProps.length) {
+		throw new Error("calculated ES properties exist that are already defined: " + existingProps.join(","));
+	}
+
+	mapping.mappings.type1.properties = _.reduce(calculatedProps, function(agg, prop, propName) {
+		var roots = _.isArray(prop.roots) ? prop.roots : [prop.roots];
+		if (prop.roots === true || ~roots.indexOf(root)) {
+			addPropertyMapping(propName, agg);
+		}
+		return agg;
+	}, mapping.mappings.type1.properties);
 
 	return mapping;
 }
 
-Promise.all(promises)
-	.then(function(result) {
-		console.log("indices created: ", _.pluck(getAllIndexNames(), "indexName").join(","));
-	})
-	.catch(function(err) {
-		console.trace(err);
-	});
-
-
-var nestedTypes = ["object", "nested"];
+function isNestedMapping(mapping) {
+	return ~["object", "nested"].indexOf(mapping.type);
+}
 
 function addPropertyMapping(propName, agg) {
 
-	var propType = generatedSchemas.properties[propName];
-	var propESObj = esMappingProperties[propName];
+	var propESObj = esMappingProperties[propName] || esMappingConfig.propertiesCalculated[propName];
+	var propType = generatedSchemas.properties[propName]; //NOTE: doesn't exist in case of calculated prop.
+
 	if (propESObj) {
 
 		if (propESObj.mapping) {
 			agg[propName] = propESObj.mapping;
 
-			//no mapping defined on a nested object, so recurse
-			//NOTE: this deliberately doesn't use clone, so this code will automatically inject
+			//If nested mapping defined without properties -> attempt to fetch mappings through
+			//knowledge of type on that property, and through that find possible nested props.
+			//
+			//TECH NOTE: this deliberately doesn't use clone, so this code will automatically inject
 			//the updated mapping to 'expand' mappings below
-			if (!agg[propName].properties && ~nestedTypes.indexOf(agg[propName].type)) {
+			if (isNestedMapping(agg[propName]) && !agg[propName].properties && propType) {
 				var nestedPropNames = _.pluck(generatedSchemas.types[propType.ranges[0]].properties, "id");
 				agg[propName].properties = _.reduce(nestedPropNames, function(agg, propName) {
 					addPropertyMapping(propName, agg);

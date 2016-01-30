@@ -23,10 +23,20 @@ module.exports = {
 		"aggregateRating", "genre"
 	],
 
+	propertiesCalculated: {
+		subtypesAll: {
+			roots: true, //true (all) or (array of) rootNames
+			mapping: {
+				type: "string",
+				"index": "not_analyzed"
+			}
+		},
+	},
+
 	properties: {
 
-		ratingValue: {
 
+		ratingValue: {
 			//mapping: used during mapping process (tools/renewESMappings)
 			//mappings are to be passed verbatim to ES mapping endpoint.
 			mapping: {
