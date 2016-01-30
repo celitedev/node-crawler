@@ -128,7 +128,7 @@ Promise.resolve()
 				var start = new Date().getTime();
 
 				var bulk = _.reduce(data.entities, function(arr, entity) {
-					var dto = entity.toElasticsearchObject(undefined, _.pick(refMap, entity._refsResolved));
+					var dto = entity.toElasticsearchObject(_.pick(refMap, entity._refsResolved));
 					var meta = {
 						index: {
 							_index: "kwhen-" + dto._root.toLowerCase(),

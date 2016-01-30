@@ -1,3 +1,5 @@
+var _ = require("lodash");
+
 //This file describes elasticsearch mappings. 
 //Each domain-property that IS NOT described here, is mapped verbatim. 
 //If a domain-property should NOT be indexed in ES it should be made explicit here. 
@@ -135,7 +137,15 @@ module.exports = {
 
 	propertiesCalculated: {
 		subtypesAll: {
+			populate: {
+				fields: "subtypes",
+				strategy: function(val) {
+					val = _.isArray(val) ? val : [val];
+					return this.concat(val);
+				}
+			},
 			roots: true, //true (all) or (array of) rootNames
+			isMulti: true,
 			mapping: {
 				type: "string",
 				"index": "not_analyzed"
