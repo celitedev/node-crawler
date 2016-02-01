@@ -123,12 +123,9 @@ module.exports = function(generatedSchemas) {
 
 					//example of multi-fields
 					//https://www.elastic.co/guide/en/elasticsearch/reference/current/_multi_fields.html
-					"fields": {
-						"raw": {
-							"type": "string",
-							"index": "not_analyzed"
-						}
-					}
+				},
+				fields: {
+					"raw": "kwhen_notAnalyzed"
 				}
 			},
 
@@ -164,7 +161,7 @@ module.exports = function(generatedSchemas) {
 			all_subtypes: {
 				roots: true, //true (all) or (array of) rootNames
 				isMulti: true,
-				mapping: "enum",
+				mapping: "kwhen_enum",
 				populate: {
 					fields: "subtypes",
 					// strategy: function(val) { //default function
@@ -177,7 +174,7 @@ module.exports = function(generatedSchemas) {
 			all_genre: {
 				roots: true,
 				isMulti: true,
-				mapping: "enum",
+				mapping: "kwhen_enum",
 				populate: {
 					fields: "genre"
 				},
