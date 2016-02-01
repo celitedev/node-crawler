@@ -5,13 +5,11 @@ var UUID = require("pure-uuid");
 
 var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
-var esMappingConfig = require("../../erd/elasticsearch");
-var esMappingProperties = esMappingConfig.properties;
-
 var domainUtils = require("../utils");
 
 module.exports = function(generatedSchemas, AbstractEntity, r) {
 
+	var esMappingConfig = require("../../erd/elasticsearch")(generatedSchemas);
 	var entityUtils = require("./utils")(generatedSchemas);
 	var validator = require("../validation")(generatedSchemas);
 
@@ -26,7 +24,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		}
 
 		this.id = state.id;
-
 		if (bootstrapObj) {
 			this.state = bootstrapObj._state;
 		}
@@ -68,11 +65,11 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		//  - subtypes *might* also be populated from the 'tag'-property
 		props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
 
-
+		var prop;
 		(function populateFromOtherFields() {
 
 			_.each(entityUtils.calcPropertyOrderToPopulate(root), function(propName) {
-				var prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
+				prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
 				if (!prop || !prop.populate) return;
 
 				//the fieldnames of which the contents should be populated into the current propName
@@ -90,6 +87,34 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				}, props[propName] || []));
 			});
 
+		}());
+
+		(function doVocabularyLookup() {
+			_.each(props, function(prop, propName) {
+
+				var input = props[propName];
+
+				if (!input) return; //no value -> nothing to do here.
+
+
+				propConfig = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
+				if (!propConfig || !propConfig.enum) return;
+
+				//add `verbatim`-defined, add verbatim values
+				if (propConfig.enum.options.verbatim) {
+					props[propName] = _.intersection(input, propConfig.enum.options.verbatim);
+				}
+
+				//loop all vocab values and include 'output' in case there's a match on 'input'. The result-arrayis set as the new value
+				props[propName] = _.uniq(_.reduce(propConfig.enum.options.values, function(arr, val) {
+					if (_.intersection(val.input, input).length) { //if there's a match...
+						return arr.concat(val.output); //... include the output of this vocab lookup
+					}
+					return arr;
+				}, props[propName]));
+
+
+			});
 		}());
 
 
@@ -190,7 +215,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		}
 
 		//Apply Elasticsearch mapping if it exists for the current key.
-		var esMappingObj = esMappingProperties[k];
+		var esMappingObj = esMappingConfig.properties[k];
 		if (esMappingObj) {
 
 			//If mapping contains a `expand` directive, create a new, possibly multivalued, field named: <prop>#expanded. 
