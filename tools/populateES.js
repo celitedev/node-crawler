@@ -56,15 +56,42 @@ Promise.resolve()
 		_.each(allProps, function(prop, propName) {
 			if (!prop.enum) return;
 
-			var values = prop.enum.options.values; //checked to exist courtesy of renewEsMappings.js
+			//store verbatim to lowercase
+			if (prop.enum.options.verbatim) {
+				prop.enum.options.verbatim = _.map(prop.enum.options.verbatim, function(v) {
+					return v.toLowerCase();
+				});
+			}
 
-			_.each(values, function(val) { //make arrays of input and output
-				val.input = _.isArray(val.input) ? val.input : [val.input];
-				val.output = _.isArray(val.output) ? val.output : [val.output];
+			prop.enum.options.values = _.reduce(prop.enum.options.values, function(agg, val, k) {
+
+				if (_.isString(val)) {
+					val = [val];
+				}
+				if (_.isArray(val)) { //only support String if array
+					val = {
+						out: _.map(val, function(v) {
+							return v.toLowerCase();
+						})
+					};
+				} else if (_.isObject(val)) {
+					val.out = _.isArray(val.out) ? val.out : [val.out];
+					val.out = _.map(val.out, function(v) {
+						return v.toLowerCase();
+					});
+				}
+
+				//limitToTypes: from singlevalued -> array
 				if (val.limitToTypes) {
 					val.limitToTypes = _.isArray(val.limitToTypes) ? val.limitToTypes : [val.limitToTypes];
 				}
-			});
+
+				agg[k.toLowerCase()] = val; //we store every enum as lowercase
+
+				return agg;
+
+			}, {});
+
 		});
 
 	})

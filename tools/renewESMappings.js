@@ -48,7 +48,7 @@ Promise.resolve()
 	.then(function() {
 
 		var nonExistPropNames = [],
-			enumOnNonDatatypesOrAmbiguous = [],
+			enumOnNonDatatypes = [],
 			enumNotMultivalued = [];
 
 		_.each(_.keys(esMappingConfig.properties), function(propName) {
@@ -58,15 +58,13 @@ Promise.resolve()
 
 				var prop = generatedSchemas.properties[propName];
 
-				if (prop.ranges.length > 1) {
-					enumOnNonDatatypesOrAmbiguous.push(propName);
-				} else if (prop.enum) {
-					//enum defined -> may not be defined on ambiguous or non-datatypes
+				if (prop.enum) {
+					//enum defined -> may not be defined on non-datatypes
 					//may be defined on all calculated fields since these are treated
-					//as non-ambiguous datatypes at all time
+					//as datatypes at all time
 					var typeName = prop.ranges[0];
 					if (!generatedSchemas.datatypes[typeName]) {
-						enumOnNonDatatypesOrAmbiguous.push(propName);
+						enumOnNonDatatypes.push(propName);
 					} else if (!prop.isMulti) {
 						enumNotMultivalued.push(propName);
 					}
@@ -88,9 +86,9 @@ Promise.resolve()
 		}
 
 
-		if (enumOnNonDatatypesOrAmbiguous.length) {
-			throw new Error("ES property with 'enum' exists on ambiguous or non-datatype property: " +
-				enumOnNonDatatypesOrAmbiguous.join(","));
+		if (enumOnNonDatatypes.length) {
+			throw new Error("ES property with 'enum' exists on non-datatype property: " +
+				enumOnNonDatatypes.join(","));
 		}
 
 		if (enumNotMultivalued.length) {
@@ -111,8 +109,8 @@ Promise.resolve()
 				JSON.stringify(prop.enum));
 
 			_.each(options.values, function(val) {
-				if (!val.input || !val.output) throw new Error("enum.options.values[x].input and enum.options.values[x].output should be defined: " +
-					JSON.stringify(prop.enum));
+				if (_.isObject(val) && !_.isArray(val) && !val.out) throw new Error("enum.options.values[x].out should be defined (or string shortcut): " +
+					JSON.stringify(val));
 			});
 
 		});

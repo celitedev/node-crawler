@@ -12,10 +12,7 @@ var _ = require("lodash");
 var singleton;
 module.exports = function(generatedSchemas) {
 
-	//Need for singleton (instead of local copy) 
-	//because we change this object in process, and this change
-	//should be propagated to all stuff referencing it.
-	singleton = singleton || {
+	var obj = {
 
 		//when expanding refs in ERD, for increased perf on indexing we don't 
 		//fetch all fields. The fields fetched here should include all the 
@@ -34,38 +31,58 @@ module.exports = function(generatedSchemas) {
 
 		properties: {
 
+			genre: {
+				mapping: {
+					type: "string",
+					"index": "not_analyzed"
+				},
+				enum: {
+					type: "static",
+					options: {
+						values: {
+							drama: "Drama",
+							documentary: "documentary",
+							"action/adventure": ["action", "adventure"],
+							"art house/foreign": ["art house", "foreign"]
+						}
+					}
+				}
+			},
+
+
 			subtypes: {
 				mapping: {
 					type: "string",
 					"index": "not_analyzed"
 				},
 
-				enum: {
-					type: "static", //alternative: elasticsearch index/type
+				// enum: {
+				// 	type: "static", //alternative: elasticsearch index/type
 
-					options: {
+				// 	options: {
 
-						//pass-along all types verbatim
-						verbatim: _.keys(generatedSchemas.types),
+				// 		//pass-along all types verbatim
+				// 		//these are lookedup + stored lowercase
+				// 		verbatim: _.keys(generatedSchemas.types),
 
-						//translate values
-						values: [{
-							input: "MovieTheater",
-							output: "movie theater",
-							limitToTypes: "LocalBusiness"
-						}, {
-							input: "pianoBar",
-							output: "piano bar"
-						}, {
-							input: "BarOrPub",
-							output: ["bar", "pub"],
-							schemaOrg: { //if a schema.org match exists for this enumeration-value list it here
-								type: "type", //the type of schema.org structure: e.g.: a Type with subtypes
-								name: "BarOrPub" //type name
-							}
-						}]
-					}
-				}
+				// 		//keys (to which input is matched) as well as 'out' 
+				// 		//are stored in matched / stored in lowercase
+				// 		values: {
+				// 			"MovieTheater": {
+				// 				out: "movie theater",
+				// 				limitToTypes: "LocalBusiness"
+				// 			},
+				// 			"pianoBar": "piano bar",
+				// 			"BarOrPub": {
+				// 				out: ["bar", "pub"],
+				// 				schemaOrg: { //if a schema.org match exists for this enumeration-value list it here
+				// 					type: "type", //the type of schema.org structure: e.g.: a Type with subtypes
+				// 					name: "BarOrPub" //type name
+				// 				}
+				// 			}
+				// 		}
+				// 	}
+				// }
 			},
 
 			ratingValue: {
@@ -153,6 +170,7 @@ module.exports = function(generatedSchemas) {
 					}
 				}
 			},
+
 			workFeatured: {
 
 				mapping: {
@@ -190,6 +208,11 @@ module.exports = function(generatedSchemas) {
 
 		},
 	};
+
+	//Need for singleton (instead of local copy) 
+	//because we change this object in process, and this change
+	//should be propagated to all stuff referencing it.
+	singleton = singleton || obj;
 
 	return singleton;
 };

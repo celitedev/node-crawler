@@ -92,45 +92,53 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		}());
 
+		//do the mapping and stuff.
+		props = _toESRecursive(props, resolvedRefMap || {});
+
 		(function doVocabularyLookup() {
-			_.each(props, function(prop, propName) {
 
-				var input = props[propName];
+			_.each(props, function(input, propName) {
 
-				if (!input) return; //no value -> nothing to do here.
-
+				if (input === undefined) return; //no value -> nothing to do here.
 
 				propConfig = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
 				if (!propConfig || !propConfig.enum) return;
 
-				//add `verbatim`-defined, add verbatim values
+				//All enum input is stored as lowercase
+				input = _.map(input, function(val) {
+					return val.toLowerCase();
+				});
+
+				props[propName] = [];
+
+				//add `verbatim`-defined, add verbatim values (these are already lowercased)
 				if (propConfig.enum.options.verbatim) {
 					props[propName] = _.intersection(input, propConfig.enum.options.verbatim);
 				}
 
 				//loop all vocab values and include 'output' in case there's a match on 'input'. The result-arrayis set as the new value
-				props[propName] = _.uniq(_.reduce(propConfig.enum.options.values, function(arr, val) {
+				props[propName] = _.uniq(_.reduce(propConfig.enum.options.values, function(arr, val, inputKey) {
 
 					//if `limitToTypes`directive defined there should be an overlap with typechain of entity
+					//Both sides are lowercased
 					if (val.limitToTypes && !~_.intersection(val.limitToTypes, typechain)) return arr;
 
 					//if there's a match...
-					if (_.intersection(val.input, input).length) {
-						return arr.concat(val.output); //... include the output of this vocab lookup
+					if (~input.indexOf(inputKey)) {
+						return arr.concat(val.out); //... include the output of this vocab lookup
 					}
 					return arr;
 				}, props[propName]));
 
-
 			});
 		}());
 
-
-		return _.extend({
+		var dto = _.extend({
 			id: this.id,
 			_root: root,
-		}, _toESRecursive(props, resolvedRefMap || {}));
+		}, props);
 
+		return dto;
 	};
 
 	function _toESRecursive(properties, resolvedRefMap) {
