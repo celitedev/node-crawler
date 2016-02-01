@@ -32,18 +32,26 @@ module.exports = function(generatedSchemas) {
 		properties: {
 
 			genre: {
-				mapping: {
-					"type": "string",
-					"analyzer": "enum"
-				},
 				enum: {
 					type: "static",
 					options: {
 						values: {
-							drama: "Drama",
-							documentary: "documentary",
-							"action/adventure": ["action", "adventure", "suspense"],
-							"art house/foreign": ["art house", "foreign"]
+							//Fandango Mappings
+							"drama": "Drama",
+							"action/adventure": ["action", "adventure"],
+							"comedy": ["comedy", "comedies", "humor"],
+							"suspense/thriller": ["suspense", "thriller"],
+							"documentary": "documentary",
+							"sci-fi/fantasy": ["sci-fy", "fantasy"],
+							"family": "family",
+							"animated": ["animated", "drawn", "animation"],
+							"horror": ["horror", "scary"],
+							"3d": ["animated", "3d", "animation"],
+							"romance": ["romance", "romcom", "romantic"],
+							"imax": "imax",
+							"concert/special events": ["concert", "special events"],
+							"art house/foreign": ["art house", "foreign"],
+							"music/performing arts": ["music", "performing arts"]
 						}
 					}
 				}
@@ -51,10 +59,7 @@ module.exports = function(generatedSchemas) {
 
 
 			subtypes: {
-				mapping: {
-					type: "string",
-					"index": "not_analyzed"
-				},
+
 
 				// enum: {
 				// 	type: "static", //alternative: elasticsearch index/type
@@ -210,7 +215,7 @@ module.exports = function(generatedSchemas) {
 				populate: {
 					fields: "genre"
 				},
-				roots: true, //true (all) or (array of) rootNames
+				roots: true,
 				isMulti: true,
 				mapping: {
 					type: "string",
