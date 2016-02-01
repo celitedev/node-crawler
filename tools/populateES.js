@@ -219,6 +219,15 @@ Promise.resolve()
 								body: bulk
 							});
 						})
+						.then(function(results) {
+							if (results.errors) {
+								var errors = _.filter(results.items, function(result) {
+									return result.index.status >= 300;
+								});
+								console.log("ERRORS IN ES BULK INSERT************************");
+								console.log(JSON.stringify(errors, null, 2));
+							}
+						})
 						.then(function() {
 							data.time.populateES += new Date().getTime() - start;
 						});
