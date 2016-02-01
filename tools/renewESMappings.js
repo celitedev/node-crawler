@@ -239,20 +239,35 @@ function addPropertyMapping(propName, agg) {
 	if (propESObj) {
 
 		if (propESObj.mapping) {
+
 			agg[propName] = propESObj.mapping;
 
-			//If nested mapping defined without properties -> attempt to fetch mappings through
-			//knowledge of type on that property, and through that find possible nested props.
-			//
-			//TECH NOTE: this deliberately doesn't use clone, so this code will automatically inject
-			//the updated mapping to 'expand' mappings below
-			if (isNestedMapping(agg[propName]) && !agg[propName].properties && propType) {
-				var nestedPropNames = _.pluck(generatedSchemas.types[propType.ranges[0]].properties, "id");
-				agg[propName].properties = _.reduce(nestedPropNames, function(agg, propName) {
-					addPropertyMapping(propName, agg);
-					return agg;
-				}, {});
+
+			//If nested mapping defined ...
+			if (isNestedMapping(agg[propName])) {
+
+				//... and property mapping without properties -> attempt to fetch mappings through
+				//knowledge of type on that property, and through that find possible nested props.
+				//
+				//TECH NOTE: this deliberately doesn't use clone, so this code will automatically inject
+				//the updated mapping to 'expand' mappings below
+				if (!agg[propName].properties && propType) {
+					var nestedPropNames = _.pluck(generatedSchemas.types[propType.ranges[0]].properties, "id");
+					agg[propName].properties = _.reduce(nestedPropNames, function(agg, propName) {
+						addPropertyMapping(propName, agg);
+						return agg;
+					}, {});
+				}
 			}
+		}
+
+		//if property is enum we set as predefined mapping.
+		//This mapping overwrites any explicitly set mapping.
+		if (propESObj.enum) {
+			agg.propName = {
+				"type": "string",
+				"analyzer": "enum"
+			};
 		}
 
 		//Extend with mappingExpanded, i.e.: a bunch of fields to include/expand a reference with
