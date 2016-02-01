@@ -60,7 +60,6 @@ module.exports = function(generatedSchemas) {
 
 			subtypes: {
 
-
 				// enum: {
 				// 	type: "static", //alternative: elasticsearch index/type
 
@@ -91,52 +90,35 @@ module.exports = function(generatedSchemas) {
 			},
 
 			ratingValue: {
-				//mapping: used during mapping process (tools/renewESMappings)
-				//mappings are to be passed verbatim to ES mapping endpoint.
-				mapping: {
-					type: "double"
-				},
-
-				//transform: used on indexing as well as quering
-				transform: function(val) {
-					return parseFloat(val);
-				}
+				mapping: "double",
+				transform: "float"
 			},
 
 			ratingCount: {
-				mapping: {
-					type: "long"
-				},
-				transform: function(val) {
-					return parseFloat(val);
-				}
+				mapping: "long",
+				transform: "float"
 			},
 
 			aggregateRating: {
-				mapping: {
-					type: "object",
-				}
+				mapping: "object"
 			},
 
-
-			//Geo is of type geo_point
-			//https://www.elastic.co/guide/en/elasticsearch/guide/current/lat-lon-formats.html
 			geo: {
 				mapping: {
+
+					//Geo is of type geo_point
+					//https://www.elastic.co/guide/en/elasticsearch/guide/current/lat-lon-formats.html
 					type: "geo_point",
 
 					//geopoints are expensive. We'll store them on disk instead of mem
 					//https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-memory.html#geo-memory
 					"doc_values": true
 				},
-				transform: function(geoObj) {
-					return [geoObj.longitude, geoObj.latitude]; //long first -> bit weird but this is the GeoJSON compliant way.
-				}
+				transform: "geo"
 			},
 
 			name: {
 				mapping: {
-
 					type: "string",
 
 					//example of multi-fields
@@ -152,39 +134,20 @@ module.exports = function(generatedSchemas) {
 
 			location: {
 
-				//each ref should be like this, since it allows term filter
-				mapping: {
-					type: "string",
-					"index": "not_analyzed"
-				},
-
 				//Exclude=true: exclude value from indexing. 
 				//Note: This doesn't prevent expanded and/or derived fields from being indexed
 				exclude: false,
 
-				//Creates a new property `location--expand`
+				//Creates a new property populate`location--expand`
 				//If multivalued this is of type 'nested' otherwise of type 'object'
 				expand: {
 					fields: ["name", "geo"],
 					// includeId: true, //include id in expanded objects. Useful for multivalued fields
-
-					transform: { //transform in object-notation
-						geo: function(geo) {
-							return [geo.longitude, geo.latitude]; //GEOJSON format
-						}
-					}
 				}
 			},
 
 			workFeatured: {
 
-				mapping: {
-					type: "string",
-					"index": "not_analyzed"
-				},
-
-				//exclude=true: exclude value from indexing. 
-				//This doesn't prevent expanded and/or derived fields from being indexed
 				exclude: false,
 
 				//creates a new property `workFeatured--expand`
@@ -192,7 +155,6 @@ module.exports = function(generatedSchemas) {
 				expand: {
 					fields: ["name", "aggregateRating", "genre"],
 					// includeId: true, //include id in expanded objects. Useful for multivalued fields
-					//transform: is optional and defaults to `_.pick(ref,expand.fields)`
 				}
 			}
 		},
@@ -200,30 +162,26 @@ module.exports = function(generatedSchemas) {
 		propertiesCalculated: {
 
 			all_subtypes: {
-				populate: {
-					fields: "subtypes"
-				},
 				roots: true, //true (all) or (array of) rootNames
 				isMulti: true,
-				mapping: {
-					type: "string",
-					analyzer: "enum"
-				}
+				mapping: "enum",
+				populate: {
+					fields: "subtypes",
+					// strategy: function(val) { //default function
+					// 	return _.isArray(val) ? val : [val];
+					// }
+				},
+
 			},
 
 			all_genre: {
+				roots: true,
+				isMulti: true,
+				mapping: "enum",
 				populate: {
 					fields: "genre"
 				},
-				roots: true,
-				isMulti: true,
-				mapping: {
-					type: "string",
-					analyzer: "enum"
-				}
 			},
-
-
 		},
 	};
 

@@ -17,6 +17,15 @@ var esMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 
 var client = new elasticsearch.Client(config.elasticsearch);
 
+
+
+var globalMappings = {
+	enum: {
+		type: "string",
+		analyzer: "enum"
+	}
+};
+
 var indexMapping = {
 	"settings": {
 		"number_of_shards": 1
@@ -240,6 +249,21 @@ function addPropertyMapping(propName, agg) {
 
 		if (propESObj.mapping) {
 
+			//expand short string notation to full mapping, e.g.: 
+			//
+			//mapping: "string" -> 
+			//
+			//mapping: {
+			// type: "string"
+			//}
+			if (_.isString(propESObj.mapping)) {
+				var lookupMapping = globalMappings[propESObj.mapping];
+				propESObj.mapping = lookupMapping ? _.cloneDeep(lookupMapping) : {
+					type: propESObj.mapping
+				};
+			}
+
+			//set mapping
 			agg[propName] = propESObj.mapping;
 
 
@@ -261,7 +285,8 @@ function addPropertyMapping(propName, agg) {
 			}
 		}
 
-		//if property is enum we set as predefined mapping.
+
+		//If property is enum we set a predefined mapping.
 		//This mapping overwrites any explicitly set mapping.
 		if (propESObj.enum) {
 			agg.propName = {
@@ -269,25 +294,45 @@ function addPropertyMapping(propName, agg) {
 				"analyzer": "enum"
 			};
 		}
+	}
 
-		//Extend with mappingExpanded, i.e.: a bunch of fields to include/expand a reference with
-		var expandObj = propESObj.expand;
-		if (expandObj) {
 
-			var out = {};
-			var obj = out[propName + "--expand"] = {
-				type: propType.isMulti ? "nested" : "object"
+	//For each property containing references: 
+	//- set standard mapping
+	//- check if we want to add a <prop>--expand mapping
+	if (propType) {
+
+		var type = generatedSchemas.types[propType.ranges[0]];
+		if (type && type.isEntity) {
+
+			//Set standard mapping for references: not_analyzed
+			//This mapping overwrites any explicitly set mapping.
+			agg[propName] = {
+				type: 'string',
+				index: 'not_analyzed'
 			};
 
-			obj.properties = _.reduce(expandObj.fields, function(agg, fieldName) {
-				var fieldESObj = esMappingConfig.properties[fieldName];
-				if (fieldESObj && fieldESObj.mapping) {
-					agg[fieldName] = fieldESObj.mapping;
-				}
-				return agg;
-			}, {});
+			propESObj = esMappingConfig.properties[propName];
 
-			_.extend(agg, out);
+			//Extend with mappingExpanded, i.e.: a bunch of fields to include/expand a reference with
+			if (propESObj && propESObj.expand) {
+
+				var out = {};
+				var obj = out[propName + "--expand"] = {
+					type: propType.isMulti ? "nested" : "object"
+				};
+
+				obj.properties = _.reduce(propESObj.expand.fields, function(agg, fieldName) {
+					var fieldESObj = esMappingConfig.properties[fieldName];
+					if (fieldESObj && fieldESObj.mapping) {
+						agg[fieldName] = fieldESObj.mapping;
+					}
+					return agg;
+				}, {});
+
+				_.extend(agg, out);
+			}
+
 		}
 	}
 }
