@@ -24,7 +24,18 @@ var indexMapping = {
 	"settings": {
 		//We don't coerce since we want everything to be explicit. 
 		//This is needed since we want to transform all queries through the same pipeline as indexing
-		"index.mapping.coerce": false
+		"index.mapping.coerce": false,
+
+		"index": {
+			"analysis": {
+				"analyzer": {
+					"enum": {
+						"tokenizer": "keyword",
+						"filter": "lowercase"
+					}
+				}
+			}
+		}
 	},
 	"mappings": {
 		"type1": {
