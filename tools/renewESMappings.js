@@ -47,16 +47,34 @@ var indexMapping = {
 
 Promise.resolve()
 	.then(function() {
-		var nonExistPropNames = [];
+		var nonExistPropNames = [],
+			enumOnNonDatatypesOrAmbiguous = [];
+
 		_.each(_.keys(esMappingProperties), function(propName) {
 			if (!~_.keys(generatedSchemas.properties).indexOf(propName)) {
 				nonExistPropNames.push(propName);
+			} else {
+				var prop = generatedSchemas.properties[propName];
+				if (prop.ranges.length > 1) {
+					enumOnNonDatatypesOrAmbiguous.push(propName);
+				} else {
+					var typeName = prop.ranges[0];
+					if (!generatedSchemas.datatypes[typeName]) {
+						enumOnNonDatatypesOrAmbiguous.push(propName);
+					}
+				}
 			}
 		});
 
 		if (nonExistPropNames.length) {
 			throw new Error("ES property doesn't exit in definitions. " +
-				"Did you want to make it a calculated property? : " + nonExistPropNames.join(","));
+				"Did you want to make it a calculated property? : " +
+				nonExistPropNames.join(","));
+		}
+
+		if (enumOnNonDatatypesOrAmbiguous.length) {
+			throw new Error("ES property with 'enum' exist on ambiguous or non-datatype property: " +
+				enumOnNonDatatypesOrAmbiguous.join(","));
 		}
 
 	})
