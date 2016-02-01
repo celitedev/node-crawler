@@ -73,7 +73,8 @@ Promise.resolve()
 
 		var nonExistPropNames = [],
 			enumOnNonDatatypes = [],
-			enumNotMultivalued = [];
+			enumNotMultivalued = [],
+			populateNotMultivalued = [];
 
 		_.each(_.keys(esMappingConfig.properties), function(propName) {
 			if (!~_.keys(generatedSchemas.properties).indexOf(propName)) {
@@ -89,18 +90,33 @@ Promise.resolve()
 					var typeName = prop.ranges[0];
 					if (!generatedSchemas.datatypes[typeName]) {
 						enumOnNonDatatypes.push(propName);
-					} else if (!prop.isMulti) {
-						enumNotMultivalued.push(propName);
 					}
 				}
+
+				if (!prop.isMulti) {
+					if (prop.enum) {
+						enumNotMultivalued.push(propName);
+					}
+					if (prop.populate) {
+						populateNotMultivalued.push(propName);
+					}
+				}
+
 			}
 		});
 
 		//test for calculated fields that define enum -> should be isMulti=true
 		_.each(esMappingConfig.propertiesCalculated, function(prop, propName) {
-			if (prop.enum && !prop.isMulti) {
-				enumNotMultivalued.push(propName);
+
+			if (!prop.isMulti) {
+				if (prop.enum) {
+					enumNotMultivalued.push(propName);
+				}
+				if (prop.populate) {
+					populateNotMultivalued.push(propName);
+				}
 			}
+
 		});
 
 		if (nonExistPropNames.length) {
@@ -119,6 +135,13 @@ Promise.resolve()
 			throw new Error("ES property with 'enum' exists on singlevalued property: " +
 				enumNotMultivalued.join(","));
 		}
+
+
+		if (populateNotMultivalued.length) {
+			throw new Error("ES property with 'populate' exists on singlevalued property: " +
+				populateNotMultivalued.join(","));
+		}
+
 
 		//test / normalize all enums
 		var allProps = _.extend({}, esMappingConfig.properties, esMappingConfig.propertiesCalculated);
