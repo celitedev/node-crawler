@@ -47,6 +47,47 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 		return _.intersection(ancestorsAndSelf, fieldtype.ranges).length;
 	},
 
+	createDagOrderGeneric: function(dagComparatorMap) {
+
+		var order = [];
+
+		function itLoop(deps, k) {
+
+			if (deps.length) {
+				return;
+			}
+
+			order.push(k);
+
+			_.each(dagComparatorMap, function(innerDeps) {
+				var needle = innerDeps.indexOf(k);
+				if (~needle) {
+					innerDeps.splice(needle, 1);
+				}
+			});
+
+			delete dagComparatorMap[k]; //delete type -> counts as stop crit
+		}
+
+		while (true) {
+
+			var dagComparatorMapSizeStart = _.size(dagComparatorMap);
+
+			//each iteration we need see the size of dagComparatorMap shrink
+			//if not, we've got a cycle
+			_.each(dagComparatorMap, itLoop);
+
+			if (!_.size(dagComparatorMap)) {
+				break; //done
+			}
+
+			if (_.size(dagComparatorMap) === dagComparatorMapSizeStart) {
+				throw new Error("Cycle detected!");
+			}
+		}
+		return order;
+	},
+
 	enums: {
 		//kind of entity: 
 		//- Canonical: our own caonical representation
