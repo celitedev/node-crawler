@@ -33,8 +33,8 @@ module.exports = function(generatedSchemas) {
 
 			genre: {
 				mapping: {
-					type: "string",
-					"index": "not_analyzed"
+					"type": "string",
+					"analyzer": "enum"
 				},
 				enum: {
 					type: "static",
@@ -42,7 +42,7 @@ module.exports = function(generatedSchemas) {
 						values: {
 							drama: "Drama",
 							documentary: "documentary",
-							"action/adventure": ["action", "adventure"],
+							"action/adventure": ["action", "adventure", "suspense"],
 							"art house/foreign": ["art house", "foreign"]
 						}
 					}
@@ -194,7 +194,7 @@ module.exports = function(generatedSchemas) {
 
 		propertiesCalculated: {
 
-			subtypesAll: {
+			all_subtypes: {
 				populate: {
 					fields: "subtypes"
 				},
@@ -202,9 +202,22 @@ module.exports = function(generatedSchemas) {
 				isMulti: true,
 				mapping: {
 					type: "string",
-					"index": "not_analyzed"
+					analyzer: "enum"
 				}
 			},
+
+			all_genre: {
+				populate: {
+					fields: "genre"
+				},
+				roots: true, //true (all) or (array of) rootNames
+				isMulti: true,
+				mapping: {
+					type: "string",
+					analyzer: "enum"
+				}
+			},
+
 
 		},
 	};
