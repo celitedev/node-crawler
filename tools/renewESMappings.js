@@ -20,9 +20,13 @@ var client = new elasticsearch.Client(config.elasticsearch);
 
 
 var globalMappings = {
-	enum: {
+	kwhen_enum: {
 		type: "string",
 		analyzer: "enum"
+	},
+	kwhen_notAnalyzed: {
+		"type": "string",
+		"index": "not_analyzed"
 	}
 };
 
@@ -285,7 +289,6 @@ function addPropertyMapping(propName, agg) {
 			}
 		}
 
-
 		//If property is enum we set a predefined mapping.
 		//This mapping overwrites any explicitly set mapping.
 		if (propESObj.enum) {
@@ -297,9 +300,11 @@ function addPropertyMapping(propName, agg) {
 	}
 
 
-	//For each property containing references: 
-	//- set standard mapping
-	//- check if we want to add a <prop>--expand mapping
+	///////////////////////////////////////////////////////
+	//For each property containing references:           //
+	//- set standard mapping                             //
+	//- check if we want to add a <prop>--expand mapping //
+	///////////////////////////////////////////////////////
 	if (propType) {
 
 		var type = generatedSchemas.types[propType.ranges[0]];
@@ -335,4 +340,23 @@ function addPropertyMapping(propName, agg) {
 
 		}
 	}
+
+	//////////////////////
+	//setting subfields //
+	//////////////////////
+	if (propESObj && propESObj.fields) {
+		agg[propName] = agg[propName] || {};
+		agg[propName].fields = _.reduce(propESObj.fields, function(agg, v, k) {
+
+			if (_.isString(v)) { //allow lookup in `globalMappings` or otherwise make object from string shortcut
+				var lookupMapping = globalMappings[v];
+				v = lookupMapping ? _.cloneDeep(lookupMapping) : {
+					type: v
+				};
+			}
+			agg[k] = v;
+			return agg;
+		}, {});
+	}
+
 }
