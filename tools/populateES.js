@@ -13,6 +13,8 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 	schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
 });
 
+var domainConfig = require("../schemas/domain/_definitions/config");
+
 var config = require("../config");
 var r = require('rethinkdbdash')(config.rethinkdb);
 
@@ -22,6 +24,7 @@ var domainUtils = require("../schemas/domain/utils");
 var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
 
 var entities = require("../schemas/domain/entities")(generatedSchemas, r);
+var entityUtils = require("../schemas/domain/entities/utils");
 var CanonicalEntity = entities.CanonicalEntity;
 
 var client = new elasticsearch.Client(config.elasticsearch);
@@ -43,6 +46,11 @@ var data = _.cloneDeep({
 var start = new Date().getTime();
 
 Promise.resolve()
+	.then(function warmPopulate() {
+		var roots = domainConfig.domain.roots;
+		_.each(roots, entityUtils.calcPropertyOrderToPopulate);
+		console.log("done warm");
+	})
 	.then(function processSourcesRecursive() {
 		return Promise.resolve()
 			.then(function getEntities() {

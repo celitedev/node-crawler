@@ -3,6 +3,7 @@ var _ = require("lodash");
 var domainUtils = require("../../utils");
 var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
+var esMappingConfig = require("../../../erd/elasticsearch");
 
 module.exports = function(generatedSchemas) {
 
@@ -464,6 +465,68 @@ module.exports = function(generatedSchemas) {
 	}
 
 
+	var propertiesInOrderPerRoot = {};
+
+	function calcPropertyOrderToPopulate(root) {
+
+		var propNamesInOrder = propertiesInOrderPerRoot[root];
+		if (!propNamesInOrder) {
+
+			//get root + all subtypes
+			var typesForRoot = _.filter(generatedSchemas.types, {
+				rootName: root
+			});
+
+			//Get all properties that can exist in index on toplevel. 
+			//This is the aggregate of all properties defined on the above types.
+			var propNames = _.uniq(_.reduce(typesForRoot, function(arr, type) {
+				return arr.concat(_.keys(type.properties));
+			}, []));
+
+
+			//add calculated fields that should exit on this root. 
+			propNames = _.reduce(esMappingConfig.propertiesCalculated, function(arr, prop, propName) {
+				var roots = _.isArray(prop.roots) ? prop.roots : [prop.roots];
+				if (prop.roots === true || ~roots.indexOf(root)) {
+					arr.push(propName);
+				}
+				return arr;
+			}, propNames);
+
+			//Create a map <propName, [dependentProps]> and use this to calculate a DAG
+			var dagComparators = _.reduce(propNames, function(agg, propName) {
+				var fieldsArr = [];
+				var prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
+				if (prop && prop.populate) {
+
+					//This property has a `populate`-directive. 
+					//That means it should be populated using other field(s)
+
+					//Prereq: this field must be multivalued.
+					if (esMappingConfig.propertiesCalculated[propName]) { //calculated field
+						if (!prop.isMulti) {
+							throw new Error("calculated property doesn't define isMulti=true: " + propName);
+						}
+					} else {
+						var propType = generatedSchemas.properties[propName]; //should exist!
+						if (!propType.isMulti) {
+							throw new Error("property doesn't define isMulti=true: " + propName);
+						}
+					}
+
+					var fields = prop.populate.fields;
+					fieldsArr = _.intersection(_.isArray(fields) ? fields : [fields], propNames);
+				}
+				agg[propName] = fieldsArr;
+				return agg;
+			}, {});
+
+			propNamesInOrder = propertiesInOrderPerRoot[root] = domainUtils.createDagOrderGeneric(dagComparators);
+		}
+		return propNamesInOrder;
+	}
+
+
 	return {
 
 		_transformProperties: _transformProperties,
@@ -478,7 +541,9 @@ module.exports = function(generatedSchemas) {
 
 		_toSimpleRecursive: _toSimpleRecursive,
 
-		isAbsoluteUrl: isAbsoluteUrl
+		isAbsoluteUrl: isAbsoluteUrl,
+
+		calcPropertyOrderToPopulate: calcPropertyOrderToPopulate
 	};
 
 };

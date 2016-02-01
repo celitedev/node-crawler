@@ -45,42 +45,55 @@ var indexMapping = {
 };
 
 
+Promise.resolve()
+	.then(function() {
+		var nonExistPropNames = [];
+		_.each(_.keys(esMappingProperties), function(propName) {
+			if (!~_.keys(generatedSchemas.properties).indexOf(propName)) {
+				nonExistPropNames.push(propName);
+			}
+		});
 
-var promises = _.map(getAllIndexNames(), function(obj) {
+		if (nonExistPropNames.length) {
+			throw new Error("ES property doesn't exit in definitions. " +
+				"Did you want to make it a calculated property? : " + nonExistPropNames.join(","));
+		}
 
-	var root = obj.root,
-		indexName = obj.indexName;
+	})
+	.then(function() {
+		return Promise.all(_.map(getAllIndexNames(), function(obj) {
 
-	return Promise.resolve()
-		.then(function deleteIndex() {
+			var root = obj.root,
+				indexName = obj.indexName;
 
 			return Promise.resolve()
-				.then(function() {
-					return client.indices.delete({
-						index: indexName
+				.then(function deleteIndex() {
+
+					return Promise.resolve()
+						.then(function() {
+							return client.indices.delete({
+								index: indexName
+							});
+						})
+						.catch(function(err) {
+							//silenty ignore index_not_found
+							if (err.body.error.type !== "index_not_found_exception") {
+								throw err;
+							}
+						});
+				})
+				.then(function createIndex() {
+					return client.indices.create({
+						method: "PUT",
+						index: indexName,
+						body: createIndexMapping(indexMapping, root)
 					});
 				})
 				.catch(function(err) {
-					//silenty ignore index_not_found
-					if (err.body.error.type !== "index_not_found_exception") {
-						throw err;
-					}
+					throw err;
 				});
-		})
-		.then(function createIndex() {
-			return client.indices.create({
-				method: "PUT",
-				index: indexName,
-				body: createIndexMapping(indexMapping, root)
-			});
-		})
-		.catch(function(err) {
-			throw err;
-		});
-});
-
-
-Promise.all(promises)
+		}));
+	})
 	.then(function(result) {
 		console.log("indices created: ", _.pluck(getAllIndexNames(), "indexName").join(","));
 	})
@@ -132,7 +145,7 @@ function createIndexMapping(indexMapping, root) {
 
 	var existingProps = _.intersection(allPropertyNames, _.keys(calculatedProps));
 	if (existingProps.length) {
-		throw new Error("calculated ES properties exist that are already defined: " + existingProps.join(","));
+		throw new Error("calculated ES properties exist that are already defined in prop definitions: " + existingProps.join(","));
 	}
 
 	mapping.mappings.type1.properties = _.reduce(calculatedProps, function(agg, prop, propName) {

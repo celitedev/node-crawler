@@ -28,7 +28,6 @@ module.exports = {
 
 	properties: {
 
-
 		ratingValue: {
 			//mapping: used during mapping process (tools/renewESMappings)
 			//mappings are to be passed verbatim to ES mapping endpoint.
@@ -136,6 +135,7 @@ module.exports = {
 	},
 
 	propertiesCalculated: {
+
 		subtypesAll: {
 			populate: {
 				fields: "subtypes"
