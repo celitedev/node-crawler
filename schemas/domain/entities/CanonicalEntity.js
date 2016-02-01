@@ -8,6 +8,8 @@ var excludePropertyKeys = domainUtils.excludePropertyKeys;
 var esMappingConfig = require("../../erd/elasticsearch");
 var esMappingProperties = esMappingConfig.properties;
 
+var domainUtils = require("../utils");
+
 module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 	var entityUtils = require("./utils")(generatedSchemas);
@@ -50,24 +52,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		});
 	};
 
-	CanonicalEntity.prototype.toElasticsearchObject = function(resolvedRefMap) {
+	var propertiesInOrderPerRoot = {};
 
-		var props = _.cloneDeep(this._props);
+	function calcPropertyOrderToPopulate(root) {
 
-		//get the root, which will tell in which index to store, as well as the subtypes: 
-		//i.e. the typechain sitting below the root.
-		var rootAndSubtypes = this.getRootAndSubtypes();
-
-		var root = rootAndSubtypes.root;
-
-		//subtypes-property is the union of: 
-		//- official subtypes 
-		//- other subtypes which were free to be manually assigned. They *must* adhere to Controlled Vocabulary through
-		//  - subtypes *might* also be populated from the 'tag'-property
-		props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
-
-
-		(function populate() {
+		var propNamesInOrder = propertiesInOrderPerRoot[root];
+		if (!propNamesInOrder) {
 
 			//get root + all subtypes
 			var typesForRoot = _.filter(generatedSchemas.types, {
@@ -80,7 +70,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				return arr.concat(_.keys(type.properties));
 			}, []));
 
-			//add possible calculated fields
+
+			//add calculated fields that should exit on this root. 
 			propNames = _.reduce(esMappingConfig.propertiesCalculated, function(arr, prop, propName) {
 				var roots = _.isArray(prop.roots) ? prop.roots : [prop.roots];
 				if (prop.roots === true || ~roots.indexOf(root)) {
@@ -89,23 +80,74 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				return arr;
 			}, propNames);
 
-			//TODO: 
-			//1. find subset of propnames that have `populate` defined. 
-			//2. use that to make DAG
-			//3. iterate all propNames according to DAG, and execute `populate` IF exists on prop
+			//Create a map <propName, [dependentProps]> and use this to calculate a DAG
+			var dagComparators = _.reduce(propNames, function(agg, propName) {
+				var fieldsArr = [];
+				var prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
+				if (prop && prop.populate) {
+					var fields = prop.populate.fields;
+					fieldsArr = _.intersection(_.isArray(fields) ? fields : [fields], propNames);
+				}
+				agg[propName] = fieldsArr;
+				return agg;
+			}, {});
 
-			// console.log(propNames);
+			propNamesInOrder = propertiesInOrderPerRoot[root] = domainUtils.createDagOrderGeneric(dagComparators);
+		}
+		return propNamesInOrder;
+	}
+
+	CanonicalEntity.prototype.toElasticsearchObject = function(resolvedRefMap) {
+
+		var props = _.cloneDeep(this._props);
+
+		(function calcSubtypes() {
+
+			//get the root, which will tell in which index to store, as well as the subtypes: 
+			//i.e. the typechain sitting below the root.
+			var rootAndSubtypes = this.getRootAndSubtypes();
+
+			var root = rootAndSubtypes.root;
+
+			//subtypes-property is the union of: 
+			//- official subtypes 
+			//- other subtypes which were free to be manually assigned. They *must* adhere to Controlled Vocabulary through
+			//  - subtypes *might* also be populated from the 'tag'-property
+			props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
 
 		}());
 
 
-		//TODO: #162
-		//Populate/copy data between properties using the `populate--directive. 
-		//Tech: we populate following a DAG
+		(function populateFromOtherFields() {
+
+			_.each(calcPropertyOrderToPopulate(root), function(propName) {
+				var prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
+				if (!prop || !prop.populate) return;
+
+				// console.log(prop);
+				//the fieldnames of which the contents should be populated into the current propName
+				var fields = _.isArray(prop.populate.fields) ? prop.populate.fields : [prop.populate.fields];
+
+				//populate.stategy with default fallback function
+				var fn = prop.populate.strategy || function(val) {
+					return _.isArray(val) ? val : [val];
+				};
+
+				//iterate all fieldnames, fetch the contents, pipe through the strategy function, and save
+				props[propName] = _.uniq(_.reduce(fields, function(arr, field) {
+					var fieldContents = props[field];
+					return fieldContents ? arr.concat(fn(fieldContents)) : arr;
+				}, props[propName] || []));
+			});
+
+		}());
+
+
 		return _.extend({
 			id: this.id,
 			_root: root,
 		}, _toESRecursive(props, resolvedRefMap || {}));
+
 	};
 
 	function _toESRecursive(properties, resolvedRefMap) {

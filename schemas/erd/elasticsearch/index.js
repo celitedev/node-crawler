@@ -138,11 +138,7 @@ module.exports = {
 	propertiesCalculated: {
 		subtypesAll: {
 			populate: {
-				fields: "subtypes",
-				strategy: function(val) {
-					val = _.isArray(val) ? val : [val];
-					return this.concat(val);
-				}
+				fields: "subtypes"
 			},
 			roots: true, //true (all) or (array of) rootNames
 			isMulti: true,
