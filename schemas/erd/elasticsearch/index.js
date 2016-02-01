@@ -35,6 +35,7 @@ module.exports = function(generatedSchemas) {
 				enum: {
 					type: "static",
 					options: {
+						verbatim: ["drama"],
 						values: {
 							//Fandango Mappings
 							"drama": "Drama",

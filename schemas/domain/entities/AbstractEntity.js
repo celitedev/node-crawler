@@ -258,7 +258,7 @@ module.exports = function(generatedSchemas, r) {
 
 	AbstractEntity.prototype.getRootAndSubtypes = function() {
 
-		var typechain = this.getTypechain();
+		var typechain = AbstractEntity.getTypechain(this._type);
 
 		var root = _.intersection(_.clone(typechain).reverse(), roots)[0];
 		var subtypeIndex = typechain.lastIndexOf(root) + 1;
@@ -268,9 +268,9 @@ module.exports = function(generatedSchemas, r) {
 		};
 	};
 
-	AbstractEntity.prototype.getTypechain = function() {
+	AbstractEntity.getTypechain = function(types) {
 		//NOTE: _type is array
-		var entityTypesInOrder = _.intersection(typesInOrder, this._type);
+		var entityTypesInOrder = _.intersection(typesInOrder, types);
 
 		//Get typechain in order, this may contain duplicates. 
 		//The root to return is the LAST root found in the typechain

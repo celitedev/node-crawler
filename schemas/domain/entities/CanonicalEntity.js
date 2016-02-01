@@ -54,7 +54,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		var props = _.cloneDeep(this._props);
 
 		//Given (possible multiple) this._type, get the typechain.
-		var typechain = this.getTypechain(); //may contain duplicate types, see method
+		var typechain = CanonicalEntity.super_.getTypechain(this._type); //may contain duplicate types, see method
 
 		//Get the root, which will tell in which index to store, as well as the subtypes: 
 		//i.e. the typechain sitting below the root.
@@ -70,7 +70,10 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		var prop;
 
-		//populate values from other fields. The values are added 
+		/////////////////////////////////////////////////////////////
+		//populate values from other fields.
+		//Values are concatted to (possibly) already exiting values //
+		/////////////////////////////////////////////////////////////
 		(function populateFromOtherFields() {
 
 			_.each(entityUtils.calcPropertyOrderToPopulate(root), function(propName) {
@@ -99,41 +102,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		}());
 
 		//do the mapping and stuff.
-		props = _toESRecursive(props, resolvedRefMap || {});
-
-
-		(function doVocabularyLookup() {
-
-			_.each(props, function(input, propName) {
-
-				if (input === undefined) return; //no value -> nothing to do here.
-
-				propConfig = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
-				if (!propConfig || !propConfig.enum) return;
-
-				props[propName] = [];
-
-				//add `verbatim`-defined, add verbatim values (these are already lowercased)
-				if (propConfig.enum.options.verbatim) {
-					props[propName] = _.intersection(input, propConfig.enum.options.verbatim);
-				}
-
-				//loop all vocab values and include 'output' in case there's a match on 'input'. The result-arrayis set as the new value
-				props[propName] = _.uniq(_.reduce(propConfig.enum.options.values, function(arr, val, inputKey) {
-
-					//if `limitToTypes`directive defined there should be an overlap with typechain of entity
-					//Both sides are lowercased
-					if (val.limitToTypes && !~_.intersection(val.limitToTypes, typechain)) return arr;
-
-					//if there's a match...
-					if (~input.indexOf(inputKey)) {
-						return arr.concat(val.out); //... include the output of this vocab lookup
-					}
-					return arr;
-				}, props[propName]));
-
-			});
-		}());
+		props = _toESRecursive(props, resolvedRefMap || {}, typechain);
 
 		var dto = _.extend({
 			id: this.id,
@@ -143,11 +112,14 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		return dto;
 	};
 
-	function _toESRecursive(properties, resolvedRefMap) {
 
-		//TODO: #100
-		//Vocabulary lookup: values are looked-up / pruned / aliases added based on Vocabulary
+	function _toESRecursive(properties, resolvedRefMap, typechain) {
 
+		if (!typechain) {
+			throw new Error("_toESRecursive expects arg 'typechain'");
+		}
+
+		typechain = _.isArray(typechain) ? typechain : [typechain];
 
 		var expandMapToInclude = {};
 		var dto = _.reduce(properties, function(agg, v, k) {
@@ -158,30 +130,36 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				isTotalValueMultiValued: _.isArray(v),
 				k: k,
 				expandMapToInclude: expandMapToInclude,
-				resolvedRefMap: resolvedRefMap
+				resolvedRefMap: resolvedRefMap,
+				typechain: typechain
 			};
 
 			var out;
 			if (_.isArray(v)) {
 
-				//Apply single transform to map. 
-				out = _.map(v, function(singleVal) {
-					return _toESRecursiveSingleItem(singleVal, argObj);
-				});
+				//Apply single transform to map, this can results in array or array of arrays
+				out = _.reduce(v, function(arr, singleVal) {
+					var possibleArr = _toESRecursiveSingleItem(singleVal, argObj);
+					return arr.concat(_.isArray(possibleArr) ? possibleArr : [possibleArr]);
+				}, []);
 
-				//A result may return undefined, which is removed using compact. 
-				out = _.compact(out);
+			} else {
+				//apply single transform to single item. Result may be undefined, or array
+				out = _toESRecursiveSingleItem(v, argObj);
+			}
+
+			if (_.isArray(out)) {
+
+				//compact: some may be undefined. uniq: vocab lookup may produce dupes
+				out = _.uniq(_.compact(out));
 
 				//if the remaining size is zero, return undefined.
 				if (!_.size(out)) {
 					out = undefined;
 				}
-			} else {
-				//apply single transform to single item. Result may be undefined
-				out = _toESRecursiveSingleItem(v, argObj);
 			}
 
-			//add result to output object if not undefined.
+			//add result to output object only if not undefined
 			if (out !== undefined) {
 				agg[k] = out;
 			}
@@ -201,13 +179,61 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		var k = argObj.k;
 		var expandMapToInclude = argObj.expandMapToInclude;
 		var resolvedRefMap = argObj.resolvedRefMap;
+		var typechain = argObj.typechain;
 
-		function applyTransformOrInspectNestedAttribs(v, transformer) {
+		function applyTransformOrInspectNestedAttribs(v, transformer, isExpandedObject, typechain) {
+
+			if (!typechain) {
+				throw new Error("sanity check: 'typechain' not defined on applyTransformOrInspectNestedAttribs");
+			}
+
 			if (v !== undefined) {
 				if (transformer) {
 					v = _doESTransform(v, transformer);
 				} else if (_.isObject(v)) {
-					v = _toESRecursive(v, resolvedRefMap);
+					v = _toESRecursive(v, resolvedRefMap, typechain);
+				}
+			}
+
+			if (v === undefined) return undefined;
+
+			if (isExpandedObject) return v; //we're done for expanded object
+
+
+			//STATE: `k` defines propertyName. (this wasn't the case for isExpandedObject)
+
+			// Vocabulary lookups. 
+			//
+			// This only ever happens on non-objects (although arrays is ok)
+			// Conditional for sake of clarity / not needed, since vocablookup-directives may only occur on datatype (i.e.: non-type)
+			if (!_.isObject(v) || _.isArray(v)) {
+
+				var esMappingObj = esMappingConfig.properties[k]; //exists based on calling logic
+				if (esMappingObj.enum) {
+
+					v = _.isArray(v) ? v : [v]; //It's safe to make array, bc: enum -> prop is multivalued
+
+					v = _.reduce(v, function(arr, val) {
+
+						//do a vocab lookup
+						val = _doVocabLookupOnSingleValue(val, {
+							enumConfig: esMappingObj.enum,
+							typechain: typechain
+						});
+
+						//after vocab lookup, do a transform again because lookup may have resulted 
+						//in values not respecting transform
+						if (transformer) {
+							val = _.uniq(_.compact(_.isArray(val) ? val : [val]));
+
+							val = _.map(_.isArray(val) ? val : [val], function(valInner) {
+								return _doESTransform(valInner, transformer);
+							});
+						}
+
+
+						return arr.concat(_.isArray(val) ? val : [val]);
+					}, []);
 				}
 			}
 			return v;
@@ -220,7 +246,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
 			if (propType.isValueObject) {
-				v = _toESRecursive(v, resolvedRefMap); //recurse non-datatypes
+				v = _toESRecursive(v, resolvedRefMap, typechain); //recurse non-datatypes
 			} else if (v._ref) {
 				v = undefined; //skip all non-resolved refs. 
 			} else {
@@ -248,8 +274,21 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					throw new Error("resolved ref couldn't be resolved: " + v);
 				}
 
+				//We get the first reftype. We can't do any better for ambiguous types: we can only expand
+				//properties when they occur on all types
+				var refTypeName = generatedSchemas.properties[k].ranges[0];
+				var refTypechain = CanonicalEntity.super_.getTypechain([refTypeName]);
+
+				if (!refTypechain.length) {
+					throw new Error("Sanity check: reftypeChain of length 0 for type: " + JSON.stringify(refTypeName));
+				}
+
 				//Apply transform on the reference if exists, or inspect nested attributes for needed transforms recursively.
-				var objExpanded = applyTransformOrInspectNestedAttribs(ref, expandObj.transform);
+				var objExpanded = applyTransformOrInspectNestedAttribs(ref, expandObj.transform, true, refTypechain);
+
+				if (_.isArray(objExpanded)) {
+					throw new Error("sanity check: expanded object after transform should never be array? ");
+				}
 
 				if (expandObj.includeId) {
 					objExpanded.id = v;
@@ -257,7 +296,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 				var key = k + "--expand";
 				expandMapToInclude[key] = isTotalValueMultiValued ?
-					(expandMapToInclude[key] || []).concat(objExpanded) :
+					(expandMapToInclude[key] || []).concat([objExpanded]) :
 					objExpanded;
 			}
 
@@ -267,7 +306,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			} else {
 
 				//apply transform if exists, or inspect nested attributes for needed transforms recursively.
-				v = applyTransformOrInspectNestedAttribs(v, esMappingObj.transform);
+				v = applyTransformOrInspectNestedAttribs(v, esMappingObj.transform, false, typechain);
+
 			}
 		}
 
@@ -323,6 +363,42 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		}, v);
 
 	}
+
+
+	function _doVocabLookupOnSingleValue(input, config) {
+
+		var enumConfig = config.enumConfig;
+		var typechain = config.typechain;
+
+		if (!typechain) {
+			throw new Error("sanity check: typechain should be defined on _doVocabLookupOnSingleValue");
+		}
+
+		var valOut = [];
+
+		//add `verbatim`-defined, add verbatim values (these are already lowercased)
+		if (enumConfig.options.verbatim && ~enumConfig.options.verbatim.indexOf(input)) {
+			valOut.push(input);
+		}
+
+
+		//loop all vocab values and include 'output' in case there's a match on 'input'. The result-arrayis set as the new value
+		valOut = _.uniq(_.reduce(enumConfig.options.values, function(arr, val, inputKey) {
+
+			//if `limitToTypes`directive defined there should be an overlap with typechain of entity
+			if (val.limitToTypes && !~_.intersection(val.limitToTypes, typechain)) return arr;
+
+			//if there's a match...
+			if (input === inputKey) {
+				return arr.concat(val.out); //... include the output of this vocab lookup
+			}
+			return arr;
+		}, valOut));
+
+		return valOut;
+
+	}
+
 
 
 	//fetch a deduped array of resolved reference ids
