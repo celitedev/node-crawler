@@ -4,8 +4,6 @@ var argv = require("yargs").argv;
 
 var config = require("../config");
 var domainConfig = require("../schemas/domain/_definitions/config");
-var esMappingConfig = require("../schemas/erd/elasticsearch");
-var esMappingProperties = esMappingConfig.properties;
 
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 	checkSoundness: true,
@@ -15,6 +13,7 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 	schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
 });
 
+var esMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 
 var client = new elasticsearch.Client(config.elasticsearch);
 
@@ -47,22 +46,38 @@ var indexMapping = {
 
 Promise.resolve()
 	.then(function() {
-		var nonExistPropNames = [],
-			enumOnNonDatatypesOrAmbiguous = [];
 
-		_.each(_.keys(esMappingProperties), function(propName) {
+		var nonExistPropNames = [],
+			enumOnNonDatatypesOrAmbiguous = [],
+			enumNotMultivalued = [];
+
+		_.each(_.keys(esMappingConfig.properties), function(propName) {
 			if (!~_.keys(generatedSchemas.properties).indexOf(propName)) {
 				nonExistPropNames.push(propName);
 			} else {
+
 				var prop = generatedSchemas.properties[propName];
+
 				if (prop.ranges.length > 1) {
 					enumOnNonDatatypesOrAmbiguous.push(propName);
-				} else {
+				} else if (prop.enum) {
+					//enum defined -> may not be defined on ambiguous or non-datatypes
+					//may be defined on all calculated fields since these are treated
+					//as non-ambiguous datatypes at all time
 					var typeName = prop.ranges[0];
 					if (!generatedSchemas.datatypes[typeName]) {
 						enumOnNonDatatypesOrAmbiguous.push(propName);
+					} else if (!prop.isMulti) {
+						enumNotMultivalued.push(propName);
 					}
 				}
+			}
+		});
+
+		//test for calculated fields that define enum -> should be isMulti=true
+		_.each(esMappingConfig.propertiesCalculated, function(prop, propName) {
+			if (prop.enum && !prop.isMulti) {
+				enumNotMultivalued.push(propName);
 			}
 		});
 
@@ -72,10 +87,36 @@ Promise.resolve()
 				nonExistPropNames.join(","));
 		}
 
+
 		if (enumOnNonDatatypesOrAmbiguous.length) {
-			throw new Error("ES property with 'enum' exist on ambiguous or non-datatype property: " +
+			throw new Error("ES property with 'enum' exists on ambiguous or non-datatype property: " +
 				enumOnNonDatatypesOrAmbiguous.join(","));
 		}
+
+		if (enumNotMultivalued.length) {
+			throw new Error("ES property with 'enum' exists on singlevalued property: " +
+				enumNotMultivalued.join(","));
+		}
+
+		//test / normalize all enums
+		var allProps = _.extend({}, esMappingConfig.properties, esMappingConfig.propertiesCalculated);
+		_.each(allProps, function(prop, propName) {
+			if (!prop.enum) return;
+			if (prop.enum.type !== "static") throw new Error("enum.type should be 'static' for now: " +
+				prop.enum.type);
+
+			var options = prop.enum.options;
+
+			if (!options || !options.values) throw new Error("enum.options and enum.options.values should be defined: " +
+				JSON.stringify(prop.enum));
+
+			_.each(options.values, function(val) {
+				if (!val.input || !val.output) throw new Error("enum.options.values[x].input and enum.options.values[x].output should be defined: " +
+					JSON.stringify(prop.enum));
+			});
+
+		});
+
 
 	})
 	.then(function() {
@@ -183,7 +224,7 @@ function isNestedMapping(mapping) {
 
 function addPropertyMapping(propName, agg) {
 
-	var propESObj = esMappingProperties[propName] || esMappingConfig.propertiesCalculated[propName];
+	var propESObj = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
 	var propType = generatedSchemas.properties[propName]; //NOTE: doesn't exist in case of calculated prop.
 
 	if (propESObj) {
@@ -215,7 +256,7 @@ function addPropertyMapping(propName, agg) {
 			};
 
 			obj.properties = _.reduce(expandObj.fields, function(agg, fieldName) {
-				var fieldESObj = esMappingProperties[fieldName];
+				var fieldESObj = esMappingConfig.properties[fieldName];
 				if (fieldESObj && fieldESObj.mapping) {
 					agg[fieldName] = fieldESObj.mapping;
 				}

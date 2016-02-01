@@ -18,7 +18,7 @@ var domainConfig = require("../schemas/domain/_definitions/config");
 var config = require("../config");
 var r = require('rethinkdbdash')(config.rethinkdb);
 
-var esMappingConfig = require("../schemas/erd/elasticsearch");
+var esMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 
 var domainUtils = require("../schemas/domain/utils");
 var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
@@ -48,7 +48,22 @@ var start = new Date().getTime();
 Promise.resolve()
 	.then(function warmPopulate() {
 		var roots = domainConfig.domain.roots;
+
 		_.each(roots, entityUtils.calcPropertyOrderToPopulate);
+
+		var allProps = _.extend({}, esMappingConfig.properties, esMappingConfig.propertiesCalculated);
+
+		_.each(allProps, function(prop, propName) {
+			if (!prop.enum) return;
+
+			var values = prop.enum.options.values; //checked to exist courtesy of renewEsMappings.js
+
+			_.each(values, function(val) { //make arrays of input and output
+				val.input = _.isArray(val.input) ? val.input : [val.input];
+				val.output = _.isArray(val.output) ? val.output : [val.output];
+			});
+		});
+
 	})
 	.then(function processSourcesRecursive() {
 		return Promise.resolve()

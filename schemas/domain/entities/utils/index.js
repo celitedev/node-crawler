@@ -3,9 +3,11 @@ var _ = require("lodash");
 var domainUtils = require("../../utils");
 var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
-var esMappingConfig = require("../../../erd/elasticsearch");
 
 module.exports = function(generatedSchemas) {
+
+	var esMappingConfig = require("../../../erd/elasticsearch")(generatedSchemas);
+
 
 
 	// /**
