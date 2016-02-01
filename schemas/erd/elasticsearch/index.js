@@ -136,17 +136,18 @@ module.exports = {
 
 	propertiesCalculated: {
 
-		subtypesAll: {
-			populate: {
-				fields: "subtypes"
-			},
-			roots: true, //true (all) or (array of) rootNames
-			isMulti: true,
-			mapping: {
-				type: "string",
-				"index": "not_analyzed"
-			}
-		},
+		// subtypesAll: {
+		// 	populate: {
+		// 		fields: "subtypes"
+		// 	},
+		// 	roots: true, //true (all) or (array of) rootNames
+		// 	isMulti: true,
+		// 	mapping: {
+		// 		type: "string",
+		// 		"index": "not_analyzed"
+		// 	}
+		// },
+
 	},
 
 

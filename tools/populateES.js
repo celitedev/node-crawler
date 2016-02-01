@@ -49,7 +49,6 @@ Promise.resolve()
 	.then(function warmPopulate() {
 		var roots = domainConfig.domain.roots;
 		_.each(roots, entityUtils.calcPropertyOrderToPopulate);
-		console.log("done warm");
 	})
 	.then(function processSourcesRecursive() {
 		return Promise.resolve()
