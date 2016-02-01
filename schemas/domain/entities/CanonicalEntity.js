@@ -52,79 +52,29 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		});
 	};
 
-	var propertiesInOrderPerRoot = {};
-
-	function calcPropertyOrderToPopulate(root) {
-
-		var propNamesInOrder = propertiesInOrderPerRoot[root];
-		if (!propNamesInOrder) {
-
-			//get root + all subtypes
-			var typesForRoot = _.filter(generatedSchemas.types, {
-				rootName: root
-			});
-
-			//Get all properties that can exist in index on toplevel. 
-			//This is the aggregate of all properties defined on the above types.
-			var propNames = _.uniq(_.reduce(typesForRoot, function(arr, type) {
-				return arr.concat(_.keys(type.properties));
-			}, []));
-
-
-			//add calculated fields that should exit on this root. 
-			propNames = _.reduce(esMappingConfig.propertiesCalculated, function(arr, prop, propName) {
-				var roots = _.isArray(prop.roots) ? prop.roots : [prop.roots];
-				if (prop.roots === true || ~roots.indexOf(root)) {
-					arr.push(propName);
-				}
-				return arr;
-			}, propNames);
-
-			//Create a map <propName, [dependentProps]> and use this to calculate a DAG
-			var dagComparators = _.reduce(propNames, function(agg, propName) {
-				var fieldsArr = [];
-				var prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
-				if (prop && prop.populate) {
-					var fields = prop.populate.fields;
-					fieldsArr = _.intersection(_.isArray(fields) ? fields : [fields], propNames);
-				}
-				agg[propName] = fieldsArr;
-				return agg;
-			}, {});
-
-			propNamesInOrder = propertiesInOrderPerRoot[root] = domainUtils.createDagOrderGeneric(dagComparators);
-		}
-		return propNamesInOrder;
-	}
-
 	CanonicalEntity.prototype.toElasticsearchObject = function(resolvedRefMap) {
 
 		var props = _.cloneDeep(this._props);
 
-		(function calcSubtypes() {
+		//get the root, which will tell in which index to store, as well as the subtypes: 
+		//i.e. the typechain sitting below the root.
+		var rootAndSubtypes = this.getRootAndSubtypes();
 
-			//get the root, which will tell in which index to store, as well as the subtypes: 
-			//i.e. the typechain sitting below the root.
-			var rootAndSubtypes = this.getRootAndSubtypes();
+		var root = rootAndSubtypes.root;
 
-			var root = rootAndSubtypes.root;
-
-			//subtypes-property is the union of: 
-			//- official subtypes 
-			//- other subtypes which were free to be manually assigned. They *must* adhere to Controlled Vocabulary through
-			//  - subtypes *might* also be populated from the 'tag'-property
-			props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
-
-		}());
+		//subtypes-property is the union of: 
+		//- official subtypes 
+		//- other subtypes which were free to be manually assigned. They *must* adhere to Controlled Vocabulary through
+		//  - subtypes *might* also be populated from the 'tag'-property
+		props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
 
 
 		(function populateFromOtherFields() {
 
-			_.each(calcPropertyOrderToPopulate(root), function(propName) {
+			_.each(entityUtils.calcPropertyOrderToPopulate(root), function(propName) {
 				var prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
 				if (!prop || !prop.populate) return;
 
-				// console.log(prop);
 				//the fieldnames of which the contents should be populated into the current propName
 				var fields = _.isArray(prop.populate.fields) ? prop.populate.fields : [prop.populate.fields];
 
