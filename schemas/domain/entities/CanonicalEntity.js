@@ -69,6 +69,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
 
 		var prop;
+
+		//populate values from other fields. The values are added 
 		(function populateFromOtherFields() {
 
 			_.each(entityUtils.calcPropertyOrderToPopulate(root), function(propName) {
@@ -86,7 +88,11 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				//iterate all fieldnames, fetch the contents, pipe through the strategy function, and save
 				props[propName] = _.uniq(_.reduce(fields, function(arr, field) {
 					var fieldContents = props[field];
-					return fieldContents ? arr.concat(fn(fieldContents)) : arr;
+
+					var val = fn(fieldContents);
+					val = _.isArray(val) ? val : [val];
+
+					return fieldContents ? arr.concat(val) : arr;
 				}, props[propName] || []));
 			});
 
@@ -94,6 +100,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		//do the mapping and stuff.
 		props = _toESRecursive(props, resolvedRefMap || {});
+
 
 		(function doVocabularyLookup() {
 
@@ -103,11 +110,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 				propConfig = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
 				if (!propConfig || !propConfig.enum) return;
-
-				//All enum input is stored as lowercase
-				input = _.map(input, function(val) {
-					return val.toLowerCase();
-				});
 
 				props[propName] = [];
 
@@ -202,8 +204,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		function applyTransformOrInspectNestedAttribs(v, transformer) {
 			if (v !== undefined) {
-				if (esMappingObj.transform) {
-					v = _doESTransform(v, esMappingObj.transform);
+				if (transformer) {
+					v = _doESTransform(v, transformer);
 				} else if (_.isObject(v)) {
 					v = _toESRecursive(v, resolvedRefMap);
 				}
@@ -236,8 +238,9 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 			//If mapping contains a `expand` directive, create a new, possibly multivalued, field named: <prop>#expanded. 
 			//E.g.: location#expanded
-			var expandObj = esMappingObj.expand;
-			if (expandObj) {
+			if (esMappingObj.expand) {
+
+				var expandObj = esMappingObj.expand;
 
 				//fetch the reference and only keep the `fields` defined.
 				var ref = _.pick(resolvedRefMap[v], expandObj.fields);
@@ -262,6 +265,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			if (esMappingObj.exclude) { //Exclude value from ES-index.  
 				v = undefined;
 			} else {
+
 				//apply transform if exists, or inspect nested attributes for needed transforms recursively.
 				v = applyTransformOrInspectNestedAttribs(v, esMappingObj.transform);
 			}
@@ -276,27 +280,48 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 	//- object-notation -> <k,v> map where values are functions with sig function(val)
 	//  missing keys are passed along untouched
 	//- function-notation -> one function with the value passed.
+	//- string-notation -> canned transformer such as float, lowercase. 
 	//
 	//Note: when transformer not defined we recurse the possibly nested object. 
 	//When transformer IS defined, we cannot do that anymore, since the transformer
 	//might (read: is likely to) have changed the 'property-schema' on which recursing relies.
-	function _doESTransform(v, transformer) {
+	function _doESTransform(v, transformers) {
 
-		if (_.isFunction(transformer)) {
-			return transformer(v);
-		}
+		transformers = _.isArray(transformers) ? transformers : [transformers];
 
-		if (_.isObject(transformer)) {
-			if (!_.isObject(v)) {
-				throw new Error("object-transformer selected but value not an object: " + v);
+		return _.reduce(transformers, function(out, transformer) {
+
+			if (_.isFunction(transformer)) {
+				return transformer(v);
 			}
-			return _.reduce(v, function(agg, value, k) {
-				agg[k] = transformer[k] ? transformer[k](value) : value;
-				return agg;
-			}, {});
-		}
 
-		throw new Error("transformer needs to be function or object:" + transformer);
+			if (_.isObject(transformer)) {
+				if (!_.isObject(v)) {
+					throw new Error("object-transformer selected but value not an object: " + v);
+				}
+				return _.reduce(v, function(agg, value, k) {
+					var transK = transformer[k];
+					if (transK) {
+						if (_.isString(transK)) {
+							transK = domainUtils.transformers[transformer];
+							if (!fn) throw new Error("canned transformer not found: " + transK);
+						}
+						agg[k] = transK(value);
+					}
+					return agg;
+				}, {});
+			}
+
+			if (_.isString(transformer)) {
+				var fn = domainUtils.transformers[transformer];
+				if (!fn) throw new Error("canned transformer not found: " + transformer);
+				return fn(v);
+			}
+
+			throw new Error("transformer needs to be function or object:" + transformer);
+
+		}, v);
+
 	}
 
 

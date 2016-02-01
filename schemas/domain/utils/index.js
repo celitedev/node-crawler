@@ -2,6 +2,22 @@ var _ = require('lodash');
 var urlRegex = require('url-regex');
 
 module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
+
+	transformers: {
+		lowercase: function(val) {
+			return val.toLowerCase();
+		},
+		uppercase: function(val) {
+			return val.toUpperCase();
+		},
+		float: function(val) {
+			return parseFloat(val);
+		},
+		geo: function(geoObj) {
+			return [geoObj.longitude, geoObj.latitude]; //long first -> bit weird but this is the GeoJSON compliant way.
+		}
+	},
+
 	//infer type from value when fieldtype has ambiguous range.
 	//NOTE: validity of ambiguity solver for fieldtype is already checked
 	//Also: type !== explicitType. This is already checked.

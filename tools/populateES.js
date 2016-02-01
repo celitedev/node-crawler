@@ -53,16 +53,37 @@ Promise.resolve()
 
 		var allProps = _.extend({}, esMappingConfig.properties, esMappingConfig.propertiesCalculated);
 
+		//////
+		///Enum-config is normalized. 
+		///
+		///- add lowercase to `transform` 
+		///- store keys to lowercase for matching 
+		///- .. as well as values. This is not really needed, (since we have a tokenfilter = lowercase) but it's nice
+		///to see them lowercase in _source as well 
+		///- create array for enum.options.values + make object if we used shorthand notation.
 		_.each(allProps, function(prop, propName) {
+
 			if (!prop.enum) return;
 
-			//store verbatim to lowercase
+			// if mapping has an enum we should always do a lowercase transform
+			// This is the same for the search-end
+			prop.transform = prop.transform || [];
+			prop.transform = _.isArray(prop.transform) ? prop.transform : [prop.transform];
+			prop.transform.push("lowercase");
+
+
+			//store verbatim-values to lowercase
 			if (prop.enum.options.verbatim) {
 				prop.enum.options.verbatim = _.map(prop.enum.options.verbatim, function(v) {
 					return v.toLowerCase();
 				});
 			}
 
+			//preProcess enum values: 
+			//- make values an array
+			//- lowercase values
+			//- lowercase keys
+			//- make limitToTypes array if exists.
 			prop.enum.options.values = _.reduce(prop.enum.options.values, function(agg, val, k) {
 
 				if (_.isString(val)) {
@@ -77,7 +98,7 @@ Promise.resolve()
 				} else if (_.isObject(val)) {
 					val.out = _.isArray(val.out) ? val.out : [val.out];
 					val.out = _.map(val.out, function(v) {
-						return v.toLowerCase();
+						return v.toLowerCase(); //store output values to lowercase
 					});
 				}
 
