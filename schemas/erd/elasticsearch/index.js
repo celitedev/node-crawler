@@ -51,7 +51,8 @@ module.exports = function(generatedSchemas) {
 						//translate values
 						values: [{
 							input: "MovieTheater",
-							output: "movie theater"
+							output: "movie theater",
+							limitToTypes: "LocalBusiness"
 						}, {
 							input: "pianoBar",
 							output: "piano bar"

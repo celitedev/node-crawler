@@ -61,6 +61,9 @@ Promise.resolve()
 			_.each(values, function(val) { //make arrays of input and output
 				val.input = _.isArray(val.input) ? val.input : [val.input];
 				val.output = _.isArray(val.output) ? val.output : [val.output];
+				if (val.limitToTypes) {
+					val.limitToTypes = _.isArray(val.limitToTypes) ? val.limitToTypes : [val.limitToTypes];
+				}
 			});
 		});
 

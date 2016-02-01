@@ -53,7 +53,10 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		var props = _.cloneDeep(this._props);
 
-		//get the root, which will tell in which index to store, as well as the subtypes: 
+		//Given (possible multiple) this._type, get the typechain.
+		var typechain = this.getTypechain(); //may contain duplicate types, see method
+
+		//Get the root, which will tell in which index to store, as well as the subtypes: 
 		//i.e. the typechain sitting below the root.
 		var rootAndSubtypes = this.getRootAndSubtypes();
 
@@ -107,7 +110,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 				//loop all vocab values and include 'output' in case there's a match on 'input'. The result-arrayis set as the new value
 				props[propName] = _.uniq(_.reduce(propConfig.enum.options.values, function(arr, val) {
-					if (_.intersection(val.input, input).length) { //if there's a match...
+
+					//if `limitToTypes`directive defined there should be an overlap with typechain of entity
+					if (val.limitToTypes && !~_.intersection(val.limitToTypes, typechain)) return arr;
+
+					//if there's a match...
+					if (_.intersection(val.input, input).length) {
 						return arr.concat(val.output); //... include the output of this vocab lookup
 					}
 					return arr;
