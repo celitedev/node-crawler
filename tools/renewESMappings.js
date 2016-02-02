@@ -4,6 +4,7 @@ var argv = require("yargs").argv;
 
 var config = require("../config");
 var domainConfig = require("../schemas/domain/_definitions/config");
+var domainUtils = require("../schemas/domain/utils");
 
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 	checkSoundness: true,
@@ -16,19 +17,6 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 var esMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 
 var client = new elasticsearch.Client(config.elasticsearch);
-
-
-
-var globalMappings = {
-	kwhen_enum: {
-		type: "string",
-		analyzer: "enum"
-	},
-	kwhen_notAnalyzed: {
-		"type": "string",
-		"index": "not_analyzed"
-	}
-};
 
 var indexMapping = {
 	"settings": {
@@ -165,6 +153,7 @@ Promise.resolve()
 
 	})
 	.then(function() {
+
 		return Promise.all(_.map(getAllIndexNames(), function(obj) {
 
 			var root = obj.root,
@@ -190,7 +179,7 @@ Promise.resolve()
 					return client.indices.create({
 						method: "PUT",
 						index: indexName,
-						body: createIndexMapping(indexMapping, root)
+						body: createIndexMapping(_.cloneDeep(indexMapping), root)
 					});
 				})
 				.catch(function(err) {
@@ -218,8 +207,7 @@ function getAllIndexNames() {
 	});
 }
 
-function createIndexMapping(indexMapping, root) {
-	var mapping = _.cloneDeep(indexMapping);
+function createIndexMapping(mapping, root) {
 
 	//get root + all subtypes
 	var typesForRoot = _.filter(generatedSchemas.types, {
@@ -284,8 +272,7 @@ function addPropertyMapping(propName, agg) {
 			// type: "string"
 			//}
 			if (_.isString(propESObj.mapping)) {
-				var lookupMapping = globalMappings[propESObj.mapping];
-				propESObj.mapping = lookupMapping ? _.cloneDeep(lookupMapping) : {
+				propESObj.mapping = {
 					type: propESObj.mapping
 				};
 			}
@@ -371,9 +358,8 @@ function addPropertyMapping(propName, agg) {
 		agg[propName] = agg[propName] || {};
 		agg[propName].fields = _.reduce(propESObj.fields, function(agg, v, k) {
 
-			if (_.isString(v)) { //allow lookup in `globalMappings` or otherwise make object from string shortcut
-				var lookupMapping = globalMappings[v];
-				v = lookupMapping ? _.cloneDeep(lookupMapping) : {
+			if (_.isString(v)) {
+				v = {
 					type: v
 				};
 			}

@@ -3,6 +3,26 @@ var urlRegex = require('url-regex');
 
 module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 
+	mappings: {
+		enum: {
+			type: "string",
+			analyzer: "enum"
+		},
+		notAnalyzed: {
+			"type": "string",
+			"index": "not_analyzed"
+		},
+		geo: {
+			//Geo is of type geo_point
+			//https://www.elastic.co/guide/en/elasticsearch/guide/current/lat-lon-formats.html
+			type: "geo_point",
+
+			//geopoints are expensive. We'll store them on disk instead of mem
+			//https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-memory.html#geo-memory
+			"doc_values": true
+		}
+	},
+
 	transformers: {
 		lowercase: function(val) {
 			return val.toLowerCase();
