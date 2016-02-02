@@ -58,7 +58,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		//Get the root, which will tell in which index to store, as well as the subtypes: 
 		//i.e. the typechain sitting below the root.
-		var rootAndSubtypes = this.getRootAndSubtypes();
+		var rootAndSubtypes = CanonicalEntity.super_.getRootAndSubtypes(typechain);
 
 		var root = rootAndSubtypes.root;
 
@@ -68,41 +68,14 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		//  - subtypes *might* also be populated from the 'tag'-property
 		props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
 
-		var prop;
-
-		/////////////////////////////////////////////////////////////
 		//populate values from other fields.
-		//Values are concatted to (possibly) already exiting values //
-		/////////////////////////////////////////////////////////////
-		(function populateFromOtherFields() {
-
-			_.each(entityUtils.calcPropertyOrderToPopulate(root), function(propName) {
-				prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
-				if (!prop || !prop.populate) return;
-
-				//the fieldnames of which the contents should be populated into the current propName
-				var fields = _.isArray(prop.populate.fields) ? prop.populate.fields : [prop.populate.fields];
-
-				//populate.stategy with default fallback function
-				var fn = prop.populate.strategy || function(val) {
-					return _.isArray(val) ? val : [val];
-				};
-
-				//iterate all fieldnames, fetch the contents, pipe through the strategy function, and save
-				props[propName] = _.uniq(_.reduce(fields, function(arr, field) {
-					var fieldContents = props[field];
-
-					var val = fn(fieldContents);
-					val = _.isArray(val) ? val : [val];
-
-					return fieldContents ? arr.concat(val) : arr;
-				}, props[propName] || []));
-			});
-
-		}());
+		_populate(props, root);
 
 		//do the mapping and stuff.
 		props = _toESRecursive(props, resolvedRefMap || {}, typechain);
+
+		//post populate
+		_populate(props, root, true);
 
 		var dto = _.extend({
 			id: this.id,
@@ -111,6 +84,38 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		return dto;
 	};
+
+	function _populate(props, root, isPostPopulate) {
+
+		_.each(entityUtils.calcPropertyOrderToPopulate(root), function(propName) {
+			var prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
+
+			if (!prop) return;
+
+			var populateObj = prop[!isPostPopulate ? "populate" : "postPopulate"];
+
+			if (!populateObj) return;
+
+			//the fieldnames of which the contents should be populated into the current propName
+			var fields = _.isArray(populateObj.fields) ? populateObj.fields : [populateObj.fields];
+
+			//populate.stategy with default fallback function
+			var fn = populateObj.strategy || function(val) {
+				return _.isArray(val) ? val : [val];
+			};
+
+			//iterate all fieldnames, fetch the contents, pipe through the strategy function, and save
+			props[propName] = _.uniq(_.reduce(fields, function(arr, field) {
+				var fieldContents = props[field];
+
+				var val = fn(fieldContents);
+				val = _.isArray(val) ? val : [val];
+
+				return fieldContents ? arr.concat(val) : arr;
+			}, props[propName] || []));
+		});
+
+	}
 
 
 	function _toESRecursive(properties, resolvedRefMap, typechain) {
@@ -183,7 +188,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		var resolvedRefMap = argObj.resolvedRefMap;
 		var typechain = argObj.typechain;
 
-		function applyTransformOrInspectNestedAttribs(v, transformer, isExpandedObject, typechain) {
+		function applyTransformOrInspectNestedAttribs(v, transformer, typechain) {
 
 			if (!typechain) {
 				throw new Error("sanity check: 'typechain' not defined on applyTransformOrInspectNestedAttribs");
@@ -198,11 +203,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			}
 
 			if (v === undefined) return undefined;
-
-			if (isExpandedObject) return v; //we're done for expanded object
-
-
-			//STATE: `k` defines propertyName. (this wasn't the case for isExpandedObject)
 
 			// Vocabulary lookups. 
 			//
@@ -279,13 +279,23 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				//properties when they occur on all types
 				var refTypeName = generatedSchemas.properties[k].ranges[0];
 				var refTypechain = CanonicalEntity.super_.getTypechain([refTypeName]);
+				var refRoot = CanonicalEntity.super_.getRootAndSubtypes(refTypechain).root;
 
 				if (!refTypechain.length) {
 					throw new Error("Sanity check: reftypeChain of length 0 for type: " + JSON.stringify(refTypeName));
 				}
 
-				//Apply transform on the reference if exists, or inspect nested attributes for needed transforms recursively.
-				var objExpanded = applyTransformOrInspectNestedAttribs(ref, expandObj.transform, true, refTypechain);
+				//populate values on Ref
+				_populate(ref, refRoot);
+
+				//perform transforms / vocab lookup on reg
+				var objExpanded = _toESRecursive(ref, resolvedRefMap, refTypechain);
+
+				//post populate on Ref
+				_populate(objExpanded, refRoot, true);
+
+				//after populate we need to prune to wanted fields again.
+				objExpanded = _.pick(objExpanded, expandObj.fields);
 
 				if (_.isArray(objExpanded)) {
 					throw new Error("sanity check: expanded object after transform should never be array? ");
@@ -307,7 +317,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			} else {
 
 				//apply transform if exists, or inspect nested attributes for needed transforms recursively.
-				v = applyTransformOrInspectNestedAttribs(v, esMappingObj.transform, false, typechain);
+				v = applyTransformOrInspectNestedAttribs(v, esMappingObj.transform, typechain);
 
 			}
 		}

@@ -133,7 +133,7 @@ module.exports = function(generatedSchemas) {
 
 			workFeatured: {
 				expand: {
-					fields: ["name", "aggregateRating", "genre"],
+					fields: ["name", "aggregateRating", "genre", "all_tags"],
 				}
 			}
 		},
@@ -157,6 +157,16 @@ module.exports = function(generatedSchemas) {
 					fields: "genre"
 				},
 			},
+
+			all_tags: {
+				roots: true,
+				isMulti: true,
+				mapping: mappings.enum,
+				postPopulate: { //populate *after* vocab lookup + transform
+					fields: ["genre", "subtypes"]
+				},
+			},
+
 		},
 	};
 

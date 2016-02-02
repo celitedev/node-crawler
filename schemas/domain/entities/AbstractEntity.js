@@ -256,9 +256,7 @@ module.exports = function(generatedSchemas, r) {
 		});
 	};
 
-	AbstractEntity.prototype.getRootAndSubtypes = function() {
-
-		var typechain = AbstractEntity.getTypechain(this._type);
+	AbstractEntity.getRootAndSubtypes = function(typechain) {
 
 		var root = _.intersection(_.clone(typechain).reverse(), roots)[0];
 		var subtypeIndex = typechain.lastIndexOf(root) + 1;
