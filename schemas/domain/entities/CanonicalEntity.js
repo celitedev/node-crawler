@@ -294,8 +294,13 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				//post populate on Ref
 				_populate(objExpanded, refRoot, true);
 
-				//after populate we need to prune to wanted fields again.
+				//After populate we need to prune to wanted fields again.
 				objExpanded = _.pick(objExpanded, expandObj.fields);
+
+				//Now optionally we prune some more fields. 
+				//This allows for keeping a calculated field (say all_tags) which is based on 
+				//a field that we now want to prune
+				objExpanded = _.omit(objExpanded, expandObj.postPruneFields || []);
 
 				if (_.isArray(objExpanded)) {
 					throw new Error("sanity check: expanded object after transform should never be array? ");

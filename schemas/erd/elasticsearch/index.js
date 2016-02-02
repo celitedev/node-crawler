@@ -133,7 +133,8 @@ module.exports = function(generatedSchemas) {
 
 			workFeatured: {
 				expand: {
-					fields: ["name", "aggregateRating", "genre", "all_tags"],
+					fields: ["name", "aggregateRating", "genre", "subtypes", "all_tags"],
+					postPruneFields: ["genre", "subtypes"]
 				}
 			}
 		},
