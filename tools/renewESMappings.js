@@ -133,21 +133,17 @@ Promise.resolve()
 
 		//test / normalize all enums
 		var allProps = _.extend({}, esMappingConfig.properties, esMappingConfig.propertiesCalculated);
+
 		_.each(allProps, function(prop, propName) {
 			if (!prop.enum) return;
+
 			if (prop.enum.type !== "static") throw new Error("enum.type should be 'static' for now: " +
 				prop.enum.type);
 
-			var options = prop.enum.options;
-
-			if (!options || !options.values) throw new Error("enum.options and enum.options.values should be defined: " +
-				JSON.stringify(prop.enum));
-
-			_.each(options.values, function(val) {
-				if (_.isObject(val) && !_.isArray(val) && !val.out) throw new Error("enum.options.values[x].out should be defined (or string shortcut): " +
-					JSON.stringify(val));
-			});
-
+			if (!prop.enum.sourceMappings || !prop.enum.vocabulary) {
+				throw new Error("enum.sourceMappings and enum.vocabulary should be defined: " +
+					JSON.stringify(prop.enum));
+			}
 		});
 
 
