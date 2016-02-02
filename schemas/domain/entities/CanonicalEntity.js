@@ -144,7 +144,9 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				}, []);
 
 			} else {
-				//apply single transform to single item. Result may be undefined, or array
+				//apply single transform to single item. Result may be undefined as well as array. 
+				//Remember isMulti= false, doesn't dictate that a transform can't make an array. 
+				//For instance geoPoint is tranformed to array [long, lat] 
 				out = _toESRecursiveSingleItem(v, argObj);
 			}
 
@@ -230,7 +232,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 								return _doESTransform(valInner, transformer);
 							});
 						}
-
 
 						return arr.concat(_.isArray(val) ? val : [val]);
 					}, []);

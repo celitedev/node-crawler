@@ -9,6 +9,11 @@ var _ = require("lodash");
 //loop them separately in renewEsMapping and populateES jobs
 
 
+//Elasticsearch mappings which may be included by reference. 
+//We first implemented this by string lookup but this gave some weird errors
+//on geo-mapping. This seems cleaner anyway.
+var mappings = require("../../domain/utils").mappings;
+
 var singleton;
 module.exports = function(generatedSchemas) {
 
@@ -105,54 +110,30 @@ module.exports = function(generatedSchemas) {
 			},
 
 			geo: {
-				mapping: {
-
-					//Geo is of type geo_point
-					//https://www.elastic.co/guide/en/elasticsearch/guide/current/lat-lon-formats.html
-					type: "geo_point",
-
-					//geopoints are expensive. We'll store them on disk instead of mem
-					//https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-memory.html#geo-memory
-					"doc_values": true
-				},
+				mapping: mappings.geo,
 				transform: "geo"
 			},
 
 			name: {
 				mapping: {
 					type: "string",
-
-					//example of multi-fields
-					//https://www.elastic.co/guide/en/elasticsearch/reference/current/_multi_fields.html
 				},
 				fields: {
-					"raw": "kwhen_notAnalyzed"
+					"raw": mappings.notAnalyzed
 				}
 			},
 
 			location: {
-
-				//Exclude=true: exclude value from indexing. 
-				//Note: This doesn't prevent expanded and/or derived fields from being indexed
 				exclude: false,
-
-				//Creates a new property populate`location--expand`
-				//If multivalued this is of type 'nested' otherwise of type 'object'
 				expand: {
 					fields: ["name", "geo"],
-					// includeId: true, //include id in expanded objects. Useful for multivalued fields
+					includeId: false,
 				}
 			},
 
 			workFeatured: {
-
-				exclude: false,
-
-				//creates a new property `workFeatured--expand`
-				//If multivalued this is of type 'nested' otherwise of type 'object'
 				expand: {
 					fields: ["name", "aggregateRating", "genre"],
-					// includeId: true, //include id in expanded objects. Useful for multivalued fields
 				}
 			}
 		},
@@ -162,20 +143,16 @@ module.exports = function(generatedSchemas) {
 			all_subtypes: {
 				roots: true, //true (all) or (array of) rootNames
 				isMulti: true,
-				mapping: "kwhen_enum",
+				mapping: mappings.enum,
 				populate: {
 					fields: "subtypes",
-					// strategy: function(val) { //default function
-					// 	return _.isArray(val) ? val : [val];
-					// }
 				},
-
 			},
 
 			all_genre: {
 				roots: true,
 				isMulti: true,
-				mapping: "kwhen_enum",
+				mapping: mappings.enum,
 				populate: {
 					fields: "genre"
 				},
