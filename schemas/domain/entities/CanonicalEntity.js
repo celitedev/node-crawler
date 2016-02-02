@@ -204,40 +204,9 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 			if (v === undefined) return undefined;
 
-			// Vocabulary lookups. 
-			//
-			// This only ever happens on non-objects (although arrays is ok)
-			// Conditional for sake of clarity / not needed, since vocablookup-directives may only occur on datatype (i.e.: non-type)
-			if (!_.isObject(v) || _.isArray(v)) {
-
-				var esMappingObj = esMappingConfig.properties[k]; //exists based on calling logic
-				if (esMappingObj.enum) {
-
-					v = _.isArray(v) ? v : [v]; //It's safe to make array, bc: enum -> prop is multivalued
-
-					v = _.reduce(v, function(arr, val) {
-
-						//do a vocab lookup
-						val = _doVocabLookupOnSingleValue(val, {
-							enumConfig: esMappingObj.enum,
-							typechain: typechain
-						});
-
-						//after vocab lookup, do a transform again because lookup may have resulted 
-						//in values not respecting transform
-						if (transformer) {
-							val = _.uniq(_.compact(_.isArray(val) ? val : [val]));
-
-							val = _.map(_.isArray(val) ? val : [val], function(valInner) {
-								return _doESTransform(valInner, transformer);
-							});
-						}
-
-						return arr.concat(_.isArray(val) ? val : [val]);
-					}, []);
-				}
-			}
-			return v;
+			return _performVocabularyLookup(v, _.extend({
+				transformer: transformer
+			}, argObj));
 		}
 
 		//Translate only original values coming from DB. 
@@ -330,6 +299,41 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		return v;
 	}
 
+	function _performVocabularyLookup(v, argObj) {
+
+		var k = argObj.k,
+			typechain = argObj.typechain,
+			transformer = argObj.transformer;
+
+		// Vocabulary lookups. 
+		var esMappingObj = esMappingConfig.properties[k]; //exists based on calling logic
+		if (esMappingObj.enum) {
+
+			v = _.isArray(v) ? v : [v]; //It's safe to make array, bc: enum -> prop is multivalued
+
+			v = _.reduce(v, function(arr, val) {
+
+				//do a vocab lookup
+				val = _doVocabLookupOnSingleValue(val, {
+					enumConfig: esMappingObj.enum,
+					typechain: typechain
+				});
+
+				//after vocab lookup, do a transform again because lookup may have resulted 
+				//in values not respecting transform
+				if (transformer) {
+					val = _.uniq(_.compact(_.isArray(val) ? val : [val]));
+
+					val = _.map(_.isArray(val) ? val : [val], function(valInner) {
+						return _doESTransform(valInner, transformer);
+					});
+				}
+
+				return arr.concat(_.isArray(val) ? val : [val]);
+			}, []);
+		}
+		return v;
+	}
 
 
 	//transform a value to it's ES-counterpart by either 
