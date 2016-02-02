@@ -85,6 +85,17 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 
 	createDagOrderGeneric: function(dagComparatorMap) {
 
+		//test if no dependencies are defined that don't exist.
+		var depsFound = [];
+		_.each(dagComparatorMap, function(deps) {
+			depsFound = depsFound.concat(deps);
+		});
+		var danglingDeps = _.difference(_.uniq(depsFound), _.keys(dagComparatorMap));
+		if (danglingDeps.length) {
+			throw new Error("created DAG but found dangling deps: " + danglingDeps.join(","));
+		}
+
+
 		var order = [];
 
 		function itLoop(deps, k) {

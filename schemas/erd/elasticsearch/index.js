@@ -17,6 +17,8 @@ var mappings = require("../../domain/utils").mappings;
 var singleton;
 module.exports = function(generatedSchemas) {
 
+	var vocabs = require("../../../vocabularies")(generatedSchemas);
+
 	var obj = {
 
 		//when expanding refs in ERD, for increased perf on indexing we don't 
@@ -36,31 +38,35 @@ module.exports = function(generatedSchemas) {
 
 		properties: {
 
+			// genre: {
+			// 	enum: {
+			// 		type: "static",
+			// 		options: {
+			// 			verbatim: ["drama"],
+			// 			values: {
+			// 				//Fandango Mappings
+			// 				"drama": "Drama",
+			// 				"action/adventure": ["action", "adventure"],
+			// 				"comedy": ["comedy", "comedies", "humor"],
+			// 				"suspense/thriller": ["suspense", "thriller"],
+			// 				"documentary": "documentary",
+			// 				"sci-fi/fantasy": ["sci-fy", "fantasy"],
+			// 				"family": "family",
+			// 				"animated": ["animated", "drawn", "animation"],
+			// 				"horror": ["horror", "scary"],
+			// 				"3d": ["animated", "3d", "animation"],
+			// 				"romance": ["romance", "romcom", "romantic"],
+			// 				"imax": "imax",
+			// 				"concert/special events": ["concert", "special events"],
+			// 				"art house/foreign": ["art house", "foreign"],
+			// 				"music/performing arts": ["music", "performing arts"]
+			// 			}
+			// 		}
+			// 	}
+			// },
+
 			genre: {
-				enum: {
-					type: "static",
-					options: {
-						verbatim: ["drama"],
-						values: {
-							//Fandango Mappings
-							"drama": "Drama",
-							"action/adventure": ["action", "adventure"],
-							"comedy": ["comedy", "comedies", "humor"],
-							"suspense/thriller": ["suspense", "thriller"],
-							"documentary": "documentary",
-							"sci-fi/fantasy": ["sci-fy", "fantasy"],
-							"family": "family",
-							"animated": ["animated", "drawn", "animation"],
-							"horror": ["horror", "scary"],
-							"3d": ["animated", "3d", "animation"],
-							"romance": ["romance", "romcom", "romantic"],
-							"imax": "imax",
-							"concert/special events": ["concert", "special events"],
-							"art house/foreign": ["art house", "foreign"],
-							"music/performing arts": ["music", "performing arts"]
-						}
-					}
-				}
+				enum: vocabs.genre
 			},
 
 

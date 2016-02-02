@@ -204,7 +204,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 			if (v === undefined) return undefined;
 
-			return _performVocabularyLookup(v, _.extend({
+			return _doVocabLookup(v, _.extend({
 				transformer: transformer
 			}, argObj));
 		}
@@ -239,19 +239,18 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				var expandObj = esMappingObj.expand;
 
 				//fetch the reference and only keep the `fields` defined.
-				var ref = _.pick(resolvedRefMap[v], expandObj.fields);
+				var ref = _.pick(resolvedRefMap[v], _.uniq(expandObj.fields.concat("_type")));
 				if (!ref) {
 					throw new Error("resolved ref couldn't be resolved: " + v);
 				}
 
 				//We get the first reftype. We can't do any better for ambiguous types: we can only expand
 				//properties when they occur on all types
-				var refTypeName = generatedSchemas.properties[k].ranges[0];
-				var refTypechain = CanonicalEntity.super_.getTypechain([refTypeName]);
+				var refTypechain = CanonicalEntity.super_.getTypechain(ref._type);
 				var refRoot = CanonicalEntity.super_.getRootAndSubtypes(refTypechain).root;
 
 				if (!refTypechain.length) {
-					throw new Error("Sanity check: reftypeChain of length 0 for type: " + JSON.stringify(refTypeName));
+					throw new Error("Sanity check: reftypeChain of length 0 for type: " + JSON.stringify(ref._type));
 				}
 
 				//populate values on Ref
@@ -299,41 +298,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		return v;
 	}
 
-	function _performVocabularyLookup(v, argObj) {
-
-		var k = argObj.k,
-			typechain = argObj.typechain,
-			transformer = argObj.transformer;
-
-		// Vocabulary lookups. 
-		var esMappingObj = esMappingConfig.properties[k]; //exists based on calling logic
-		if (esMappingObj.enum) {
-
-			v = _.isArray(v) ? v : [v]; //It's safe to make array, bc: enum -> prop is multivalued
-
-			v = _.reduce(v, function(arr, val) {
-
-				//do a vocab lookup
-				val = _doVocabLookupOnSingleValue(val, {
-					enumConfig: esMappingObj.enum,
-					typechain: typechain
-				});
-
-				//after vocab lookup, do a transform again because lookup may have resulted 
-				//in values not respecting transform
-				if (transformer) {
-					val = _.uniq(_.compact(_.isArray(val) ? val : [val]));
-
-					val = _.map(_.isArray(val) ? val : [val], function(valInner) {
-						return _doESTransform(valInner, transformer);
-					});
-				}
-
-				return arr.concat(_.isArray(val) ? val : [val]);
-			}, []);
-		}
-		return v;
-	}
 
 
 	//transform a value to it's ES-counterpart by either 
@@ -385,41 +349,42 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 	}
 
 
-	function _doVocabLookupOnSingleValue(input, config) {
+	function _doVocabLookup(v, argObj) {
 
-		var enumConfig = config.enumConfig;
-		var typechain = config.typechain;
+		var k = argObj.k,
+			typechain = argObj.typechain,
+			transformer = argObj.transformer;
 
-		if (!typechain) {
-			throw new Error("sanity check: typechain should be defined on _doVocabLookupOnSingleValue");
+		// Vocabulary lookups. 
+		var esMappingObj = esMappingConfig.properties[k]; //exists based on calling logic
+		if (esMappingObj.enum) {
+
+			//It's safe to make array, bc: enum -> prop is multivalued
+			//resulting array is later flatmapped into overall result
+			v = _.isArray(v) ? v : [v];
+
+			//e.g.: ["Movie"]
+			var typesForThisEnum = _.intersection(_.keys(esMappingObj.enum.sourceMappings), typechain);
+
+			v = _.reduce(v, function(arr, val) {
+
+				//do a vocab lookup
+				val = _.reduce(typesForThisEnum, function(arr, typeName) {
+					var valueMapForType = esMappingObj.enum.sourceMappings[typeName];
+					return arr.concat(valueMapForType[val] || []);
+				}, []);
+
+				//after vocab lookup, do a transform again because lookup may have resulted 
+				//in values not respecting transform
+				val = transformer ? _.map(val, _.partial(_doESTransform, _, transformer)) : val;
+
+				return arr.concat(val);
+			}, []);
+
+			v = _.uniq(_.compact(v));
 		}
-
-		var valOut = [];
-
-		//add `verbatim`-defined, add verbatim values (these are already lowercased)
-		if (enumConfig.options.verbatim && ~enumConfig.options.verbatim.indexOf(input)) {
-			valOut.push(input);
-		}
-
-
-		//loop all vocab values and include 'output' in case there's a match on 'input'. The result-arrayis set as the new value
-		valOut = _.uniq(_.reduce(enumConfig.options.values, function(arr, val, inputKey) {
-
-			//if `limitToTypes`directive defined there should be an overlap with typechain of entity
-			if (val.limitToTypes && !~_.intersection(val.limitToTypes, typechain)) return arr;
-
-			//if there's a match...
-			if (input === inputKey) {
-				return arr.concat(val.out); //... include the output of this vocab lookup
-			}
-			return arr;
-		}, valOut));
-
-		return valOut;
-
+		return v;
 	}
-
-
 
 	//fetch a deduped array of resolved reference ids
 	CanonicalEntity.prototype.fetchResolvedRefs = function(props) {
