@@ -17,6 +17,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		this._kind = domainUtils.enums.kind.SOURCE;
 		this._sourceTable = domainUtils.statics.SOURCETABLE;
 		SourceEntity.super_.call(this, state, bootstrapObj, options);
+
 		if (!state.sourceType) {
 			throw new Error("'state.sourceType' should be defined on SourceEntity");
 		}
@@ -44,7 +45,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			throw new Error("SourceEntity with detailPageAware=true but sourceUrl undefined");
 		}
 
-		this.id = getSourceId(this.sourceType, this.sourceId);
+		this.id = state.id || getSourceId(this.sourceType, this.sourceId);
 
 		//bootstrapObject: the object from DB
 		if (bootstrapObj) {

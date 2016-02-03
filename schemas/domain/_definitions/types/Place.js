@@ -1,7 +1,7 @@
 module.exports = {
 	properties: {
 		aggregateRating: false,
-		address: true,
+		address: false,
 		name: true,
 		branchCode: false,
 		containedInPlace: false, // TBD: not sure want entire hierarchy displayed?
