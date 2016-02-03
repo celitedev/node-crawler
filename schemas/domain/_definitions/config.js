@@ -1,4 +1,12 @@
+var UUID = require("pure-uuid");
+
 module.exports = {
+	statics: {
+		NYC: {
+			id: new UUID(5, "ns:URL", "NEWYORKCITYBABY").format(), //TEMP STUFF
+			sourceId: "NEWYORKCITYBABY"
+		}
+	},
 	domain: {
 		roots: [
 			"Place",

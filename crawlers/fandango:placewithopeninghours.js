@@ -1,5 +1,7 @@
 var _ = require("lodash");
 
+var nycId = require("../schemas/domain/_definitions/config").statics.NYC.id;
+
 //crawlSchema for: 
 //source: Eventful
 //type: events
@@ -146,6 +148,9 @@ module.exports = {
 			mapping: {
 				_type: function(val) {
 					return ["MovieTheater"];
+				},
+				containedInPlace: function(val) {
+					return nycId;
 				}
 			},
 

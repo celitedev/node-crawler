@@ -9,6 +9,7 @@ var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
 function getSourceEntityState(result) {
 	return {
+		id: result.id,
 		sourceType: result._sourceType,
 		sourceUrl: result._sourceUrl,
 		sourceId: result._sourceId,
