@@ -589,11 +589,6 @@ module.exports = function(generatedSchemas, r) {
 				v._path = compoundKey;
 			});
 
-			if (!v.length) {
-				v = undefined;
-				return;
-			}
-
 			_.each(arr, function(v) {
 				agg.push(v); //can't do concat because array-ref not maintained
 			});
