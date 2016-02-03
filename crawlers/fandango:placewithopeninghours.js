@@ -1,6 +1,6 @@
 var _ = require("lodash");
 
-var nycId = require("../schemas/domain/_definitions/config").statics.NYC.id;
+var nycObj = require("../schemas/domain/_definitions/config").statics.NYC;
 
 //crawlSchema for: 
 //source: Eventful
@@ -150,7 +150,7 @@ module.exports = {
 					return ["MovieTheater"];
 				},
 				containedInPlace: function(val) {
-					return nycId;
+					return nycObj.sourceId; //always grab the sourceId not the id!
 				}
 			},
 
