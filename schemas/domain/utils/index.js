@@ -1,5 +1,4 @@
 var _ = require('lodash');
-var urlRegex = require('url-regex');
 
 module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 
@@ -44,9 +43,7 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 	inferTypeForAmbiguousRange: function(fieldtype, obj) {
 		switch (fieldtype.ambiguitySolvedBy.type) {
 			case "urlVsSomething":
-				if (urlRegex({
-						exact: true
-					}).test(obj._value)) {
+				if (obj._value.indexOf("http:") === 0 || ~obj._value.indexOf("https:") === 0) {
 					return "URL";
 				} else {
 					//return the other thing. We know that there's exactly 2 elements, so...

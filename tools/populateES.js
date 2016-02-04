@@ -38,6 +38,8 @@ var data = _.cloneDeep({
 	},
 	time: {
 		getEntities: 0,
+		fetchRefs: 0,
+		createDTOS: 0,
 		populateES: 0,
 		updateStateOfEntities: 0
 	}
@@ -111,54 +113,33 @@ Promise.resolve()
 			})
 			.then(function fetchRefs() {
 
-				var fieldsToFetch = _.uniq(esMappingConfig.refExpandWithFields.concat(["id", "_type"]));
+				var start = new Date().getTime();
 
-				var refs = _.uniq(_.reduce(data.entities, function(arr, entity) {
-
-					var refs = entity.fetchResolvedRefs();
-					entity._refsResolved = refs;
-
-					return arr.concat(refs);
-				}, []));
-
-				if (!refs.length) {
-					return {};
-				}
-
-				// return Promise.resolve().then(function() {
-				// 		return tableCanonicalEntity.getAll.apply(tableCanonicalEntity, refs).pluck(fieldsToFetch);
-				// 	}).then(function(results) {
-
-				return Promise.resolve().then(function() {
-					return tableCanonicalEntity.pluck(fieldsToFetch);
-				}).then(function(results) {
-
-					//skip building aliases since that's not needed
-					var options = {
-						skipAlias: true
-					};
-
-					return _.reduce(results, function(agg, result) {
-
-						var entity = new CanonicalEntity({
-							id: result.id,
-							type: result._type
-						}, result, options);
-
-						var simpleDTO = entity.toSimple();
-						agg[entity.id] = simpleDTO;
-
-						return agg;
-					}, {});
-				});
+				return Promise.resolve()
+					.then(function() {
+						return CanonicalEntity.fetchRefs(data.entities, true);
+					})
+					.then(function(refMap) {
+						data.time.fetchRefs += new Date().getTime() - start;
+						return refMap;
+					});
 
 			})
-			.then(function populateES(refMap) {
+			.then(function createDTOS(refMap) {
+				var start = new Date().getTime();
+
+				return Promise.all(_.map(data.entities, function(entity) {
+					return entity.toElasticsearchObject(refMap);
+				})).then(function(dtos) {
+					data.time.createDTOS += new Date().getTime() - start;
+					return dtos;
+				});
+			})
+			.then(function populateES(dtos) {
 
 				var start = new Date().getTime();
 
-				var bulk = _.reduce(data.entities, function(arr, entity) {
-					var dto = entity.toElasticsearchObject(refMap);
+				var bulk = _.reduce(dtos, function(arr, dto) {
 					var meta = {
 						index: {
 							_index: "kwhen-" + dto._root.toLowerCase(),
@@ -170,25 +151,28 @@ Promise.resolve()
 					return arr.concat([meta, dto]);
 				}, []);
 
-				if (bulk.length) {
-					return Promise.resolve().then(function() {
-							return client.bulk({
-								body: bulk
-							});
-						})
-						.then(function(results) {
-							if (results.errors) {
-								var errors = _.filter(results.items, function(result) {
-									return result.index.status >= 300;
+				return Promise.resolve()
+					.then(function() {
+						if (bulk.length) {
+							return Promise.resolve().then(function() {
+									return client.bulk({
+										body: bulk
+									});
+								})
+								.then(function(results) {
+									if (results.errors) {
+										var errors = _.filter(results.items, function(result) {
+											return result.index.status >= 300;
+										});
+										console.log("ERRORS IN ES BULK INSERT************************");
+										console.log(JSON.stringify(errors, null, 2));
+									}
 								});
-								console.log("ERRORS IN ES BULK INSERT************************");
-								console.log(JSON.stringify(errors, null, 2));
-							}
-						})
-						.then(function() {
-							data.time.populateES += new Date().getTime() - start;
-						});
-				}
+						}
+					})
+					.then(function() {
+						data.time.populateES += new Date().getTime() - start;
+					});
 			})
 			.then(function updateStateOfEntities() {
 
