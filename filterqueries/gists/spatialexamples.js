@@ -18,24 +18,68 @@ var test = {
 		},
 	},
 	C: {
-		//.. in theater X
+		//.. in theater X, referenced by id. 
+		//
+		//Uses default paths to get to `location` property. 
+		//
+		//This works for 
+		//- Place
+		//- PlaceWithOpeninghours
+		//- OrganizationOrPerson
+		//- CreativeWork
+		//- Event
+		//
 		spatial: {
 			type: "location",
 			options: "id"
 		}
 	},
 	D: {
-		//.. in theater X
+		//.. in theater X, referenced by name
+		//
+		//Uses default paths to get to `location` property. 
+		//
+		//Can perform in 1 query if `location--name` or `location--expand.name` is avail
+		//Otherwise does lookup on location by name and use derived id in `location` property
 		spatial: {
 			type: "location",
 			options: {
 				name: "theater X",
 			}
 		}
-		//nearPOint + NearPlace
-		//what's the conceptual difference (from NLP) between containedInPlace and location? 
-		//i.e.: how can we know what to ask? 
+
 	},
+
+	Z: {
+
+		//
+		//Also see: https://github.com/Kwhen/crawltest/issues/174
+		//
+		//When has Person organized Event at Theater? 
+		//
+		//- assume Person
+		//- theater referenced by name
+		//- relationship `organizer` is made explicit by defining `path`
+		//- the default relationship for Person -> `location` = `performer`
+		//
+		//1. Fetch id of Person
+		//2. Remainder can perform in 1 query if `location--name` or `location--expand.name` is avail
+		// Otherwise does lookup on location by name and use derived id in `location` property
+		// 
+		spatial: {
+			type: "location",
+			options: {
+				name: "theater X",
+				_path: "inverse--organizer.location.geo"
+			}
+		}
+
+	},
+
+
+	//nearPOint + NearPlace
+	//what's the conceptual difference (from NLP) between containedInPlace and location? 
+	//i.e.: how can we know what to ask? 
 	E: {
 		type: "nearPoint",
 		options: {

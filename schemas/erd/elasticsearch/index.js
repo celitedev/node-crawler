@@ -121,7 +121,7 @@ module.exports = function(generatedSchemas) {
 			workFeatured: {
 				expand: {
 					fields: ["name", "aggregateRating", "genre", "subtypes", "all_tags"],
-					postPruneFields: ["genre", "subtypes"] //there are used to create `all_tags`
+					// postPruneFields: ["genre", "subtypes"] //there are used to create `all_tags`
 				}
 			}
 		},
