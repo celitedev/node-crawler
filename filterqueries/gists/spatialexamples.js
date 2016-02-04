@@ -70,41 +70,63 @@ var test = {
 			type: "location",
 			options: {
 				name: "theater X",
-				_path: "inverse--organizer.location.geo"
+				_path: "inverse--organizer.location"
 			}
 		}
 
 	},
+	nearbyPoint: {
+		spatial: {
+			type: "location",
+			options: {
+				name: "theater X",
+				_path: "inverse--organizer.location",
 
-
-	//nearPOint + NearPlace
-	//what's the conceptual difference (from NLP) between containedInPlace and location? 
-	//i.e.: how can we know what to ask? 
-	E: {
-		type: "nearPoint",
-		options: {
-			latitude: "<latitude>",
-			longitude: "<longitude>",
-			radius: 5,
-			radiusMetric: "km"
+				//if defined changes query from AT place to NEAR place (using location.geo)
+				//Again, it depends on expansion if this can be done in 1 query.
+				_nearby: {
+					point: {
+						latitude: "<latitude>", //e.g User coords
+						longitude: "<longitude>",
+					},
+					radius: 5,
+					radiusMetric: "km"
+				}
+			}
 		}
 	},
-	F: {
-		//Near place requires doing a lookup on ThingIndex for place / placewithOpeningHours
-		//Fetch the geo and do a nearPoint calculation
-		type: "nearPlace",
-		options: {
-			id: "<id>",
-			radius: 5,
-			radiusMetric: "km"
+
+	nearbyPointEntityById: {
+		spatial: {
+			type: "location",
+			options: {
+				name: "theater X",
+				_path: "inverse--organizer.location",
+				_nearby: {
+					entity: {
+						id: "<id>", //needs separate lookup to find latitude/longitude
+					},
+					radius: 5,
+					radiusMetric: "km"
+				}
+			}
 		}
 	},
-	G: {
-		type: "nearPlace",
-		options: {
-			name: "Grand Central",
-			radius: 5,
-			radiusMetric: "km"
+
+	nearbyPointEntityByName: {
+		spatial: {
+			type: "location",
+			options: {
+				name: "theater X",
+				_path: "inverse--organizer.location",
+				_nearby: {
+					entity: {
+						name: "Grand Central", //needs separate lookup to find latitude/longitude
+					},
+					radius: 5,
+					radiusMetric: "km"
+				}
+			}
 		}
 	}
 };
