@@ -210,7 +210,6 @@ function createIndexMapping(mapping, root) {
 		rootName: root
 	});
 
-
 	//Get all properties that can exist in index. 
 	//This is the aggregate of all properties defined on the above types.
 	var propNames = _.uniq(_.reduce(typesForRoot, function(arr, type) {
@@ -337,7 +336,13 @@ function addPropertyMapping(propName, agg) {
 					};
 
 					obj.properties = _.reduce(propESObj.expand.fields, function(agg, fieldName) {
-						var fieldESObj = esMappingConfig.properties[fieldName];
+
+						var name = fieldName;
+						if (~name.indexOf("--")) { //fieldName: `containedInPlace--name` should fetch mapping from `name`
+							name = name.substring(name.indexOf("--") + 2);
+						}
+
+						var fieldESObj = esMappingConfig.properties[name];
 						if (fieldESObj && fieldESObj.mapping) {
 							agg[fieldName] = fieldESObj.mapping;
 						}
