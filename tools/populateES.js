@@ -38,6 +38,8 @@ var data = _.cloneDeep({
 	},
 	time: {
 		getEntities: 0,
+		fetchRefs: 0,
+		createDTOS: 0,
 		populateES: 0,
 		updateStateOfEntities: 0
 	}
@@ -109,30 +111,48 @@ Promise.resolve()
 			.then(function resetDataObject(entities) {
 				data.entities = entities;
 			})
-			.then(function populateES() {
+			.then(function fetchRefs() {
 
 				var start = new Date().getTime();
 
 				return Promise.resolve()
 					.then(function() {
-						return Promise.all(_.map(data.entities, function(entity) {
-							return entity.toElasticsearchObject();
-						}));
+						return CanonicalEntity.fetchRefs(data.entities, true);
 					})
-					.then(function(dtos) {
+					.then(function(refMap) {
+						data.time.fetchRefs += new Date().getTime() - start;
+						return refMap;
+					});
 
-						var bulk = _.reduce(dtos, function(arr, dto) {
-							var meta = {
-								index: {
-									_index: "kwhen-" + dto._root.toLowerCase(),
-									_type: 'type1',
-									_id: dto.id
-								}
-							};
-							delete dto._root;
-							return arr.concat([meta, dto]);
-						}, []);
+			})
+			.then(function createDTOS(refMap) {
+				var start = new Date().getTime();
 
+				return Promise.all(_.map(data.entities, function(entity) {
+					return entity.toElasticsearchObject(refMap);
+				})).then(function(dtos) {
+					data.time.createDTOS += new Date().getTime() - start;
+					return dtos;
+				});
+			})
+			.then(function populateES(dtos) {
+
+				var start = new Date().getTime();
+
+				var bulk = _.reduce(dtos, function(arr, dto) {
+					var meta = {
+						index: {
+							_index: "kwhen-" + dto._root.toLowerCase(),
+							_type: 'type1',
+							_id: dto.id
+						}
+					};
+					delete dto._root;
+					return arr.concat([meta, dto]);
+				}, []);
+
+				return Promise.resolve()
+					.then(function() {
 						if (bulk.length) {
 							return Promise.resolve().then(function() {
 									return client.bulk({
@@ -147,11 +167,11 @@ Promise.resolve()
 										console.log("ERRORS IN ES BULK INSERT************************");
 										console.log(JSON.stringify(errors, null, 2));
 									}
-								})
-								.then(function() {
-									data.time.populateES += new Date().getTime() - start;
 								});
 						}
+					})
+					.then(function() {
+						data.time.populateES += new Date().getTime() - start;
 					});
 			})
 			.then(function updateStateOfEntities() {
