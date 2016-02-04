@@ -329,17 +329,32 @@ function addPropertyMapping(propName, agg) {
 			if (propESObj && propESObj.expand) {
 
 				var out = {};
-				var obj = out[propName + "--expand"] = {
-					type: propType.isMulti ? "nested" : "object"
-				};
 
-				obj.properties = _.reduce(propESObj.expand.fields, function(agg, fieldName) {
-					var fieldESObj = esMappingConfig.properties[fieldName];
-					if (fieldESObj && fieldESObj.mapping) {
-						agg[fieldName] = fieldESObj.mapping;
-					}
-					return agg;
-				}, {});
+				if (!propESObj.expand.flatten) {
+
+					var obj = out[propName + "--expand"] = {
+						type: propType.isMulti ? "nested" : "object"
+					};
+
+					obj.properties = _.reduce(propESObj.expand.fields, function(agg, fieldName) {
+						var fieldESObj = esMappingConfig.properties[fieldName];
+						if (fieldESObj && fieldESObj.mapping) {
+							agg[fieldName] = fieldESObj.mapping;
+						}
+						return agg;
+					}, {});
+
+				} else {
+
+					out = _.reduce(propESObj.expand.fields, function(agg, fieldName) {
+						var fieldESObj = esMappingConfig.properties[fieldName];
+						if (fieldESObj && fieldESObj.mapping) {
+							agg[propName + "--" + fieldName] = fieldESObj.mapping;
+						}
+						return agg;
+					}, {});
+
+				}
 
 				_.extend(agg, out);
 			}
