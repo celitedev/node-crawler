@@ -38,33 +38,6 @@ module.exports = function(generatedSchemas) {
 
 		properties: {
 
-			// genre: {
-			// 	enum: {
-			// 		type: "static",
-			// 		options: {
-			// 			verbatim: ["drama"],
-			// 			values: {
-			// 				//Fandango Mappings
-			// 				"drama": "Drama",
-			// 				"action/adventure": ["action", "adventure"],
-			// 				"comedy": ["comedy", "comedies", "humor"],
-			// 				"suspense/thriller": ["suspense", "thriller"],
-			// 				"documentary": "documentary",
-			// 				"sci-fi/fantasy": ["sci-fy", "fantasy"],
-			// 				"family": "family",
-			// 				"animated": ["animated", "drawn", "animation"],
-			// 				"horror": ["horror", "scary"],
-			// 				"3d": ["animated", "3d", "animation"],
-			// 				"romance": ["romance", "romcom", "romantic"],
-			// 				"imax": "imax",
-			// 				"concert/special events": ["concert", "special events"],
-			// 				"art house/foreign": ["art house", "foreign"],
-			// 				"music/performing arts": ["music", "performing arts"]
-			// 			}
-			// 		}
-			// 	}
-			// },
-
 			genre: {
 				enum: vocabs.genre
 			},
@@ -126,6 +99,13 @@ module.exports = function(generatedSchemas) {
 				},
 				fields: {
 					"raw": mappings.notAnalyzed
+				}
+			},
+
+			containedInPlace: {
+				expand: {
+					fields: ["name"], //create field: containedInPlace--name
+					flatten: true
 				}
 			},
 

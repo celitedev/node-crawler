@@ -278,10 +278,28 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					objExpanded.id = v;
 				}
 
-				var key = k + "--expand";
-				expandMapToInclude[key] = isTotalValueMultiValued ?
-					(expandMapToInclude[key] || []).concat([objExpanded]) :
-					objExpanded;
+				if (!expandObj.flatten) {
+
+					var key = k + "--expand";
+					expandMapToInclude[key] = isTotalValueMultiValued ?
+						(expandMapToInclude[key] || []).concat([objExpanded]) :
+						objExpanded;
+
+				} else {
+
+					//add individual fields to expandMapToInclude
+					_.each(objExpanded, function(v, fieldKey) {
+						var key = k + "--" + fieldKey;
+
+						if (isTotalValueMultiValued) {
+							v = _.isArray(v) ? v : [v];
+							expandMapToInclude[key] = (expandMapToInclude[key] || []).concat(v);
+						} else {
+							//NOTE: v can still be an array here
+							expandMapToInclude[k + "--" + fieldKey] = v;
+						}
+					});
+				}
 			}
 
 
