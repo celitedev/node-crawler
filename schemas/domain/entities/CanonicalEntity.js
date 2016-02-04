@@ -239,10 +239,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				var expandObj = esMappingObj.expand;
 
 				//fetch the reference and only keep the `fields` defined.
-				var ref = _.pick(resolvedRefMap[v], _.uniq(expandObj.fields.concat("_type")));
+				var ref = resolvedRefMap[v];
 				if (!ref) {
 					throw new Error("resolved ref couldn't be resolved: " + v);
 				}
+
+				ref = _.pick(ref, _.uniq(expandObj.fields.concat("_type")));
 
 				//We get the first reftype. We can't do any better for ambiguous types: we can only expand
 				//properties when they occur on all types

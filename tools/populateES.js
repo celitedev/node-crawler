@@ -125,8 +125,12 @@ Promise.resolve()
 					return {};
 				}
 
+				// return Promise.resolve().then(function() {
+				// 		return tableCanonicalEntity.getAll.apply(tableCanonicalEntity, refs).pluck(fieldsToFetch);
+				// 	}).then(function(results) {
+
 				return Promise.resolve().then(function() {
-					return tableCanonicalEntity.getAll.apply(tableCanonicalEntity, refs).pluck(fieldsToFetch);
+					return tableCanonicalEntity.pluck(fieldsToFetch);
 				}).then(function(results) {
 
 					//skip building aliases since that's not needed
@@ -154,7 +158,7 @@ Promise.resolve()
 				var start = new Date().getTime();
 
 				var bulk = _.reduce(data.entities, function(arr, entity) {
-					var dto = entity.toElasticsearchObject(_.pick(refMap, entity._refsResolved));
+					var dto = entity.toElasticsearchObject(refMap);
 					var meta = {
 						index: {
 							_index: "kwhen-" + dto._root.toLowerCase(),
