@@ -30,7 +30,7 @@ module.exports = function(generatedSchemas) {
 			"name",
 
 			//place
-			"address", "geo",
+			"address", "geo", "containedInPlace",
 
 			//creative work
 			"aggregateRating", "genre"
@@ -112,7 +112,7 @@ module.exports = function(generatedSchemas) {
 			location: {
 				exclude: false,
 				expand: {
-					fields: ["name", "geo"],
+					fields: ["name", "geo", "containedInPlace", "containedInPlace--name"],
 					includeId: false,
 				}
 			},
