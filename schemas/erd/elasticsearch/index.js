@@ -103,25 +103,26 @@ module.exports = function(generatedSchemas) {
 			},
 
 			containedInPlace: {
-				// expand: {
-				// 	fields: ["name"], //create field: containedInPlace--name
-				// 	flatten: true
-				// }
+				expand: {
+					fields: ["name"], //create field: containedInPlace--name
+					flatten: true
+				}
 			},
 
 			location: {
 				exclude: false,
-				// expand: {
-				// 	fields: ["name", "geo", "containedInPlace", "containedInPlace--name"],
-				// 	includeId: false,
-				// }
+				expand: {
+					fields: ["name", "geo", "containedInPlace", "containedInPlace--name"],
+					postPruneFields: ["containedInPlace"], //used to create containedInPlace--name
+					includeId: false,
+				}
 			},
 
 			workFeatured: {
-				// expand: {
-				// 	fields: ["name", "aggregateRating", "genre", "subtypes", "all_tags"],
-				// 	postPruneFields: ["genre", "subtypes"]
-				// }
+				expand: {
+					fields: ["name", "aggregateRating", "genre", "subtypes", "all_tags"],
+					postPruneFields: ["genre", "subtypes"] //there are used to create `all_tags`
+				}
 			}
 		},
 

@@ -8,6 +8,9 @@ var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
 module.exports = function(generatedSchemas, AbstractEntity, r) {
 
+	var refMapCalc = {};
+	var refsInProgress = [];
+
 	var domainUtils = require("../utils");
 	var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
 
@@ -51,12 +54,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		});
 	};
 
-	CanonicalEntity.prototype.toElasticsearchObject = function() {
+	CanonicalEntity.prototype.toElasticsearchObject = function(refMap) {
 
 		var self = this;
 
 		return Promise.resolve()
-			.then(function() {
+			.then(function toElasticsearchObjectPromise() {
 
 				var props = _.cloneDeep(self._props);
 
@@ -79,8 +82,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				_populate(props, root);
 
 				//do the mapping and stuff.
-				return _toESRecursive(props, typechain)
-					.then(function(dto) {
+				return _toESRecursive(props, typechain, refMap)
+					.then(function toElasticsearchObjectAfterRecursive(dto) {
 
 						//post populate
 						_populate(dto, root, true);
@@ -98,7 +101,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 	function _populate(props, root, isPostPopulate) {
 
-		_.each(entityUtils.calcPropertyOrderToPopulate(root), function(propName) {
+		_.each(entityUtils.calcPropertyOrderToPopulate(root), function populateLoop(propName) {
 			var prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
 
 			if (!prop) return;
@@ -111,12 +114,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			var fields = _.isArray(populateObj.fields) ? populateObj.fields : [populateObj.fields];
 
 			//populate.stategy with default fallback function
-			var fn = populateObj.strategy || function(val) {
+			var fn = populateObj.strategy || function populateDefaultFN(val) {
 				return _.isArray(val) ? val : [val];
 			};
 
 			//iterate all fieldnames, fetch the contents, pipe through the strategy function, and save
-			props[propName] = _.uniq(_.reduce(fields, function(arr, field) {
+			props[propName] = _.uniq(_.reduce(fields, function populateReducer(arr, field) {
 				var fieldContents = props[field];
 
 				var val = fn(fieldContents);
@@ -129,7 +132,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 	}
 
 
-	function _toESRecursive(properties, typechain) {
+	function _toESRecursive(properties, typechain, resolvedRefMap) {
 
 		if (!typechain) {
 			throw new Error("_toESRecursive expects arg 'typechain'");
@@ -137,14 +140,21 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		typechain = _.isArray(typechain) ? typechain : [typechain];
 
-		return fetchRefs(properties)
-			.then(function(refMap) {
+		return Promise.resolve()
+			.then(function _toESRecursiveFetchRefsIfNeeded() {
+				if (!resolvedRefMap) {
+					return fetchRefs(properties);
+				} else {
+					return resolvedRefMap;
+				}
+			})
+			.then(function _toESRecursiveWork(resolvedRefMap) {
 
 				var expandMapToInclude = {};
 
 				var dto = {};
 
-				var promises = _.map(properties, function(v, k) {
+				var promises = _.map(properties, function _toESRecursivePerProperty(v, k) {
 
 					if (excludePropertyKeys.indexOf(k) !== -1) return;
 
@@ -152,22 +162,23 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 						isTotalValueMultiValued: _.isArray(v),
 						k: k,
 						expandMapToInclude: expandMapToInclude,
-						typechain: typechain
+						typechain: typechain,
+						resolvedRefMap: resolvedRefMap
 					};
 
 					return Promise.resolve()
-						.then(function() {
+						.then(function _toESRecursivePerPropertyRecurse() {
 
 							if (_.isArray(v)) {
 
-								return Promise.all(_.map(v, function(singleVal) {
+								return Promise.all(_.map(v, function _toESRecursivePerPropertyRecurseForArray(singleVal) {
 										return _toESRecursiveSingleItem(singleVal, argObj);
 									}))
-									.then(function(arrOfPossibleArr) {
+									.then(function _toESRecursivePerPropertyRecurseForArrayThen(arrOfPossibleArr) {
 
 										arrOfPossibleArr = _.compact(arrOfPossibleArr);
 
-										return _.reduce(arrOfPossibleArr, function(out, possibleArr) {
+										return _.reduce(arrOfPossibleArr, function _toESRecursivePerPropertyRecurseForArrayReduce(out, possibleArr) {
 											return out.concat(_.isArray(possibleArr) ? possibleArr : [possibleArr]);
 										}, []);
 									});
@@ -179,7 +190,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 								return _toESRecursiveSingleItem(v, argObj);
 							}
 						})
-						.then(function(out) {
+						.then(function _toESRecursivePerPropertyRecurseAfter(out) {
 
 							if (_.isArray(out)) {
 
@@ -200,13 +211,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				});
 
 				return Promise.all(promises)
-					.then(function() {
+					.then(function _toESRecursiveExtendDTO() {
 						return _.extend(dto, expandMapToInclude);
 					});
 			});
 
 	}
-
 
 	function _toESRecursiveSingleItem(v, argObj) {
 
@@ -214,11 +224,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		var k = argObj.k;
 		var expandMapToInclude = argObj.expandMapToInclude;
 		var typechain = argObj.typechain;
+		var resolvedRefMap = argObj.resolvedRefMap;
 
 		var esMappingObj = esMappingConfig.properties[k];
 
 		return Promise.resolve()
-			.then(function calcV() {
+			.then(function _toESRecursiveSingleItemCalcV() {
 
 				if (!v._type) return v;
 
@@ -227,19 +238,21 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
 				if (propType.isValueObject) {
-					return _toESRecursive(v, typechain); //recurse non-datatypes
+					//recurse non-datatypes
+					//We've already resolved references for all valueObjects.
+					return _toESRecursive(v, typechain, resolvedRefMap);
 				} else if (v._ref) {
 					return undefined; //skip all non-resolved refs. 
 				} else {
 					return v._value; //simplify all datatypes and object-references to their value
 				}
 			})
-			.then(function(v) {
+			.then(function _toESRecursiveSingleItemCalcVAfter(v) {
 
 				if (v === undefined) return undefined;
 
 				return Promise.resolve()
-					.then(function() {
+					.then(function _toESRecursiveSingleItemWork() {
 
 						//If mapping contains a `expand` directive, create a new, possibly multivalued, field named: <prop>#expanded. 
 						//E.g.: location#expanded
@@ -251,44 +264,57 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 							var ref = resolvedRefMap[v];
 
 							if (!ref) {
+								// console.log(v);
+								// console.log(resolvedRefMap);
 								throw new Error("resolved ref couldn't be resolved: " + v);
 							}
 
-							ref = _.pick(ref, _.uniq(expandObj.fields.concat("_type")));
+							var refId = ref.id;
 
-							//We get the first reftype. We can't do any better for ambiguous types: we can only expand
-							//properties when they occur on all types
-							var refTypechain = CanonicalEntity.super_.getTypechain(ref._type);
-							var refRoot = CanonicalEntity.super_.getRootAndSubtypes(refTypechain).root;
+							return Promise.resolve()
+								.then(function calcRefObj() {
 
-							if (!refTypechain.length) {
-								throw new Error("Sanity check: reftypeChain of length 0 for type: " + JSON.stringify(ref._type));
-							}
-
-							//populate values on Ref
-							_populate(ref, refRoot);
-
-							return _toESRecursive(ref, refTypechain)
-								.then(function(objExpanded) {
-
-									//post populate on Ref
-									_populate(objExpanded, refRoot, true);
-
-									//After populate we need to prune to wanted fields again.
-									objExpanded = _.pick(objExpanded, expandObj.fields);
-
-									//Now optionally we prune some more fields. 
-									//This allows for keeping a calculated field (say all_tags) which is based on 
-									//a field that we now want to prune
-									objExpanded = _.omit(objExpanded, expandObj.postPruneFields || []);
-
-									if (_.isArray(objExpanded)) {
-										throw new Error("sanity check: expanded object after transform should never be array? ");
+									if (refMapCalc[refId]) {
+										return refMapCalc[refId];
 									}
 
-									if (expandObj.includeId) {
-										objExpanded.id = v;
+									if (refsInProgress.indexOf(refId) === -1) {
+
+										refsInProgress.push(refId);
+										return _processObjExpanded(ref, expandObj, refId);
+
+									} else {
+
+										//ref in progress, let's wait for it. It's quicker that way
+										var start = new Date().getTime();
+										return Promise.resolve()
+											.then(function recheckIfRefInProgressIsDone() {
+
+												if (refMapCalc[refId]) {
+													//cool, we've resolved the objExpanded now
+													return refMapCalc[refId];
+
+												} else {
+
+													if (new Date().getTime() - start < 1000) {
+														//check in later if we've resolved.
+														return new Promise(function(resolve, reject) {
+															setTimeout(function() { //Promise.delay doesn't work? so do it like this
+																return resolve(recheckIfRefInProgressIsDone());
+															});
+														});
+
+													} else {
+														//we've waited > 500 ms to resolve. Probably due to crash in other concurrent worker. 
+														//We can't let this get in the way, so we resolve ourselves.
+														return _processObjExpanded(ref, expandObj, refId);
+													}
+												}
+											});
+
 									}
+								})
+								.then(function doCalculationsBasedOnObjExpanded(objExpanded) {
 
 									if (!expandObj.flatten) {
 
@@ -300,7 +326,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 									} else {
 
 										//add individual fields to expandMapToInclude
-										_.each(objExpanded, function(v, fieldKey) {
+										_.each(objExpanded, function _toESRecursiveSingleItemExpandMap(v, fieldKey) {
 											var key = k + "--" + fieldKey;
 
 											if (isTotalValueMultiValued) {
@@ -331,17 +357,17 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					throw new Error("sanity check: 'typechain' not defined on applyTransformOrInspectNestedAttribs");
 				}
 				return Promise.resolve()
-					.then(function() {
+					.then(function transformOrRecurseOnValueTransformOrRecurse() {
 
 						if (esMappingObj.transform) {
 							return _doESTransform(v, esMappingObj.transform);
 						} else if (_.isObject(v)) {
-							return _toESRecursive(v, typechain);
+							return _toESRecursive(v, typechain, resolvedRefMap);
 						} else {
 							return v;
 						}
 					})
-					.then(function(v) {
+					.then(function transformOrRecurseOnValueVocabLookup(v) {
 
 						return _doVocabLookup(v, _.extend({
 							transformer: esMappingObj.transform
@@ -351,6 +377,54 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			});
 	}
 
+
+	function _processObjExpanded(ref, expandObj, refId) {
+
+		ref = _.pick(ref, expandObj.fields.concat("_type"));
+
+		//We get the first reftype. We can't do any better for ambiguous types: we can only expand
+		//properties when they occur on all types
+		var refTypechain = CanonicalEntity.super_.getTypechain(ref._type);
+		var refRoot = CanonicalEntity.super_.getRootAndSubtypes(refTypechain).root;
+
+		if (!refTypechain.length) {
+			throw new Error("Sanity check: reftypeChain of length 0 for type: " + JSON.stringify(ref._type));
+		}
+
+		//populate values on Ref
+		_populate(ref, refRoot);
+
+		return _toESRecursive(ref, refTypechain)
+			.then(function _toESRecursiveSingleItemWorkAfterToESRecursive(objExpanded) {
+
+				//post populate on Ref
+				_populate(objExpanded, refRoot, true);
+
+				//After populate we need to prune to wanted fields again.
+				objExpanded = _.pick(objExpanded, expandObj.fields);
+
+				//Now optionally we prune some more fields. 
+				//This allows for keeping a calculated field (say all_tags) which is based on 
+				//a field that we now want to prune
+				objExpanded = _.omit(objExpanded, expandObj.postPruneFields || []);
+
+				if (_.isArray(objExpanded)) {
+					throw new Error("sanity check: expanded object after transform should never be array? ");
+				}
+
+				if (expandObj.includeId) {
+					objExpanded.id = v;
+				}
+
+				return objExpanded;
+			})
+			.then(function cacheRef(objExpanded) {
+				refMapCalc[refId] = objExpanded; //cache
+				refsInProgress.splice(refsInProgress.indexOf(refId), 1); //can be removed
+				return objExpanded;
+			});
+
+	}
 
 
 	//transform a value to it's ES-counterpart by either 
@@ -366,7 +440,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		transformers = _.isArray(transformers) ? transformers : [transformers];
 
-		return _.reduce(transformers, function(out, transformer) {
+		return _.reduce(transformers, function _doESTransformReduce(out, transformer) {
 
 			if (_.isFunction(transformer)) {
 				return transformer(v);
@@ -376,7 +450,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				if (!_.isObject(v)) {
 					throw new Error("object-transformer selected but value not an object: " + v);
 				}
-				return _.reduce(v, function(agg, value, k) {
+				return _.reduce(v, function _doESTransformReducePerProperty(agg, value, k) {
 					var transK = transformer[k];
 					if (transK) {
 						if (_.isString(transK)) {
@@ -418,10 +492,10 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			//e.g.: ["Movie"]
 			var typesForThisEnum = _.intersection(_.keys(esMappingObj.enum.sourceMappings), typechain);
 
-			v = _.reduce(v, function(arr, val) {
+			v = _.reduce(v, function _doVocabLookupReduce(arr, val) {
 
 				//do a vocab lookup
-				val = _.reduce(typesForThisEnum, function(arr, typeName) {
+				val = _.reduce(typesForThisEnum, function _doVocabLookupReducePerSingleVal(arr, typeName) {
 					var valueMapForType = esMappingObj.enum.sourceMappings[typeName];
 					return arr.concat(valueMapForType[val] || []);
 				}, []);
@@ -438,10 +512,60 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		return v;
 	}
 
+	function fetchRefs(propertiesOrEntities, isEntities) {
+
+		var fieldsToFetch = _.uniq(esMappingConfig.refExpandWithFields.concat(["id", "_type"]));
+
+		var refs;
+
+		if (!isEntities) {
+			var properties = propertiesOrEntities;
+			refs = _fetchResolvedRefsRecursive(properties);
+		} else {
+			var entities = propertiesOrEntities;
+			refs = _.reduce(entities, function fetchRefsReduce(arr, entity) {
+				return arr.concat(_fetchResolvedRefsRecursive(entity._props));
+			}, []);
+		}
+
+		if (!refs.length) {
+			return Promise.resolve({});
+		}
+
+		//lot's of dupes potentially
+		refs = _.uniq(refs);
+
+		return tableCanonicalEntity.getAll.apply(tableCanonicalEntity, refs).pluck(fieldsToFetch)
+			.then(function fetchRefsAfter(results) {
+
+				//skip building aliases since that's not needed
+				var options = {
+					skipAlias: true
+				};
+
+				return _.reduce(results, function fetchRefsAfterReduce(agg, result) {
+
+					var entity = new CanonicalEntity({
+						id: result.id,
+						type: result._type
+					}, result, options);
+
+					var simpleDTO = entity.toSimple();
+					simpleDTO.id = result.id;
+
+					agg[entity.id] = simpleDTO;
+
+					return agg;
+				}, {});
+			});
+	}
+
+	CanonicalEntity.fetchRefs = fetchRefs;
+
 
 	function _fetchResolvedRefsRecursive(properties) {
 
-		var refs = _.reduce(_.clone(properties), function(arr, v, k) {
+		var refs = _.reduce(properties, function _fetchResolvedRefsRecursivePerProp(arr, v, k) {
 			if (excludePropertyKeys.indexOf(k) !== -1) return arr;
 
 			function transformSingleItem(v) {
@@ -449,21 +573,32 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				var prop = generatedSchemas.properties[k];
 				if (!prop) {
 					//possible because we've already performed `populate` which can add calculated properties
-					return undefined;
+					return;
 				}
 
 				//if first is range is datatype -> all in range are datatype as per #107
 				//If datatype -> return undefined
 				if (generatedSchemas.datatypes[prop.ranges[0]]) {
-					return undefined;
+					return;
 				}
 
-				if (v.isValueObject) {
+				var type = generatedSchemas.types[prop.ranges[0]];
+
+				if (!type) {
+					throw new Error("sanity check: type should exist for propName: " + k);
+				}
+
+				if (type.isValueObject) {
 					return arr.concat(_fetchResolvedRefsRecursive(v));
 				}
 
 				if (v._value) {
 					arr.push(v._value);
+				} else if (_.isString(v)) {
+					//must be a reference as well since it's a string and no datatype
+					//it's not formatted as a _value anymore, since it was already simplified. 
+					//This happens on nested objects from 2nd degree onwards.
+					arr.push(v);
 				}
 			}
 
@@ -476,48 +611,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		return refs;
 	}
 
-
-	function fetchRefs(properties) {
-
-
-		var fieldsToFetch = _.uniq(esMappingConfig.refExpandWithFields.concat(["id", "_type"]));
-
-		// var refs = _.uniq(_.reduce(data.entities, function(arr, entity) {
-
-		// 	var refs = _fetchResolvedRefsRecursive(properties);
-		// 	entity._refsResolved = refs;
-
-		// 	return arr.concat(refs);
-		// }, []));
-
-		var refs = _fetchResolvedRefsRecursive(properties);
-
-		if (!refs.length) {
-			return Promise.resolve({});
-		}
-
-		return tableCanonicalEntity.getAll.apply(tableCanonicalEntity, refs).pluck(fieldsToFetch)
-			.then(function(results) {
-
-				//skip building aliases since that's not needed
-				var options = {
-					skipAlias: true
-				};
-
-				return _.reduce(results, function(agg, result) {
-
-					var entity = new CanonicalEntity({
-						id: result.id,
-						type: result._type
-					}, result, options);
-
-					var simpleDTO = entity.toSimple();
-					agg[entity.id] = simpleDTO;
-
-					return agg;
-				}, {});
-			});
-	}
 
 
 	return CanonicalEntity;
