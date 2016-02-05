@@ -12,23 +12,68 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 	schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
 });
 
-var domainConfig = require("../schemas/domain/_definitions/config");
 
 var config = require("../config");
-var r = require('rethinkdbdash')(config.rethinkdb);
-
 var esMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
+var domainConfig = require("../schemas/domain/_definitions/config");
+var esConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 
 var domainUtils = require("../schemas/domain/utils");
+var rootUtils = require("../schemas/domain/utils/rootUtils")(generatedSchemas);
+
+
+var entityUtils = require("../schemas/domain/entities/utils");
+
+
+
+//Rethink
+var r = require('rethinkdbdash')(config.rethinkdb);
 var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
 
 var entities = require("../schemas/domain/entities")(generatedSchemas, r);
-var entityUtils = require("../schemas/domain/entities/utils");
 var CanonicalEntity = entities.CanonicalEntity;
 
+
+//Elasticsearch 
 var client = new elasticsearch.Client(config.elasticsearch);
 
 
+//Get all possible properties per root (including the properties defined on subtypes of said root)
+//Format: 
+//
+//Place: {
+//	gender: "Text"
+//}
+//
+//Later on we want to extend this with: 
+//- type for ES calc fields
+//- ways to see if we can do range queries (either ordinal OR number)
+//- ...
+var roots = domainConfig.domain.roots;
+var rootPropertyMap = _.reduce(roots, function(agg, root) {
+
+	var calcPropNamesForRoot = _.reduce(esConfig.propertiesCalculated, function(agg2, calcProp, name) {
+		var roots = _.isArray(calcProp.roots) ? calcProp.roots : [calcProp.roots];
+		if (calcProp.roots === true || ~roots.indexOf(root)) {
+			agg2[name] = _.pick(calcProp, "isMulti");
+		}
+		return agg2;
+	}, {});
+
+	agg[root] = _.extend(_.reduce(rootUtils.getPropertyMapForType(root, roots), function(agg2, v, k) {
+		var key = k.substring(k.indexOf(".") + 1);
+		agg2[key] = _.pick(generatedSchemas.properties[key], "isMulti");
+		return agg2;
+	}, {}), calcPropNamesForRoot);
+
+
+	return agg;
+}, {});
+
+
+/////////////
+//EXPRESS  //
+/////////////
 
 var express = require('express');
 var app = express();
@@ -42,11 +87,7 @@ app.get('/', function(req, res) {
 	res.send('Use POST silly');
 });
 
-var roots = domainConfig.domain.roots;
 
-var FilterObject = t.struct({
-
-}, 'FilterObject');
 
 var SortObject = t.struct({
 	type: t.String,
@@ -64,11 +105,15 @@ var FilterQuery = t.struct({
 	wantUnique: t.Boolean,
 
 	//How should we filter the returned results
-	filter: t.maybe(FilterObject),
+	filter: t.maybe(t.Object),
+
+	spatial: t.maybe(t.Object),
+
+	temporal: t.maybe(t.Object),
 
 	//return items similar to the items defined in filterObject. 
 	//If similarTo and filter are both defined, similarTo is executed first
-	similarTo: t.maybe(FilterObject),
+	similarTo: t.maybe(t.Object),
 
 	//sort is always required. Also for wantUnique = true: 
 	//if multiple values returned we look at score to see if we're confident
@@ -88,14 +133,171 @@ FilterQuery.prototype.getESIndex = function() {
 	return "kwhen-" + this.getRoot().toLowerCase();
 };
 
+
+function wrapWithNestedQueryIfNeeed(query, k) {
+
+	var nestedQ = {
+		"nested": {
+			"query": {}
+		}
+	};
+
+	var EXPAND_NEEDLE = "--expand";
+
+	//calculate if we've got an expanded query going on.
+	var expandObjNeedle = k.indexOf(EXPAND_NEEDLE);
+	if (expandObjNeedle === -1) {
+
+		//no expanded query: just return an ordinary range query
+		return query;
+	}
+
+	//We're talking majestic expanded objects here. 
+	//In Elasticsearch these are respresented as so-called nested objects, 
+	//which require a specific way of querying. 
+	//See: https://www.elastic.co/guide/en/elasticsearch/guide/current/nested-query.html
+
+	if (k.substring(0, expandObjNeedle).indexOf(".") !== -1) {
+		//Found expanded object but path doesn't start with it. 
+		//e.g.: test.workfeatured--expand
+		throw new Error("expanded object should be at beginning of query: " + k);
+	}
+
+	//nested path = name of expanded object, e.g.: workFeatured--expand
+	nestedQ.nested.path = k.substring(0, expandObjNeedle + EXPAND_NEEDLE.length);
+	nestedQ.nested.query = query;
+
+	return nestedQ;
+}
+
+
+function performTextQuery(v, k) {
+
+	var mathQuery = {
+		match: {}
+	};
+
+	mathQuery.match[k] = {
+		query: v,
+
+		//this requires all terms to be found. This is default (since only 1 term) for exact matches
+		//and we require this for free text (e.g.: name) as well for now. 
+		//
+		//More info
+		//- https://www.elastic.co/guide/en/elasticsearch/guide/current/match-multi-word.html
+		//- https://www.elastic.co/guide/en/elasticsearch/guide/current/bool-query.html#_controlling_precision
+		operator: "and"
+	};
+	return wrapWithNestedQueryIfNeeed(mathQuery, k);
+}
+
+
+//verbatim copy of range filter structure. Allowed keys: gt, gte, lt, lte
+function performRangeQuery(v, k) {
+
+	var rangeQuery = {
+		range: {}
+	};
+
+	rangeQuery.range[k] = v;
+
+
+	return wrapWithNestedQueryIfNeeed(rangeQuery, k);
+}
+
+function performTemporalQuery(v, k) {
+
+	var rangeQuery = {
+		range: {}
+	};
+
+	rangeQuery.range[k] = v;
+
+
+	return wrapWithNestedQueryIfNeeed(rangeQuery, k);
+}
+
+
+
+FilterQuery.prototype.getTemporal = function() {
+
+	if (!this.temporal) {
+		return {};
+	}
+
+	//TODO: all the checking on values, properties given root and all that.
+	//NOTE startDate hardcoded
+	return {
+		query: {
+			bool: {
+				must: performTemporalQuery(this.temporal, "startDate")
+			}
+		}
+	};
+
+};
+
 FilterQuery.prototype.getFilter = function() {
 	if (!this.filter) {
 		return {
-			"match_all": {}
+			query: {
+				"match_all": {}
+			}
 		};
-	} else {
-		throw new Error("filter not implemented yet");
 	}
+	var query = {
+		query: {
+			bool: {}
+		}
+	};
+
+	//For now we only support AND
+	//TODO: Should support arbitary nested AND / OR, 
+	//which should already be encoded as a nested structure in supplied filter object
+	var mustObj = query.query.bool.must = [];
+
+	var root = this.getRoot();
+	var propertiesNotAllowed = [];
+
+	_.each(this.filter, function(v, k) {
+
+		var prop = rootPropertyMap[root][k];
+
+		//TODO: Disable property checking for now
+		// if (!prop) {
+		// 	return propertiesNotAllowed.push(k);
+		// }
+
+
+		//TODO: realy simple check of typeOfQuery.
+		//We likely want to do: 
+		//- check property type
+		//- based on property type decide candidate queryTypes. 
+		//- based on supplied query decide winner from candidates. 
+		//- error if query isn't supported by property
+
+		var typeOfQuery = _.isObject(v) ? "Range" : "Text";
+		var propFilter;
+
+		switch (typeOfQuery) {
+			case "Text":
+				propFilter = performTextQuery(v, k);
+				break;
+
+			case "Range":
+				propFilter = performRangeQuery(v, k);
+				break;
+		}
+
+		//add filter to AND
+		mustObj.push(propFilter);
+	});
+
+	if (propertiesNotAllowed.length) {
+		throw new Error("following filter properties not allowed for root: " + propertiesNotAllowed.join(","));
+	}
+
+	return query;
 };
 
 FilterQuery.prototype.wantRawESResults = function() {
@@ -107,13 +309,25 @@ FilterQuery.prototype.performQuery = function() {
 
 	return Promise.resolve()
 		.then(function() {
-			return client.search({
+
+			var searchQuery = {
 				index: self.getESIndex(),
 				type: 'type1',
-				body: {
-					query: self.getFilter()
+				body: {}
+			};
+
+			//getFilter exends body. Can set: 
+			//- query
+			//- filter
+			_.merge(searchQuery.body, self.getFilter(), self.getTemporal(), function(a, b) {
+				if (_.isArray(a)) {
+					return a.concat(b);
 				}
 			});
+
+			console.log(JSON.stringify(searchQuery.body));
+
+			return client.search(searchQuery);
 		})
 		.then(function(esResult) {
 

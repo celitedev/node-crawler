@@ -266,7 +266,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 							if (!ref) {
 								// console.log(v);
 								// console.log(resolvedRefMap);
-								throw new Error("resolved ref couldn't be resolved: " + v);
+								throw new Error("resolved ref couldn't be resolved: " + v + " - " + k);
 							}
 
 							var refId = ref.id;

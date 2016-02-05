@@ -22,5 +22,6 @@ module.exports = {
 		publisher: false,
 		text: false,
 		thumbnailUrl: false,
+		subtypes: false,
 	}
 };
