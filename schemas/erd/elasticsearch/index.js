@@ -118,6 +118,13 @@ module.exports = function(generatedSchemas) {
 				}
 			},
 
+			performer: {
+				exclude: false,
+				expand: {
+					fields: ["name"]
+				}
+			},
+
 			workFeatured: {
 				expand: {
 					fields: ["name", "aggregateRating", "genre", "subtypes", "all_tags"],
@@ -138,7 +145,7 @@ module.exports = function(generatedSchemas) {
 			},
 
 			all_genre: {
-				roots: true,
+				roots: "CreativeWork",
 				isMulti: true,
 				mapping: mappings.enum,
 				populate: {

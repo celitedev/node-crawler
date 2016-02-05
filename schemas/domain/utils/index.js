@@ -43,7 +43,7 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 	inferTypeForAmbiguousRange: function(fieldtype, obj) {
 		switch (fieldtype.ambiguitySolvedBy.type) {
 			case "urlVsSomething":
-				if (obj._value.indexOf("http:") === 0 || ~obj._value.indexOf("https:") === 0) {
+				if (obj._value.indexOf("http:") === 0 || obj._value.indexOf("https:") === 0) {
 					return "URL";
 				} else {
 					//return the other thing. We know that there's exactly 2 elements, so...
@@ -131,6 +131,8 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 		}
 		return order;
 	},
+
+
 
 	enums: {
 		//kind of entity: 

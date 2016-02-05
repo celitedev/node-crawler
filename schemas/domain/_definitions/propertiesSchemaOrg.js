@@ -578,7 +578,10 @@ module.exports = {
 			type: "implicitType",
 			storage: "thingIndex"
 		},
-		// isMulti: true
+
+		//eventful events have multiple locations
+		//One of which is a map entry, which is wrong. #177
+		isMulti: true
 	},
 	member: { //e.g.: org or persons
 		ambiguitySolvedBy: {
