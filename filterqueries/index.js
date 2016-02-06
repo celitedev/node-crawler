@@ -237,6 +237,130 @@ FilterQuery.prototype.getTemporal = function() {
 
 };
 
+FilterQuery.prototype.getSpatial = function() {
+
+	if (!this.spatial) {
+		return {};
+	}
+
+	var type = this.spatial.type;
+	var options = this.spatial.options;
+
+	if (!type) throw new Error("Spatial query needs `type` property");
+	if (!options) throw new Error("Spatial query needs `options` property");
+
+	//resolve path;
+
+	var path = options._path;
+
+	//Find default path given context.
+	if (path === undefined) {
+		switch (this.spatial.type) {
+			case "location":
+				switch (this.getRoot()) {
+					case "Event":
+						path = "location";
+						break;
+					case "Place":
+						path = "";
+						break;
+					case "PlaceWithOpeninghours":
+						path = "";
+						break;
+					case "OrganizationAndPerson":
+						path = "inverse--performer.location";
+						break;
+					case "CreativeWork":
+						path = "inverse--workFeatured.location";
+						break;
+					default:
+						throw new Error("spatial type `location` is not supported for root: " + this.getRoot());
+				}
+				break;
+			case "containedInPlace":
+				switch (this.getRoot()) {
+					case "Event":
+						path = "location--expand.containedInPlace";
+						break;
+					case "Place":
+						path = "containedInPlace";
+						break;
+					case "PlaceWithOpeninghours":
+						path = "containedInPlace";
+						break;
+					case "OrganizationAndPerson":
+						path = "inverse--performer.location--expand.containedInPlace";
+						break;
+					case "CreativeWork":
+						path = "inverse--workFeatured.location--expand.containedInPlace";
+						break;
+					default:
+						throw new Error("spatial type `containedInPlace` is not supported for root: " + this.getRoot());
+				}
+				break;
+			default:
+				throw new Error("spatial type not supported: " + this.spatial.type);
+		}
+	}
+
+	if (options._nearby) {
+		//should be solved by using `<path>--extend.geo`
+		throw new Error("spatial.options._nearby not yet supported");
+	}
+
+	// STATE: NOT searching by _nearby, so either searching by id or name
+
+	var totalQuery;
+	var queryVal;
+	var mathQuery = {
+		match: {}
+	};
+
+	//Searching by id
+	if (options.id) {
+
+		if (path === "") {
+			throw new Error("specify `spatial.options._nearby` if you need to search _nearby this location");
+		}
+		queryVal = options.id;
+
+	} else if (options.name) {
+
+		//searching by name of location | containedInPlace
+
+		queryVal = options.name;
+
+		if (this.spatial.type === "location") {
+			path += "--expand.name";
+		} else if (this.spatial.type === "containedInPlace") {
+			path += "--name";
+		} else {
+			throw new Error("spatial type not supported: " + this.spatial.type);
+		}
+	} else {
+		throw new Error("spatial query without _nearby requires either `id` or `name` as options");
+	}
+
+	mathQuery.match[path] = {
+		query: queryVal,
+		operator: "and"
+	};
+
+	totalQuery = wrapWithNestedQueryIfNeeed(mathQuery, path);
+
+	//TODO: all the checking on values, properties given root and all that.
+	//NOTE startDate hardcoded
+	return {
+		query: {
+			bool: {
+				must: totalQuery
+			}
+		}
+	};
+
+};
+
+
 FilterQuery.prototype.getFilter = function() {
 	if (!this.filter) {
 		return {
@@ -319,7 +443,7 @@ FilterQuery.prototype.performQuery = function() {
 			//getFilter exends body. Can set: 
 			//- query
 			//- filter
-			_.merge(searchQuery.body, self.getFilter(), self.getTemporal(), function(a, b) {
+			_.merge(searchQuery.body, self.getFilter(), self.getTemporal(), self.getSpatial(), function(a, b) {
 				if (_.isArray(a)) {
 					return a.concat(b);
 				}
