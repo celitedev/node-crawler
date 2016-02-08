@@ -343,14 +343,68 @@ FilterQuery.prototype.getSpatial = function() {
 		root: this.getRoot()
 	};
 
+
+	//type = nearUser
+	//{
+	//   "type": "Event", 
+	//   "wantUnique": false,
+	//   "filter": {
+	//     "subtypes": "ScreeningEvent",
+	//     "workFeatured--expand.name": "Kung Fu Panda 3"
+	//   }, 
+	//   "spatial": {
+	//     "type": "nearUser",
+	//     "options": {
+	//       "distance": "5km"
+	//     }
+	//   },
+	//   "meta": {
+	//     "elasticsearch": {
+	//       "showRaw": true 
+	//     },
+	//     "user": {
+	//       "geo": {
+	//         "lat": 40.7866, 
+	//       	"lon":-73.9776 
+	//       }
+	//     }
+	//   }
+	// }
+	if (command.type === "nearUser") {
+		if (!this.meta || !this.meta.user || !this.meta.user.geo) {
+			throw new Error("need meta.user.geo for spatial type: nearUser");
+		}
+		command.options.geo = this.meta.user.geo;
+		command.type = "nearPoint";
+	}
+
 	//////////////
-	//Find path //
+	//Find default path //
 	//////////////
 	command.path = options._path || spatialHelpers.findDefaultPath(command);
 
-	//extend path to specific property
-
 	switch (command.type) {
+
+		//type = location
+		// 		{
+		//   "type": "Event", 
+		//   "wantUnique": false,
+		//   "filter": {
+		//     "subtypes": "ScreeningEvent",
+		//     "workFeatured--expand.name": "Kung Fu Panda 3"
+		//   }, 
+		//   "spatial": {
+		//     "type": "location",
+		//     "options": {
+		//       "name": "amc"
+		//     }
+		//   },
+		//   "meta": {
+		//     "elasticsearch": {
+		//       "showRaw": true 
+		//     }
+		//   }
+		// }
 		case "location":
 			if (!command.options.id && !command.options.name) {
 				throw new Error("need id or name for spatial type: Location");
@@ -368,6 +422,22 @@ FilterQuery.prototype.getSpatial = function() {
 
 			break;
 
+			//type = containedInPlace
+			//
+			// {
+			//   "type": "Event", 
+			//   "wantUnique": false,
+			//   "filter": {
+			//     "subtypes": "ScreeningEvent",
+			//     "workFeatured--expand.name": "Kung Fu Panda 3"
+			//   }, 
+			//   "spatial": {
+			//     "type": "containedInPlace",
+			//     "options": {
+			//       "name": "new"
+			//     }
+			//   }
+			// }
 		case "containedInPlace":
 			if (!command.options.id && !command.options.name) throw new Error("need id or name for spatial type: containedInPlace");
 			command.path = command.options.name ? command.path + "--name" : command.path;
@@ -383,7 +453,7 @@ FilterQuery.prototype.getSpatial = function() {
 
 			break;
 
-			//nearPoint: 
+			//type = nearPoint
 			//{
 			// 		"type": "Event",
 			// 		"wantUnique": false,
