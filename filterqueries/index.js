@@ -173,11 +173,11 @@ function wrapWithNestedQueryIfNeeed(query, k) {
 
 function performTextQuery(v, k) {
 
-	var mathQuery = {
+	var matchQuery = {
 		match: {}
 	};
 
-	mathQuery.match[k] = {
+	matchQuery.match[k] = {
 		query: v,
 
 		//this requires all terms to be found. This is default (since only 1 term) for exact matches
@@ -188,7 +188,7 @@ function performTextQuery(v, k) {
 		//- https://www.elastic.co/guide/en/elasticsearch/guide/current/bool-query.html#_controlling_precision
 		operator: "and"
 	};
-	return wrapWithNestedQueryIfNeeed(mathQuery, k);
+	return wrapWithNestedQueryIfNeeed(matchQuery, k);
 }
 
 
@@ -237,27 +237,29 @@ FilterQuery.prototype.getTemporal = function() {
 
 };
 
-FilterQuery.prototype.getSpatial = function() {
 
-	if (!this.spatial) {
-		return {};
-	}
-
-	var type = this.spatial.type;
-	var options = this.spatial.options;
-
-	if (!type) throw new Error("Spatial query needs `type` property");
-	if (!options) throw new Error("Spatial query needs `options` property");
-
-	//resolve path;
-
-	var path = options._path;
-
-	//Find default path given context.
-	if (path === undefined) {
-		switch (this.spatial.type) {
+var spatialHelpers = {
+	findDefaultPath: function findDefaultPath(command) {
+		var path;
+		//Find default path given context.
+		switch (command.type) {
 			case "location":
-				switch (this.getRoot()) {
+				switch (command.root) {
+					case "Event":
+						path = "location";
+						break;
+					case "OrganizationAndPerson":
+						path = "inverse--performer.location";
+						break;
+					case "CreativeWork":
+						path = "inverse--workFeatured.location";
+						break;
+					default:
+						throw new Error("spatial type `location` is not supported for root: " + command.root);
+				}
+				break;
+			case "nearPoint":
+				switch (command.root) {
 					case "Event":
 						path = "location";
 						break;
@@ -274,11 +276,27 @@ FilterQuery.prototype.getSpatial = function() {
 						path = "inverse--workFeatured.location";
 						break;
 					default:
-						throw new Error("spatial type `location` is not supported for root: " + this.getRoot());
+						throw new Error("spatial type `nearPoint` is not supported for root: " + command.root);
 				}
 				break;
+
+				// case "nearLocation":
+				// 	switch (command.root) {
+				// 		case "Event":
+				// 			path = "location";
+				// 			break;
+				// 		case "OrganizationAndPerson":
+				// 			path = "inverse--performer.location";
+				// 			break;
+				// 		case "CreativeWork":
+				// 			path = "inverse--workFeatured.location";
+				// 			break;
+				// 		default:
+				// 			throw new Error("spatial type `nearLocation` is not supported for root: " + command.root);
+				// 	}
+				// 	break;
 			case "containedInPlace":
-				switch (this.getRoot()) {
+				switch (command.root) {
 					case "Event":
 						path = "location--expand.containedInPlace";
 						break;
@@ -295,78 +313,152 @@ FilterQuery.prototype.getSpatial = function() {
 						path = "inverse--workFeatured.location--expand.containedInPlace";
 						break;
 					default:
-						throw new Error("spatial type `containedInPlace` is not supported for root: " + this.getRoot());
+						throw new Error("spatial type `containedInPlace` is not supported for root: " + command.root);
 				}
 				break;
 			default:
-				throw new Error("spatial type not supported: " + this.spatial.type);
+				throw new Error("spatial type not supported: " + command.type);
 		}
+
+		return path;
+	}
+};
+
+FilterQuery.prototype.getSpatial = function() {
+
+	if (!this.spatial) {
+		return {};
 	}
 
-	if (options._nearby) {
-		//should be solved by using `<path>--extend.geo`
-		throw new Error("spatial.options._nearby not yet supported");
-	}
+	if (!this.spatial.type) throw new Error("Spatial query needs `type` property");
+	if (!this.spatial.options) throw new Error("Spatial query needs `options` property");
 
-	// STATE: NOT searching by _nearby, so either searching by id or name
+	var options = this.spatial.options;
 
-	var totalQuery;
-	var queryVal;
-	var mathQuery = {
-		match: {}
+	var command = {
+		path: options._path,
+		options: options,
+		queryVal: undefined,
+		type: this.spatial.type,
+		root: this.getRoot()
 	};
 
-	//Searching by id
-	if (options.id) {
+	//////////////
+	//Find path //
+	//////////////
+	command.path = options._path || spatialHelpers.findDefaultPath(command);
 
-		if (path === "") {
-			throw new Error("specify `spatial.options._nearby` if you need to search _nearby this location");
-		}
-		queryVal = options.id;
+	//extend path to specific property
 
-	} else if (options.name) {
+	switch (command.type) {
+		case "location":
+			if (!command.options.id && !command.options.name) {
+				throw new Error("need id or name for spatial type: Location");
+			}
+			command.path = command.options.name ? command.path + "--expand.name" : command.path;
 
-		//searching by name of location | containedInPlace
+			command.query = {
+				match: {}
+			};
 
-		queryVal = options.name;
+			command.query.match[command.path] = {
+				query: command.options.name || command.options.id,
+				operator: "and"
+			};
 
-		if (this.spatial.type === "location") {
-			path += "--expand.name";
-		} else if (this.spatial.type === "containedInPlace") {
-			path += "--name";
-		} else {
-			throw new Error("spatial type not supported: " + this.spatial.type);
-		}
-	} else {
-		throw new Error("spatial query without _nearby requires either `id` or `name` as options");
+			break;
+
+		case "containedInPlace":
+			if (!command.options.id && !command.options.name) throw new Error("need id or name for spatial type: containedInPlace");
+			command.path = command.options.name ? command.path + "--name" : command.path;
+
+			command.query = {
+				match: {}
+			};
+
+			command.query.match[command.path] = {
+				query: command.options.name || command.options.id,
+				operator: "and"
+			};
+
+			break;
+
+			//nearPoint: 
+			//{
+			// 		"type": "Event",
+			// 		"wantUnique": false,
+			// 		"filter": {
+			// 			"subtypes": "ScreeningEvent",
+			// 			"workFeatured--expand.name": "Kung Fu Panda 3"
+			// 		},
+			// 		"spatial": {
+			// 			"type": "nearPoint",
+			// 			"options": {
+			// 				"geo": {
+			// 					"lat": 40.7866,
+			// 					"lon": -73.9776
+			// 				},
+			// 				"distance": "5km"
+			// 			}
+			// 		},
+			// 		"meta": {
+			// 			"elasticsearch": {
+			// 				"showRaw": true
+			// 			}
+			// 		}
+			// }
+		case "nearPoint":
+			if (!command.options.geo) throw new Error("need geo for spatial type: nearPoint");
+
+			//if path is "" , we're on a Place|PlacewithOpeninghours so can ask directly
+			//Otherwise, it's on the expanded object
+			command.path += command.path ? "--expand.geo" : "geo";
+
+			command.query = {
+				geo_distance: {
+					distance: command.options.distance || "2km",
+
+					//https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-distance.html
+					//Faster lookups. This is ok since we're searching really close so can treat earth as a plane
+					"distance_type": "plane",
+				}
+			};
+
+			command.query.geo_distance[command.path] = command.options.geo;
+			break;
+
+			// case "nearLocation":
+			// 	throw new Error("NearLocation not implemented yet");
+
+			// 	//we need to fetch the geo from the location first, before being able to use it in a nearby query. 
+			// 	//This requires 2 passes right?
+			// 	if (command.options.geo === undefined || command.opions.geo === undefined) {
+			// 		throw new Error("need geo for type: nearLocation");
+			// 	}
+			// 	command.path += "--expand.geo";
+			// 	command.queryVal = command.options.geo;
+			// 	break;
+
+		default:
+			throw new Error("spatial type not implemented: " + command.type);
 	}
 
-	mathQuery.match[path] = {
-		query: queryVal,
-		operator: "and"
-	};
 
-	totalQuery = wrapWithNestedQueryIfNeeed(mathQuery, path);
 
-	//TODO: all the checking on values, properties given root and all that.
-	//NOTE startDate hardcoded
 	return {
 		query: {
 			bool: {
-				must: totalQuery
+				must: wrapWithNestedQueryIfNeeed(command.query, command.path)
 			}
 		}
 	};
-
 };
 
 
 FilterQuery.prototype.getFilter = function() {
 	if (!this.filter) {
 		return {
-			query: {
-				"match_all": {}
-			}
+
 		};
 	}
 	var query = {

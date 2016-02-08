@@ -70,7 +70,7 @@ var test = {
 			type: "location",
 			options: {
 				name: "theater X",
-				_path: "inverse--organizer.location"
+				_path: "organizer--inverse.location"
 			}
 		}
 
@@ -80,7 +80,7 @@ var test = {
 			type: "location",
 			options: {
 				name: "theater X",
-				_path: "inverse--organizer.location",
+				_path: "organizer--inverse.location",
 
 				//if defined changes query from AT place to NEAR place (using location.geo)
 				//Again, it depends on expansion if this can be done in 1 query.
@@ -101,7 +101,7 @@ var test = {
 			type: "location",
 			options: {
 				name: "theater X",
-				_path: "inverse--organizer.location",
+				_path: "organizer--inverse.location",
 				_nearby: {
 					entity: {
 						id: "<id>", //needs separate lookup to find latitude/longitude
@@ -118,7 +118,7 @@ var test = {
 			type: "location",
 			options: {
 				name: "theater X",
-				_path: "inverse--organizer.location",
+				_path: "organizer--inverse.location",
 				_nearby: {
 					entity: {
 						name: "Grand Central", //needs separate lookup to find latitude/longitude
