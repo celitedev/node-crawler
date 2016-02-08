@@ -6,7 +6,7 @@ var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
 module.exports = function(generatedSchemas) {
 
-	var esMappingConfig = require("../../../erd/elasticsearch")(generatedSchemas);
+	var erdMappingConfig = require("../../../erd/elasticsearch")(generatedSchemas);
 
 
 
@@ -487,7 +487,7 @@ module.exports = function(generatedSchemas) {
 
 
 			//add calculated fields that should exit on this root. 
-			propNames = _.reduce(esMappingConfig.propertiesCalculated, function(arr, prop, propName) {
+			propNames = _.reduce(erdMappingConfig.propertiesCalculated, function(arr, prop, propName) {
 				var roots = _.isArray(prop.roots) ? prop.roots : [prop.roots];
 				if (prop.roots === true || ~roots.indexOf(root)) {
 					arr.push(propName);
@@ -498,14 +498,14 @@ module.exports = function(generatedSchemas) {
 			//Create a map <propName, [dependentProps]> and use this to calculate a DAG
 			var dagComparators = _.reduce(propNames, function(agg, propName) {
 				var fieldsArr = [];
-				var prop = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
+				var prop = erdMappingConfig.properties[propName] || erdMappingConfig.propertiesCalculated[propName];
 				if (prop && prop.populate) {
 
 					//This property has a `populate`-directive. 
 					//That means it should be populated using other field(s)
 
 					//Prereq: this field must be multivalued.
-					if (esMappingConfig.propertiesCalculated[propName]) { //calculated field
+					if (erdMappingConfig.propertiesCalculated[propName]) { //calculated field
 						if (!prop.isMulti) {
 							throw new Error("calculated property doesn't define isMulti=true: " + propName);
 						}

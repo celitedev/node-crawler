@@ -147,6 +147,7 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 	statics: {
 		SOURCETABLE: "sourceEntities",
 		CANONICALTABLE: "entities",
+		ERDTABLE: "erd",
 		REFNORMS: "refNorms",
 		REFX: "refX"
 	}
