@@ -260,92 +260,99 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				if (v === undefined) return undefined;
 				if (noExpand) return v;
 
-				//If mapping contains a `expand` directive, create a new, possibly multivalued, field named: <prop>#expanded. 
-				//E.g.: location#expanded
-				if (esMappingObj && esMappingObj.expand) {
+				return Promise.resolve()
+					.then(function() {
 
-					var expandObj = esMappingObj.expand;
 
-					//fetch the reference and only keep the `fields` defined.
-					var ref = resolvedRefMap[v];
+						//If mapping contains a `expand` directive, create a new, possibly multivalued, field named: <prop>#expanded. 
+						//E.g.: location#expanded
+						if (esMappingObj && esMappingObj.expand) {
 
-					if (!ref) {
-						// console.log(v);
-						// console.log(resolvedRefMap);
-						throw new Error("resolved ref couldn't be resolved: " + v + " - " + k);
-					}
+							var expandObj = esMappingObj.expand;
 
-					var refId = ref.id;
+							//fetch the reference and only keep the `fields` defined.
+							var ref = resolvedRefMap[v];
 
-					return Promise.resolve()
-						.then(function calcRefObj() {
-
-							if (refMapCalc[refId]) {
-								return refMapCalc[refId];
+							if (!ref) {
+								throw new Error("resolved ref couldn't be resolved: " + v + " - " + k);
 							}
 
-							if (refsInProgress.indexOf(refId) === -1) {
+							var refId = ref.id;
 
-								refsInProgress.push(refId);
-								return _processObjExpanded(ref, expandObj, refId);
+							return Promise.resolve()
+								.then(function calcRefObj() {
 
-							} else {
+									if (refMapCalc[refId]) {
+										return refMapCalc[refId];
+									}
 
-								//ref in progress, let's wait for it. It's quicker that way
-								var start = new Date().getTime();
-								return Promise.resolve()
-									.then(function recheckIfRefInProgressIsDone() {
+									if (refsInProgress.indexOf(refId) === -1) {
 
-										if (refMapCalc[refId]) {
-											//cool, we've resolved the objExpanded now
-											return refMapCalc[refId];
+										refsInProgress.push(refId);
+										return _processObjExpanded(ref, expandObj, refId);
 
-										} else {
-
-											if (new Date().getTime() - start < 1000) {
-												//check in later if we've resolved.
-												return new Promise(function(resolve, reject) {
-													setTimeout(function() { //Promise.delay doesn't work? so do it like this
-														return resolve(recheckIfRefInProgressIsDone());
-													});
-												});
-
-											} else {
-												//we've waited > 500 ms to resolve. Probably due to crash in other concurrent worker. 
-												//We can't let this get in the way, so we resolve ourselves.
-												return _processObjExpanded(ref, expandObj, refId);
-											}
-										}
-									});
-
-							}
-						})
-						.then(function doCalculationsBasedOnObjExpanded(objExpanded) {
-
-							if (!expandObj.flatten) {
-
-								var key = k + "--expand";
-								expandMapToInclude[key] = isTotalValueMultiValued ?
-									(expandMapToInclude[key] || []).concat([objExpanded]) :
-									objExpanded;
-
-							} else {
-
-								//add individual fields to expandMapToInclude
-								_.each(objExpanded, function toERDRecursiveSingleItemExpandMap(v, fieldKey) {
-									var key = k + "--" + fieldKey;
-
-									if (isTotalValueMultiValued) {
-										v = _.isArray(v) ? v : [v];
-										expandMapToInclude[key] = (expandMapToInclude[key] || []).concat(v);
 									} else {
-										//NOTE: v can still be an array here
-										expandMapToInclude[k + "--" + fieldKey] = v;
+
+										//ref in progress, let's wait for it. It's quicker that way
+										var start = new Date().getTime();
+										return Promise.resolve()
+											.then(function recheckIfRefInProgressIsDone() {
+
+												if (refMapCalc[refId]) {
+													//cool, we've resolved the objExpanded now
+													return refMapCalc[refId];
+
+												} else {
+
+													if (new Date().getTime() - start < 1000) {
+														//check in later if we've resolved.
+														return new Promise(function(resolve, reject) {
+															setTimeout(function() { //Promise.delay doesn't work? so do it like this
+																return resolve(recheckIfRefInProgressIsDone());
+															});
+														});
+
+													} else {
+														//we've waited > 500 ms to resolve. Probably due to crash in other concurrent worker. 
+														//We can't let this get in the way, so we resolve ourselves.
+														return _processObjExpanded(ref, expandObj, refId);
+													}
+												}
+											});
+
+									}
+								})
+								.then(function doCalculationsBasedOnObjExpanded(objExpanded) {
+
+									if (!expandObj.flatten) {
+
+										var key = k + "--expand";
+										expandMapToInclude[key] = isTotalValueMultiValued ?
+											(expandMapToInclude[key] || []).concat([objExpanded]) :
+											objExpanded;
+
+									} else {
+
+										//add individual fields to expandMapToInclude
+										_.each(objExpanded, function toERDRecursiveSingleItemExpandMap(v, fieldKey) {
+											var key = k + "--" + fieldKey;
+
+											if (isTotalValueMultiValued) {
+												v = _.isArray(v) ? v : [v];
+												expandMapToInclude[key] = (expandMapToInclude[key] || []).concat(v);
+											} else {
+												//NOTE: v can still be an array here
+												expandMapToInclude[k + "--" + fieldKey] = v;
+											}
+										});
 									}
 								});
-							}
-						});
-				}
+
+						}
+					})
+					.then(function() {
+						return v; // return v in all circumstances
+					});
 			})
 			.then(function transformOrRecurseOnValue(v) {
 
