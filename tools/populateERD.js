@@ -22,6 +22,7 @@ var esMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 
 var domainUtils = require("../schemas/domain/utils");
 var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
+var tableERDEntity = r.table(domainUtils.statics.ERDTABLE);
 
 var entities = require("../schemas/domain/entities")(generatedSchemas, r);
 var entityUtils = require("../schemas/domain/entities/utils");
@@ -38,6 +39,8 @@ var data = _.cloneDeep({
 	},
 	time: {
 		getEntities: 0,
+		createRethinkDTOs: 0,
+		populateRethinkERD: 0,
 		fetchRefs: 0,
 		createDTOS: 0,
 		populateES: 0,
@@ -111,6 +114,28 @@ Promise.resolve()
 			.then(function resetDataObject(entities) {
 				data.entities = entities;
 			})
+			.then(function createRethinkDTOs() {
+				var start = new Date().getTime();
+
+				return Promise.all(_.map(data.entities, function(entity) {
+					return entity.toERDObject(true);
+				})).then(function(dtos) {
+					data.time.createRethinkDTOs += new Date().getTime() - start;
+					return dtos;
+				});
+			})
+			.then(function populateRethinkERD(dtos) {
+				var start = new Date().getTime();
+				return Promise.resolve()
+					.then(function() {
+						return tableERDEntity.insert(dtos, {
+							conflict: "update"
+						});
+					})
+					.then(function() {
+						data.time.populateRethinkERD += new Date().getTime() - start;
+					});
+			})
 			.then(function fetchRefs() {
 
 				var start = new Date().getTime();
@@ -129,7 +154,7 @@ Promise.resolve()
 				var start = new Date().getTime();
 
 				return Promise.all(_.map(data.entities, function(entity) {
-					return entity.toElasticsearchObject(refMap);
+					return entity.toERDObject(refMap);
 				})).then(function(dtos) {
 					data.time.createDTOS += new Date().getTime() - start;
 					return dtos;
