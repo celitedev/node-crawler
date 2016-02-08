@@ -28,7 +28,7 @@ var entityUtils = require("../schemas/domain/entities/utils");
 
 //Rethink
 var r = require('rethinkdbdash')(config.rethinkdb);
-var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
+var erdEntityTable = r.table(domainUtils.statics.ERDTABLE);
 
 var entities = require("../schemas/domain/entities")(generatedSchemas, r);
 var CanonicalEntity = entities.CanonicalEntity;
@@ -627,20 +627,7 @@ FilterQuery.prototype.performQuery = function() {
 						if (self.wantUnique) {
 							hits = esResult.hits.hits = hits.slice(0, 1);
 						}
-						return r.table(tableCanonicalEntity).getAll.apply(tableCanonicalEntity, _.pluck(hits, "_id"))
-							.then(function(rdbResults) {
-
-								var options = {
-									skipAlias: true
-								};
-
-								return _.map(rdbResults, function(result) {
-									return new CanonicalEntity({
-										id: result.id,
-										type: result._type
-									}, result, options).toSimple();
-								});
-							});
+						return r.table(erdEntityTable).getAll.apply(erdEntityTable, _.pluck(hits, "_id"));
 					}
 				})
 				.then(function(entities) {
