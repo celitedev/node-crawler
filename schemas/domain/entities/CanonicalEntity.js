@@ -118,15 +118,46 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				return _.isArray(val) ? val : [val];
 			};
 
-			//iterate all fieldnames, fetch the contents, pipe through the strategy function, and save
-			props[propName] = _.uniq(_.reduce(fields, function populateReducer(arr, field) {
-				var fieldContents = props[field];
+			if (!prop.isMulti) {
 
-				var val = fn(fieldContents);
-				val = _.isArray(val) ? val : [val];
+				///////////////////////////////////////////////
+				//process populate for a single-valued field //
+				///////////////////////////////////////////////
 
-				return fieldContents ? arr.concat(val) : arr;
-			}, props[propName] || []));
+				_.each(fields, function populateSingleValued(field) {
+
+					if (props[propName] !== undefined) return; //only continue if value not set already
+
+					//fetch content of field
+					var fieldContents = props[field];
+
+					var val = fn(fieldContents);
+					val = _.isArray(val) ? val : [val];
+
+					//fetch first item if it exists and set 
+					if (val.length && val[0] !== undefined) {
+						props[propName] = val[0];
+					}
+
+				});
+
+			} else {
+
+				//////////////////////////////////////////////
+				//process populate for a multi-valued field //
+				//////////////////////////////////////////////
+
+				//iterate all fieldnames, fetch the contents, pipe through the strategy function, and save
+				props[propName] = _.uniq(_.reduce(fields, function populateReducer(arr, field) {
+					var fieldContents = props[field];
+
+					var val = fn(fieldContents);
+					val = _.isArray(val) ? val : [val];
+
+					return fieldContents ? arr.concat(val) : arr;
+				}, props[propName] || []));
+
+			}
 		});
 
 	}
@@ -228,10 +259,14 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		var typechain = argObj.typechain;
 		var resolvedRefMap = argObj.resolvedRefMap;
 
-		var esMappingObj = erdMappingConfig.properties[k];
+		var erdMappingObj = erdMappingConfig.properties[k] || erdMappingConfig.propertiesCalculated[k];
 
 		return Promise.resolve()
 			.then(function toERDRecursiveSingleItemCalcV() {
+
+				if (!v) {
+					console.log("SADASD");
+				}
 
 				if (!v._type) return v;
 
@@ -259,9 +294,9 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 						//If mapping contains a `expand` directive, create a new, possibly multivalued, field named: <prop>#expanded. 
 						//E.g.: location#expanded
-						if (esMappingObj && esMappingObj.expand) {
+						if (erdMappingObj && erdMappingObj.expand) {
 
-							var expandObj = esMappingObj.expand;
+							var expandObj = erdMappingObj.expand;
 
 							//fetch the reference and only keep the `fields` defined.
 							var ref = resolvedRefMap[v];
@@ -351,8 +386,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 				if (v === undefined) return undefined;
 
-				if (!esMappingObj) return v; //TODO: 8 feb 2016 - unsure if this should be here?
-				if (esMappingObj.exclude) return undefined;
+				if (!erdMappingObj) return v; //no mapping object so no transformers, vocab lookup, etc.
+				if (erdMappingObj.exclude) return undefined;
 
 				if (!typechain) {
 					throw new Error("sanity check: 'typechain' not defined on applyTransformOrInspectNestedAttribs");
@@ -360,9 +395,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				return Promise.resolve()
 					.then(function transformOrRecurseOnValueTransformOrRecurse() {
 
-						if (esMappingObj.transform) {
-							return _doESTransform(v, esMappingObj.transform);
+						if (erdMappingObj.transform) {
+							//we either do a transform, and then don't try to recurse anymore (since transform can alter at will, 
+							//which will make tranform on child-properties moot).. 
+							return _doESTransform(v, erdMappingObj.transform);
 						} else if (_.isObject(v)) {
+							// .. or no transform specified and we recurse properties
 							return toERDRecursive(v, typechain, resolvedRefMap);
 						} else {
 							return v;
@@ -371,7 +409,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					.then(function transformOrRecurseOnValueVocabLookup(v) {
 
 						return _doVocabLookup(v, _.extend({
-							transformer: esMappingObj.transform
+							transformer: erdMappingObj.transform
 						}, argObj));
 
 					});
@@ -483,21 +521,21 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			transformer = argObj.transformer;
 
 		// Vocabulary lookups. 
-		var esMappingObj = erdMappingConfig.properties[k]; //exists based on calling logic
-		if (esMappingObj.enum) {
+		var erdMappingObj = erdMappingConfig.properties[k] || erdMappingConfig.propertiesCalculated[k]; //exists based on calling logic
+		if (erdMappingObj.enum) {
 
 			//It's safe to make array, bc: enum -> prop is multivalued
 			//resulting array is later flatmapped into overall result
 			v = _.isArray(v) ? v : [v];
 
 			//e.g.: ["Movie"]
-			var typesForThisEnum = _.intersection(_.keys(esMappingObj.enum.sourceMappings), typechain);
+			var typesForThisEnum = _.intersection(_.keys(erdMappingObj.enum.sourceMappings), typechain);
 
 			v = _.reduce(v, function _doVocabLookupReduce(arr, val) {
 
 				//do a vocab lookup
 				val = _.reduce(typesForThisEnum, function _doVocabLookupReducePerSingleVal(arr, typeName) {
-					var valueMapForType = esMappingObj.enum.sourceMappings[typeName];
+					var valueMapForType = erdMappingObj.enum.sourceMappings[typeName];
 					return arr.concat(valueMapForType[val] || []);
 				}, []);
 
@@ -509,6 +547,19 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			}, []);
 
 			v = _.uniq(_.compact(v));
+
+			if (erdMappingObj.enumStrictSingleValued) {
+				if (!v.length) {
+					return undefined;
+				}
+
+				// if (v.length > 1) {
+				// 	console.log("WARN: `enumStrictSingleValued` set but multiple values found after enum, selecting first one (k, values)", k,
+				// 		v.join(","));
+				// }
+
+				return v[0];
+			}
 		}
 		return v;
 	}

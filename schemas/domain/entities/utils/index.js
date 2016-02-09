@@ -504,17 +504,17 @@ module.exports = function(generatedSchemas) {
 					//This property has a `populate`-directive. 
 					//That means it should be populated using other field(s)
 
-					//Prereq: this field must be multivalued.
-					if (erdMappingConfig.propertiesCalculated[propName]) { //calculated field
-						if (!prop.isMulti) {
-							throw new Error("calculated property doesn't define isMulti=true: " + propName);
-						}
-					} else {
-						var propType = generatedSchemas.properties[propName]; //should exist!
-						if (!propType.isMulti) {
-							throw new Error("property doesn't define isMulti=true: " + propName);
-						}
-					}
+					// //Prereq: this field must be multivalued.
+					// if (erdMappingConfig.propertiesCalculated[propName]) { //calculated field
+					// 	if (!prop.isMulti) {
+					// 		throw new Error("calculated property doesn't define isMulti=true: " + propName);
+					// 	}
+					// } else {
+					// 	var propType = generatedSchemas.properties[propName]; //should exist!
+					// 	if (!propType.isMulti) {
+					// 		throw new Error("property doesn't define isMulti=true: " + propName);
+					// 	}
+					// }
 
 					var fields = prop.populate.fields;
 					fieldsArr = _.intersection(_.isArray(fields) ? fields : [fields], propNames);
