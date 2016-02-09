@@ -129,7 +129,7 @@ module.exports = function(generatedSchemas) {
 	//- location.name -> pointing to location name
 	//- location.containedInPlace.name -> pointing to name of containedInPlace for location
 	//
-	function getPathForCompoundKey(root, propNameArr) {
+	function getPathForCompoundKey(root, propNameArr, objSupported) {
 
 		//TECH: at the moment we only resolve these properties if there's an expansion defined to get to them.
 		//I.e.: only if we need 1 query do we allow the key to be defined. 
@@ -144,22 +144,27 @@ module.exports = function(generatedSchemas) {
 			throw new Error("magic path lookup not implemented yet. I.e.: specifycing `location` on CreativeWork, would go through Event");
 		}
 
-
 		if (prop.isValueObject) {
 
 			if (!propNameArr.length) {
-				//e.g.: location.aggregateRating = {..} not supported yet. 
-				//Instead use 
+
+				// For normal filters: eg: location.aggregateRating = {..} not supported yet. 
+
+				//..exceptions should inject `objSupported`
+				if (objSupported) { //e.g.: spatial lookup on `geo`
+					return (prop.path ? prop.path + "." : "") + propName;
+				}
+
 				throw new Error("path ending in ValueObject isn't supported (yet): " + propName);
 			}
 			//e.g.: aggregatedValue.ratingValue
 			//We return the path is it would have been returned for `ratingValue`
-			return getPathForCompoundKey(root, propNameArr);
+			return getPathForCompoundKey(root, propNameArr, objSupported);
 		}
 
 		var path = (prop.path ? prop.path + "." : "") + propName; //possibly a valueObject
 
-		//we reached the end of the path
+		//we reached the tail
 		if (!propNameArr.length) return path;
 
 		if (!prop.isEntity) return undefined; //no ValueObject and no Entity -> dot-separation not supported.
@@ -167,7 +172,7 @@ module.exports = function(generatedSchemas) {
 		//expand not defined which should be the case by now
 		if (!prop.expand) return undefined;
 
-		return path + (prop.expand.flatten ? "--" : "--expand.") + getPathForCompoundKey(prop.rootName, propNameArr);
+		return path + (prop.expand.flatten ? "--" : "--expand.") + getPathForCompoundKey(prop.rootName, propNameArr, objSupported);
 
 		//NOTE: again, LATER ON we allow resolving other related entities in a multi-stage lookup
 	}
@@ -176,6 +181,10 @@ module.exports = function(generatedSchemas) {
 	function performSpatialPointQuery(options, path) {
 
 		if (!options.geo) throw new Error("need `options.geo` for spatial type: nearPoint");
+
+		path = path ? path + ".geo" : "geo"; //add `geo` to path if defined                  	               
+
+		path = getPathForCompoundKey(options._root, path.split("."), true);
 
 		var query = {
 			geo_distance: {
@@ -203,6 +212,11 @@ module.exports = function(generatedSchemas) {
 		if (!options.id && !options.name) {
 			throw new Error("need options.id or options.name for spatial type: location or containedInPlace");
 		}
+
+		path = path ? path + "." + options._type : options._type; //add `location` or `containedInPlace` to path
+		path += options.name ? ".name" : ""; //add `name` to path if defined, otherwise leave as is.                          	               
+
+		path = getPathForCompoundKey(options._root, path.split("."));
 
 		var query = {
 			match: {}
