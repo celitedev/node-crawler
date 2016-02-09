@@ -121,15 +121,13 @@ FilterQuery.prototype.getSpatial = function() {
 
 	if (!this.spatial.type) throw new Error("Spatial query needs `type` property");
 	if (!this.spatial.options) throw new Error("Spatial query needs `options` property");
-	if (!this.spatial.path) throw new Error("Spatial query needs `path` property");
 
-	var options = this.spatial.options,
-		type = this.spatial.type,
-		path = filterQueryUtils.getPathForCompoundKey(this.getRoot(), this.spatial.path.split(".")),
-		query;
+	var options = this.spatial.options;
 
+	options._root = this.getRoot();
+	options._type = this.spatial.type;
 
-	if (type === "nearUser") {
+	if (options._type === "nearUser") {
 		if (!this.meta || !this.meta.user || !this.meta.user.geo) {
 			throw new Error("need meta.user.geo for spatial type: nearUser");
 		}
@@ -137,13 +135,13 @@ FilterQuery.prototype.getSpatial = function() {
 		type = "nearPoint";
 	}
 
-	switch (type) {
+	switch (options._type) {
 		case "nearPoint":
-			return filterQueryUtils.performSpatialPointQuery(options, path);
+			return filterQueryUtils.performSpatialPointQuery(options, this.spatial.path);
 		case "location":
-			return filterQueryUtils.performSpatialLookupQuery(options, path);
+			return filterQueryUtils.performSpatialLookupQuery(options, this.spatial.path);
 		case "containedInPlace":
-			return filterQueryUtils.performSpatialLookupQuery(options, path);
+			return filterQueryUtils.performSpatialLookupQuery(options, this.spatial.path);
 		default:
 			throw new Error("spatial type not supported: " + type);
 	}
