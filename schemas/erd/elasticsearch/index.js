@@ -85,7 +85,7 @@ module.exports = function(generatedSchemas) {
 				exclude: false,
 				expand: {
 					fields: ["name", "geo", "containedInPlace", "containedInPlace--name"],
-					postPruneFields: ["containedInPlace"], //used to create containedInPlace--name
+					// postPruneFields: ["containedInPlace"], //used to create containedInPlace--name
 					includeId: false,
 				}
 			},
@@ -146,6 +146,10 @@ module.exports = function(generatedSchemas) {
 			},
 
 		},
+
+		defaultPropertyRelations: {
+
+		}
 	};
 
 	//Need for singleton (instead of local copy) 
