@@ -122,7 +122,6 @@ module.exports = function(generatedSchemas) {
 	}
 
 
-
 	//filter keys may specify proper paths as follows: 
 	//
 	//- location -> pointing to property location
@@ -174,13 +173,60 @@ module.exports = function(generatedSchemas) {
 	}
 
 
+	function performSpatialPointQuery(options, path) {
+
+		if (!options.geo) throw new Error("need `options.geo` for spatial type: nearPoint");
+
+		var query = {
+			geo_distance: {
+				distance: options.distance || "2km",
+
+				//https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-distance.html
+				//Faster lookups. This is ok since we're searching really close so can treat earth as a plane
+				"distance_type": "plane",
+			}
+		};
+
+		query.geo_distance[path] = options.geo;
+
+		return {
+			query: {
+				bool: {
+					must: wrapWithNestedQueryIfNeeed(query, path)
+				}
+			}
+		};
+	}
+
+	function performSpatialLookupQuery(options, path) {
+
+		if (!options.id && !options.name) {
+			throw new Error("need options.id or options.name for spatial type: location or containedInPlace");
+		}
+
+		var query = {
+			match: {}
+		};
+
+		query.match[path] = {
+			query: options.name || options.id,
+			operator: "and"
+		};
+
+		return {
+			query: {
+				bool: {
+					must: wrapWithNestedQueryIfNeeed(query, path)
+				}
+			}
+		};
+	}
 
 	function performTextQuery(v, k) {
 
 		var matchQuery = {
 			match: {}
 		};
-
 		matchQuery.match[k] = {
 			query: v,
 
@@ -192,6 +238,7 @@ module.exports = function(generatedSchemas) {
 			//- https://www.elastic.co/guide/en/elasticsearch/guide/current/bool-query.html#_controlling_precision
 			operator: "and"
 		};
+
 		return wrapWithNestedQueryIfNeeed(matchQuery, k);
 	}
 
@@ -202,9 +249,7 @@ module.exports = function(generatedSchemas) {
 		var rangeQuery = {
 			range: {}
 		};
-
 		rangeQuery.range[k] = v;
-
 
 		return wrapWithNestedQueryIfNeeed(rangeQuery, k);
 	}
@@ -214,107 +259,19 @@ module.exports = function(generatedSchemas) {
 		var rangeQuery = {
 			range: {}
 		};
-
 		rangeQuery.range[k] = v;
-
 
 		return wrapWithNestedQueryIfNeeed(rangeQuery, k);
 	}
 
-	var spatialHelpers = {
-		findDefaultPath: function findDefaultPath(command) {
-			var path;
-			//Find default path given context.
-			switch (command.type) {
-				case "location":
-					switch (command.root) {
-						case "Event":
-							path = "location";
-							break;
-						case "OrganizationAndPerson":
-							path = "inverse--performer.location";
-							break;
-						case "CreativeWork":
-							path = "inverse--workFeatured.location";
-							break;
-						default:
-							throw new Error("spatial type `location` is not supported for root: " + command.root);
-					}
-					break;
-				case "nearPoint":
-					switch (command.root) {
-						case "Event":
-							path = "location";
-							break;
-						case "Place":
-							path = "";
-							break;
-						case "PlaceWithOpeninghours":
-							path = "";
-							break;
-						case "OrganizationAndPerson":
-							path = "inverse--performer.location";
-							break;
-						case "CreativeWork":
-							path = "inverse--workFeatured.location";
-							break;
-						default:
-							throw new Error("spatial type `nearPoint` is not supported for root: " + command.root);
-					}
-					break;
-
-					// case "nearLocation":
-					// 	switch (command.root) {
-					// 		case "Event":
-					// 			path = "location";
-					// 			break;
-					// 		case "OrganizationAndPerson":
-					// 			path = "inverse--performer.location";
-					// 			break;
-					// 		case "CreativeWork":
-					// 			path = "inverse--workFeatured.location";
-					// 			break;
-					// 		default:
-					// 			throw new Error("spatial type `nearLocation` is not supported for root: " + command.root);
-					// 	}
-					// 	break;
-				case "containedInPlace":
-					switch (command.root) {
-						case "Event":
-							path = "location--expand.containedInPlace";
-							break;
-						case "Place":
-							path = "containedInPlace";
-							break;
-						case "PlaceWithOpeninghours":
-							path = "containedInPlace";
-							break;
-						case "OrganizationAndPerson":
-							path = "inverse--performer.location--expand.containedInPlace";
-							break;
-						case "CreativeWork":
-							path = "inverse--workFeatured.location--expand.containedInPlace";
-							break;
-						default:
-							throw new Error("spatial type `containedInPlace` is not supported for root: " + command.root);
-					}
-					break;
-				default:
-					throw new Error("spatial type not supported: " + command.type);
-			}
-
-			return path;
-		}
-	};
-
-
 	return {
-		spatialHelpers: spatialHelpers,
 		performTemporalQuery: performTemporalQuery,
 		performRangeQuery: performRangeQuery,
 		performTextQuery: performTextQuery,
+		performSpatialPointQuery: performSpatialPointQuery,
+		performSpatialLookupQuery: performSpatialLookupQuery,
 		getPathForCompoundKey: getPathForCompoundKey,
-		wrapWithNestedQueryIfNeeed: wrapWithNestedQueryIfNeeed
+		wrapWithNestedQueryIfNeeed: wrapWithNestedQueryIfNeeed,
 	};
 
 };

@@ -121,100 +121,32 @@ FilterQuery.prototype.getSpatial = function() {
 
 	if (!this.spatial.type) throw new Error("Spatial query needs `type` property");
 	if (!this.spatial.options) throw new Error("Spatial query needs `options` property");
+	if (!this.spatial.path) throw new Error("Spatial query needs `path` property");
 
-	var options = this.spatial.options;
-
-	var command = {
-		path: options._path,
-		options: options,
-		queryVal: undefined,
-		type: this.spatial.type,
-		root: this.getRoot()
-	};
+	var options = this.spatial.options,
+		type = this.spatial.type,
+		path = filterQueryUtils.getPathForCompoundKey(this.getRoot(), this.spatial.path.split(".")),
+		query;
 
 
-	if (command.type === "nearUser") {
+	if (type === "nearUser") {
 		if (!this.meta || !this.meta.user || !this.meta.user.geo) {
 			throw new Error("need meta.user.geo for spatial type: nearUser");
 		}
-		command.options.geo = this.meta.user.geo;
-		command.type = "nearPoint";
+		options.geo = this.meta.user.geo;
+		type = "nearPoint";
 	}
 
-	//////////////
-	//Find default path //
-	//////////////
-	command.path = options._path || filterQueryUtils.spatialHelpers.findDefaultPath(command);
-
-	switch (command.type) {
-
-		case "location":
-			if (!command.options.id && !command.options.name) {
-				throw new Error("need id or name for spatial type: Location");
-			}
-			command.path = command.options.name ? command.path + "--expand.name" : command.path;
-
-			command.query = {
-				match: {}
-			};
-
-			command.query.match[command.path] = {
-				query: command.options.name || command.options.id,
-				operator: "and"
-			};
-
-			break;
-
-
-		case "containedInPlace":
-			if (!command.options.id && !command.options.name) throw new Error("need id or name for spatial type: containedInPlace");
-			command.path = command.options.name ? command.path + "--name" : command.path;
-
-			command.query = {
-				match: {}
-			};
-
-			command.query.match[command.path] = {
-				query: command.options.name || command.options.id,
-				operator: "and"
-			};
-
-			break;
-
-
+	switch (type) {
 		case "nearPoint":
-			if (!command.options.geo) throw new Error("need geo for spatial type: nearPoint");
-
-			//if path is "" , we're on a Place|PlacewithOpeninghours so can ask directly
-			//Otherwise, it's on the expanded object
-			command.path += command.path ? "--expand.geo" : "geo";
-
-			command.query = {
-				geo_distance: {
-					distance: command.options.distance || "2km",
-
-					//https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-distance.html
-					//Faster lookups. This is ok since we're searching really close so can treat earth as a plane
-					"distance_type": "plane",
-				}
-			};
-
-			command.query.geo_distance[command.path] = command.options.geo;
-			break;
-
+			return filterQueryUtils.performSpatialPointQuery(options, path);
+		case "location":
+			return filterQueryUtils.performSpatialLookupQuery(options, path);
+		case "containedInPlace":
+			return filterQueryUtils.performSpatialLookupQuery(options, path);
 		default:
-			throw new Error("spatial type not implemented: " + command.type);
+			throw new Error("spatial type not supported: " + type);
 	}
-
-
-
-	return {
-		query: {
-			bool: {
-				must: filterQueryUtils.wrapWithNestedQueryIfNeeed(command.query, command.path)
-			}
-		}
-	};
 };
 
 
