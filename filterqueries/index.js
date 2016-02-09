@@ -14,7 +14,7 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 
 
 var config = require("../config");
-var esMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
+var erdMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 var domainConfig = require("../schemas/domain/_definitions/config");
 var esConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 

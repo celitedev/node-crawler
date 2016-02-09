@@ -14,7 +14,7 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 	schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
 });
 
-var esMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
+var erdMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 
 var client = new elasticsearch.Client(config.elasticsearch);
 
@@ -61,10 +61,9 @@ Promise.resolve()
 
 		var nonExistPropNames = [],
 			enumOnNonDatatypes = [],
-			enumNotMultivalued = [],
 			populateNotMultivalued = [];
 
-		_.each(_.keys(esMappingConfig.properties), function(propName) {
+		_.each(_.keys(erdMappingConfig.properties), function(propName) {
 			if (!~_.keys(generatedSchemas.properties).indexOf(propName)) {
 				nonExistPropNames.push(propName);
 			} else {
@@ -81,31 +80,25 @@ Promise.resolve()
 					}
 				}
 
-				if (!prop.isMulti) {
-					if (prop.enum) {
-						enumNotMultivalued.push(propName);
-					}
-					if (prop.populate) {
-						populateNotMultivalued.push(propName);
-					}
-				}
+				// if (!prop.isMulti) {
+				// 	if (prop.populate) {
+				// 		populateNotMultivalued.push(propName);
+				// 	}
+				// }
 
 			}
 		});
 
-		//test for calculated fields that define enum -> should be isMulti=true
-		_.each(esMappingConfig.propertiesCalculated, function(prop, propName) {
+		// //test for calculated fields that define enum -> should be isMulti=true
+		// _.each(erdMappingConfig.propertiesCalculated, function(prop, propName) {
 
-			if (!prop.isMulti) {
-				if (prop.enum) {
-					enumNotMultivalued.push(propName);
-				}
-				if (prop.populate) {
-					populateNotMultivalued.push(propName);
-				}
-			}
+		// 	if (!prop.isMulti) {
+		// 		if (prop.populate) {
+		// 			populateNotMultivalued.push(propName);
+		// 		}
+		// 	}
 
-		});
+		// });
 
 		if (nonExistPropNames.length) {
 			throw new Error("ES property doesn't exit in definitions. " +
@@ -119,20 +112,13 @@ Promise.resolve()
 				enumOnNonDatatypes.join(","));
 		}
 
-		if (enumNotMultivalued.length) {
-			throw new Error("ES property with 'enum' exists on singlevalued property: " +
-				enumNotMultivalued.join(","));
-		}
-
-
-		if (populateNotMultivalued.length) {
-			throw new Error("ES property with 'populate' exists on singlevalued property: " +
-				populateNotMultivalued.join(","));
-		}
-
+	if (populateNotMultivalued.length) {
+		throw new Error("ES property with 'populate' exists on singlevalued property: " +
+			populateNotMultivalued.join(","));
+	}
 
 		//test / normalize all enums
-		var allProps = _.extend({}, esMappingConfig.properties, esMappingConfig.propertiesCalculated);
+		var allProps = _.extend({}, erdMappingConfig.properties, erdMappingConfig.propertiesCalculated);
 
 		_.each(allProps, function(prop, propName) {
 			if (!prop.enum) return;
@@ -228,7 +214,7 @@ function createIndexMapping(mapping, root) {
 	//- true -> belong to any root
 	//- string || [string]  
 	var allPropertyNames = _.keys(generatedSchemas.properties);
-	var calculatedProps = esMappingConfig.propertiesCalculated;
+	var calculatedProps = erdMappingConfig.propertiesCalculated;
 
 	var existingProps = _.intersection(allPropertyNames, _.keys(calculatedProps));
 	if (existingProps.length) {
@@ -252,7 +238,7 @@ function isNestedMapping(mapping) {
 
 function addPropertyMapping(propName, agg) {
 
-	var propESObj = esMappingConfig.properties[propName] || esMappingConfig.propertiesCalculated[propName];
+	var propESObj = erdMappingConfig.properties[propName] || erdMappingConfig.propertiesCalculated[propName];
 	var propType = generatedSchemas.properties[propName]; //NOTE: doesn't exist in case of calculated prop.
 
 	if (propESObj) {
@@ -322,7 +308,7 @@ function addPropertyMapping(propName, agg) {
 				index: 'not_analyzed'
 			};
 
-			propESObj = esMappingConfig.properties[propName];
+			propESObj = erdMappingConfig.properties[propName];
 
 			//Extend with mappingExpanded, i.e.: a bunch of fields to include/expand a reference with
 			if (propESObj && propESObj.expand) {
@@ -342,7 +328,7 @@ function addPropertyMapping(propName, agg) {
 							name = name.substring(name.indexOf("--") + 2);
 						}
 
-						var fieldESObj = esMappingConfig.properties[name];
+						var fieldESObj = erdMappingConfig.properties[name];
 						if (fieldESObj && fieldESObj.mapping) {
 							agg[fieldName] = fieldESObj.mapping;
 						}
@@ -352,7 +338,7 @@ function addPropertyMapping(propName, agg) {
 				} else {
 
 					out = _.reduce(propESObj.expand.fields, function(agg, fieldName) {
-						var fieldESObj = esMappingConfig.properties[fieldName];
+						var fieldESObj = erdMappingConfig.properties[fieldName];
 						if (fieldESObj && fieldESObj.mapping) {
 							agg[propName + "--" + fieldName] = fieldESObj.mapping;
 						}

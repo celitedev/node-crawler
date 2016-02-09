@@ -42,7 +42,6 @@ module.exports = function(generatedSchemas) {
 				enum: vocabs.genre
 			},
 
-
 			subtypes: {
 
 				// enum: {
@@ -134,6 +133,17 @@ module.exports = function(generatedSchemas) {
 		},
 
 		propertiesCalculated: {
+
+			testbla: {
+				roots: true, //true (all) or (array of) rootNames
+				isMulti: false,
+				enum: vocabs.genre,
+				enumStrictSingleValued: true, //enum can mess up single-valued-ness.
+				populate: {
+					fields: "genre",
+				},
+			},
+
 
 			all_subtypes: {
 				roots: true, //true (all) or (array of) rootNames

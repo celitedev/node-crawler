@@ -4,6 +4,7 @@ var redis = require("redis");
 var Promise = require("bluebird");
 var uuid = require("uuid");
 var elasticsearch = require('elasticsearch');
+var colors = require("colors");
 
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 	checkSoundness: true,
@@ -18,7 +19,7 @@ var domainConfig = require("../schemas/domain/_definitions/config");
 var config = require("../config");
 var r = require('rethinkdbdash')(config.rethinkdb);
 
-var esMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
+var erdMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 
 var domainUtils = require("../schemas/domain/utils");
 var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
@@ -40,6 +41,7 @@ var data = _.cloneDeep({
 	time: {
 		getEntities: 0,
 		fetchRefs: 0,
+		createDTOS: 0,
 		populateRethinkERD: 0,
 		populateES: 0,
 		updateStateOfEntities: 0
@@ -54,13 +56,25 @@ Promise.resolve()
 
 		_.each(roots, entityUtils.calcPropertyOrderToPopulate);
 
-		var allProps = _.extend({}, esMappingConfig.properties, esMappingConfig.propertiesCalculated);
+		var allProps = _.extend({}, erdMappingConfig.properties, erdMappingConfig.propertiesCalculated);
 
 		///
 		///Enum-config is normalized. 
 		///
 		///- add lowercase to `transform` 
 		_.each(allProps, function(prop, propName) {
+
+
+			//set isMulti for all erd-properties
+			if (erdMappingConfig.properties[propName]) {
+				if (prop.isMulti !== undefined) throw new Error("isMulti not allowed on ERD-properties, unless they're calculated: " + propName);
+				var propDef = generatedSchemas.properties[propName];
+				if (!propDef) throw new Error("non-calculated ERD-poprety should be defined in domain: " + propName);
+				prop.isMulti = !!propDef.isMulti;
+			} else {
+				//calculated ERD field
+				prop.isMulti = !!prop.isMulti; //make false explicit as well to be clear
+			}
 
 			if (!prop.enum) return;
 
@@ -80,9 +94,40 @@ Promise.resolve()
 
 				return Promise.resolve()
 					.then(function fetchRows() {
-						return tableCanonicalEntity.getAll(true, {
+
+						// var .filter(r.row('_type').contains("Movie"))
+						var getAll = tableCanonicalEntity.getAll(true, {
 							index: "modifiedERD"
-						}).limit(data.state.batch);
+						});
+
+						if (argv.type) {
+							console.log(("Only processing: + " + argv.type).yellow);
+							getAll = getAll.filter(r.row('_type').contains(argv.type));
+						}
+
+						return Promise.resolve()
+							.then(function resetStateWhenTesting() {
+								if (argv.reset) {
+									console.log(("Resetting _state.modifiedERD for testing").yellow);
+
+									if (!argv.type) {
+										return tableCanonicalEntity.update({
+											_state: {
+												modifiedERD: null
+											}
+										});
+									} else {
+										return tableCanonicalEntity.filter(r.row('_type').contains(argv.type)).update({
+											_state: {
+												modifiedERD: null
+											}
+										});
+									}
+								}
+							})
+							.then(function() {
+								return getAll.limit(data.state.batch);
+							});
 					})
 					.then(function createCanonicalEntities(results) {
 
