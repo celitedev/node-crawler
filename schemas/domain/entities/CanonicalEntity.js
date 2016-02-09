@@ -139,16 +139,12 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			throw new Error("toERDRecursive expects arg 'typechain'");
 		}
 
-		var noExpand = resolvedRefMap === true;
-
 		typechain = _.isArray(typechain) ? typechain : [typechain];
 
 		return Promise.resolve()
 			.then(function toERDRecursiveFetchRefsIfNeeded() {
 
-				if (noExpand === true) {
-					return undefined;
-				} else if (!resolvedRefMap) {
+				if (!resolvedRefMap) {
 					return fetchRefs(properties);
 				} else {
 					return resolvedRefMap;
@@ -169,8 +165,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 						k: k,
 						expandMapToInclude: expandMapToInclude,
 						typechain: typechain,
-						resolvedRefMap: resolvedRefMap,
-						noExpand: noExpand
+						resolvedRefMap: resolvedRefMap
 					};
 
 					return Promise.resolve()
@@ -232,7 +227,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 		var expandMapToInclude = argObj.expandMapToInclude;
 		var typechain = argObj.typechain;
 		var resolvedRefMap = argObj.resolvedRefMap;
-		var noExpand = argObj.noExpand;
 
 		var esMappingObj = erdMappingConfig.properties[k];
 
@@ -248,7 +242,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				if (propType.isValueObject) {
 					//recurse non-datatypes
 					//We've already resolved references for all valueObjects.
-					return toERDRecursive(v, typechain, noExpand || resolvedRefMap);
+					return toERDRecursive(v, typechain, resolvedRefMap);
 				} else if (v._ref) {
 					return undefined; //skip all non-resolved refs. 
 				} else {
@@ -258,7 +252,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			.then(function erdExpandSingleItem(v) {
 
 				if (v === undefined) return undefined;
-				if (noExpand) return v;
 
 				return Promise.resolve()
 					.then(function() {
@@ -370,7 +363,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 						if (esMappingObj.transform) {
 							return _doESTransform(v, esMappingObj.transform);
 						} else if (_.isObject(v)) {
-							return toERDRecursive(v, typechain, noExpand || resolvedRefMap);
+							return toERDRecursive(v, typechain, resolvedRefMap);
 						} else {
 							return v;
 						}

@@ -39,10 +39,8 @@ var data = _.cloneDeep({
 	},
 	time: {
 		getEntities: 0,
-		createRethinkDTOs: 0,
-		populateRethinkERD: 0,
 		fetchRefs: 0,
-		createDTOS: 0,
+		populateRethinkERD: 0,
 		populateES: 0,
 		updateStateOfEntities: 0
 	}
@@ -114,28 +112,6 @@ Promise.resolve()
 			.then(function resetDataObject(entities) {
 				data.entities = entities;
 			})
-			.then(function createRethinkDTOs() {
-				var start = new Date().getTime();
-
-				return Promise.all(_.map(data.entities, function(entity) {
-					return entity.toERDObject(true);
-				})).then(function(dtos) {
-					data.time.createRethinkDTOs += new Date().getTime() - start;
-					return dtos;
-				});
-			})
-			.then(function populateRethinkERD(dtos) {
-				var start = new Date().getTime();
-				return Promise.resolve()
-					.then(function() {
-						return tableERDEntity.insert(dtos, {
-							conflict: "update"
-						});
-					})
-					.then(function() {
-						data.time.populateRethinkERD += new Date().getTime() - start;
-					});
-			})
 			.then(function fetchRefs() {
 
 				var start = new Date().getTime();
@@ -159,6 +135,51 @@ Promise.resolve()
 					data.time.createDTOS += new Date().getTime() - start;
 					return dtos;
 				});
+			})
+			.then(function populateRethinkERD(dtos) {
+				var start = new Date().getTime();
+				return Promise.resolve()
+					.then(function() {
+
+						function recurseObjectToRemoveExpandKeys(dto) {
+
+							//dtos to rethink are the ES dtos with --expand + --* removed
+							return _.reduce(dto, function(agg, v, k) {
+
+								if (!~k.indexOf("--")) { //only keep stuff for which key doesn't have '--'
+									if (_.isArray(v)) {
+
+										v = _.compact(_.map(v, function(singleItem) {
+											var obj = _.isObject(singleItem) ? recurseObjectToRemoveExpandKeys(singleItem) : singleItem;
+											return _.size(obj) ? obj : undefined;
+										}));
+
+										v = _.size(v) ? v : undefined;
+
+									} else {
+										v = _.isObject(v) ? recurseObjectToRemoveExpandKeys(v) : v;
+									}
+									if (v !== undefined) {
+										agg[k] = v;
+									}
+								}
+
+								return agg;
+							}, {});
+						}
+
+						var dtosRethink = _.map(_.cloneDeep(dtos), recurseObjectToRemoveExpandKeys);
+
+						return tableERDEntity.insert(dtosRethink, {
+							conflict: "update"
+						});
+					})
+					.then(function() {
+						data.time.populateRethinkERD += new Date().getTime() - start;
+					})
+					.then(function passDTOsToES() {
+						return dtos;
+					});
 			})
 			.then(function populateES(dtos) {
 
