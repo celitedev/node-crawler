@@ -17,7 +17,8 @@ module.exports = function(generatedSchemas) {
 	var vocabs = _.reduce(glob.sync(path.resolve(__dirname, "vocabs") + "**/**/*.js"), function(vocabs, file) {
 		var vocabName = file.substring(file.lastIndexOf("/") + 1, file.lastIndexOf("."));
 		if (vocabName === "index") return vocabs; //skip this index file
-		vocabs[vocabName] = require(file);
+		var vocabOrFN = require(file);
+		vocabs[vocabName] = _.isFunction(vocabOrFN) ? vocabOrFN(generatedSchemas) : vocabOrFN;
 		return vocabs;
 	}, {});
 
