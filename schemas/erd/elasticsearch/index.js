@@ -43,34 +43,7 @@ module.exports = function(generatedSchemas) {
 			},
 
 			subtypes: {
-
-				// enum: {
-				// 	type: "static", //alternative: elasticsearch index/type
-
-				// 	options: {
-
-				// 		//pass-along all types verbatim
-				// 		//these are lookedup + stored lowercase
-				// 		verbatim: _.keys(generatedSchemas.types),
-
-				// 		//keys (to which input is matched) as well as 'out' 
-				// 		//are stored in matched / stored in lowercase
-				// 		values: {
-				// 			"MovieTheater": {
-				// 				out: "movie theater",
-				// 				limitToTypes: "LocalBusiness"
-				// 			},
-				// 			"pianoBar": "piano bar",
-				// 			"BarOrPub": {
-				// 				out: ["bar", "pub"],
-				// 				schemaOrg: { //if a schema.org match exists for this enumeration-value list it here
-				// 					type: "type", //the type of schema.org structure: e.g.: a Type with subtypes
-				// 					name: "BarOrPub" //type name
-				// 				}
-				// 			}
-				// 		}
-				// 	}
-				// }
+				enum: vocabs.subtypes
 			},
 
 			ratingValue: {
