@@ -14,61 +14,23 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
 
 
 var config = require("../config");
-var erdMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
-var domainConfig = require("../schemas/domain/_definitions/config");
-var esConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
-
-var domainUtils = require("../schemas/domain/utils");
-var rootUtils = require("../schemas/domain/utils/rootUtils")(generatedSchemas);
-
-
-var entityUtils = require("../schemas/domain/entities/utils");
-
-
 
 //Rethink
 var r = require('rethinkdbdash')(config.rethinkdb);
+var domainUtils = require("../schemas/domain/utils");
 var erdEntityTable = r.table(domainUtils.statics.ERDTABLE);
-
-var entities = require("../schemas/domain/entities")(generatedSchemas, r);
-var CanonicalEntity = entities.CanonicalEntity;
-
 
 //Elasticsearch 
 var client = new elasticsearch.Client(config.elasticsearch);
 
 
-//Get all possible properties per root (including the properties defined on subtypes of said root)
-//Format: 
-//
-//Place: {
-//	gender: "Text"
-//}
-//
-//Later on we want to extend this with: 
-//- type for ES calc fields
-//- ways to see if we can do range queries (either ordinal OR number)
-//- ...
+//DomainConfig
+var domainConfig = require("../schemas/domain/_definitions/config");
 var roots = domainConfig.domain.roots;
-var rootPropertyMap = _.reduce(roots, function(agg, root) {
-
-	var calcPropNamesForRoot = _.reduce(esConfig.propertiesCalculated, function(agg2, calcProp, name) {
-		var roots = _.isArray(calcProp.roots) ? calcProp.roots : [calcProp.roots];
-		if (calcProp.roots === true || ~roots.indexOf(root)) {
-			agg2[name] = _.pick(calcProp, "isMulti");
-		}
-		return agg2;
-	}, {});
-
-	agg[root] = _.extend(_.reduce(rootUtils.getPropertyMapForType(root, roots), function(agg2, v, k) {
-		var key = k.substring(k.indexOf(".") + 1);
-		agg2[key] = _.pick(generatedSchemas.properties[key], "isMulti");
-		return agg2;
-	}, {}), calcPropNamesForRoot);
 
 
-	return agg;
-}, {});
+//FilterQueryUtils
+var filterQueryUtils = require("./utils")(generatedSchemas);
 
 
 /////////////
@@ -86,8 +48,6 @@ app.use(methodOverride());
 app.get('/', function(req, res) {
 	res.send('Use POST silly');
 });
-
-
 
 var SortObject = t.struct({
 	type: t.String,
@@ -134,90 +94,6 @@ FilterQuery.prototype.getESIndex = function() {
 };
 
 
-function wrapWithNestedQueryIfNeeed(query, k) {
-
-	var nestedQ = {
-		"nested": {
-			"query": {}
-		}
-	};
-
-	var EXPAND_NEEDLE = "--expand";
-
-	//calculate if we've got an expanded query going on.
-	var expandObjNeedle = k.indexOf(EXPAND_NEEDLE);
-	if (expandObjNeedle === -1) {
-
-		//no expanded query: just return an ordinary range query
-		return query;
-	}
-
-	//We're talking majestic expanded objects here. 
-	//In Elasticsearch these are respresented as so-called nested objects, 
-	//which require a specific way of querying. 
-	//See: https://www.elastic.co/guide/en/elasticsearch/guide/current/nested-query.html
-
-	if (k.substring(0, expandObjNeedle).indexOf(".") !== -1) {
-		//Found expanded object but path doesn't start with it. 
-		//e.g.: test.workfeatured--expand
-		throw new Error("expanded object should be at beginning of query: " + k);
-	}
-
-	//nested path = name of expanded object, e.g.: workFeatured--expand
-	nestedQ.nested.path = k.substring(0, expandObjNeedle + EXPAND_NEEDLE.length);
-	nestedQ.nested.query = query;
-
-	return nestedQ;
-}
-
-
-function performTextQuery(v, k) {
-
-	var matchQuery = {
-		match: {}
-	};
-
-	matchQuery.match[k] = {
-		query: v,
-
-		//this requires all terms to be found. This is default (since only 1 term) for exact matches
-		//and we require this for free text (e.g.: name) as well for now. 
-		//
-		//More info
-		//- https://www.elastic.co/guide/en/elasticsearch/guide/current/match-multi-word.html
-		//- https://www.elastic.co/guide/en/elasticsearch/guide/current/bool-query.html#_controlling_precision
-		operator: "and"
-	};
-	return wrapWithNestedQueryIfNeeed(matchQuery, k);
-}
-
-
-//verbatim copy of range filter structure. Allowed keys: gt, gte, lt, lte
-function performRangeQuery(v, k) {
-
-	var rangeQuery = {
-		range: {}
-	};
-
-	rangeQuery.range[k] = v;
-
-
-	return wrapWithNestedQueryIfNeeed(rangeQuery, k);
-}
-
-function performTemporalQuery(v, k) {
-
-	var rangeQuery = {
-		range: {}
-	};
-
-	rangeQuery.range[k] = v;
-
-
-	return wrapWithNestedQueryIfNeeed(rangeQuery, k);
-}
-
-
 
 FilterQuery.prototype.getTemporal = function() {
 
@@ -230,98 +106,11 @@ FilterQuery.prototype.getTemporal = function() {
 	return {
 		query: {
 			bool: {
-				must: performTemporalQuery(this.temporal, "startDate")
+				must: filterQueryUtils.performTemporalQuery(this.temporal, "startDate")
 			}
 		}
 	};
 
-};
-
-
-var spatialHelpers = {
-	findDefaultPath: function findDefaultPath(command) {
-		var path;
-		//Find default path given context.
-		switch (command.type) {
-			case "location":
-				switch (command.root) {
-					case "Event":
-						path = "location";
-						break;
-					case "OrganizationAndPerson":
-						path = "inverse--performer.location";
-						break;
-					case "CreativeWork":
-						path = "inverse--workFeatured.location";
-						break;
-					default:
-						throw new Error("spatial type `location` is not supported for root: " + command.root);
-				}
-				break;
-			case "nearPoint":
-				switch (command.root) {
-					case "Event":
-						path = "location";
-						break;
-					case "Place":
-						path = "";
-						break;
-					case "PlaceWithOpeninghours":
-						path = "";
-						break;
-					case "OrganizationAndPerson":
-						path = "inverse--performer.location";
-						break;
-					case "CreativeWork":
-						path = "inverse--workFeatured.location";
-						break;
-					default:
-						throw new Error("spatial type `nearPoint` is not supported for root: " + command.root);
-				}
-				break;
-
-				// case "nearLocation":
-				// 	switch (command.root) {
-				// 		case "Event":
-				// 			path = "location";
-				// 			break;
-				// 		case "OrganizationAndPerson":
-				// 			path = "inverse--performer.location";
-				// 			break;
-				// 		case "CreativeWork":
-				// 			path = "inverse--workFeatured.location";
-				// 			break;
-				// 		default:
-				// 			throw new Error("spatial type `nearLocation` is not supported for root: " + command.root);
-				// 	}
-				// 	break;
-			case "containedInPlace":
-				switch (command.root) {
-					case "Event":
-						path = "location--expand.containedInPlace";
-						break;
-					case "Place":
-						path = "containedInPlace";
-						break;
-					case "PlaceWithOpeninghours":
-						path = "containedInPlace";
-						break;
-					case "OrganizationAndPerson":
-						path = "inverse--performer.location--expand.containedInPlace";
-						break;
-					case "CreativeWork":
-						path = "inverse--workFeatured.location--expand.containedInPlace";
-						break;
-					default:
-						throw new Error("spatial type `containedInPlace` is not supported for root: " + command.root);
-				}
-				break;
-			default:
-				throw new Error("spatial type not supported: " + command.type);
-		}
-
-		return path;
-	}
 };
 
 FilterQuery.prototype.getSpatial = function() {
@@ -335,193 +124,27 @@ FilterQuery.prototype.getSpatial = function() {
 
 	var options = this.spatial.options;
 
-	var command = {
-		path: options._path,
-		options: options,
-		queryVal: undefined,
-		type: this.spatial.type,
-		root: this.getRoot()
-	};
+	options._root = this.getRoot();
+	options._type = this.spatial.type;
 
-
-	//type = nearUser
-	//{
-	//   "type": "Event", 
-	//   "wantUnique": false,
-	//   "filter": {
-	//     "subtypes": "ScreeningEvent",
-	//     "workFeatured--expand.name": "Kung Fu Panda 3"
-	//   }, 
-	//   "spatial": {
-	//     "type": "nearUser",
-	//     "options": {
-	//       "distance": "5km"
-	//     }
-	//   },
-	//   "meta": {
-	//     "elasticsearch": {
-	//       "showRaw": true 
-	//     },
-	//     "user": {
-	//       "geo": {
-	//         "lat": 40.7866, 
-	//       	"lon":-73.9776 
-	//       }
-	//     }
-	//   }
-	// }
-	if (command.type === "nearUser") {
+	if (options._type === "nearUser") {
 		if (!this.meta || !this.meta.user || !this.meta.user.geo) {
 			throw new Error("need meta.user.geo for spatial type: nearUser");
 		}
-		command.options.geo = this.meta.user.geo;
-		command.type = "nearPoint";
+		options.geo = this.meta.user.geo;
+		type = "nearPoint";
 	}
 
-	//////////////
-	//Find default path //
-	//////////////
-	command.path = options._path || spatialHelpers.findDefaultPath(command);
-
-	switch (command.type) {
-
-		//type = location
-		// 		{
-		//   "type": "Event", 
-		//   "wantUnique": false,
-		//   "filter": {
-		//     "subtypes": "ScreeningEvent",
-		//     "workFeatured--expand.name": "Kung Fu Panda 3"
-		//   }, 
-		//   "spatial": {
-		//     "type": "location",
-		//     "options": {
-		//       "name": "amc"
-		//     }
-		//   },
-		//   "meta": {
-		//     "elasticsearch": {
-		//       "showRaw": true 
-		//     }
-		//   }
-		// }
-		case "location":
-			if (!command.options.id && !command.options.name) {
-				throw new Error("need id or name for spatial type: Location");
-			}
-			command.path = command.options.name ? command.path + "--expand.name" : command.path;
-
-			command.query = {
-				match: {}
-			};
-
-			command.query.match[command.path] = {
-				query: command.options.name || command.options.id,
-				operator: "and"
-			};
-
-			break;
-
-			//type = containedInPlace
-			//
-			// {
-			//   "type": "Event", 
-			//   "wantUnique": false,
-			//   "filter": {
-			//     "subtypes": "ScreeningEvent",
-			//     "workFeatured--expand.name": "Kung Fu Panda 3"
-			//   }, 
-			//   "spatial": {
-			//     "type": "containedInPlace",
-			//     "options": {
-			//       "name": "new"
-			//     }
-			//   }
-			// }
-		case "containedInPlace":
-			if (!command.options.id && !command.options.name) throw new Error("need id or name for spatial type: containedInPlace");
-			command.path = command.options.name ? command.path + "--name" : command.path;
-
-			command.query = {
-				match: {}
-			};
-
-			command.query.match[command.path] = {
-				query: command.options.name || command.options.id,
-				operator: "and"
-			};
-
-			break;
-
-			//type = nearPoint
-			//{
-			// 		"type": "Event",
-			// 		"wantUnique": false,
-			// 		"filter": {
-			// 			"subtypes": "ScreeningEvent",
-			// 			"workFeatured--expand.name": "Kung Fu Panda 3"
-			// 		},
-			// 		"spatial": {
-			// 			"type": "nearPoint",
-			// 			"options": {
-			// 				"geo": {
-			// 					"lat": 40.7866,
-			// 					"lon": -73.9776
-			// 				},
-			// 				"distance": "5km"
-			// 			}
-			// 		},
-			// 		"meta": {
-			// 			"elasticsearch": {
-			// 				"showRaw": true
-			// 			}
-			// 		}
-			// }
+	switch (options._type) {
 		case "nearPoint":
-			if (!command.options.geo) throw new Error("need geo for spatial type: nearPoint");
-
-			//if path is "" , we're on a Place|PlacewithOpeninghours so can ask directly
-			//Otherwise, it's on the expanded object
-			command.path += command.path ? "--expand.geo" : "geo";
-
-			command.query = {
-				geo_distance: {
-					distance: command.options.distance || "2km",
-
-					//https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-distance.html
-					//Faster lookups. This is ok since we're searching really close so can treat earth as a plane
-					"distance_type": "plane",
-				}
-			};
-
-			command.query.geo_distance[command.path] = command.options.geo;
-			break;
-
-			// case "nearLocation":
-			// 	throw new Error("NearLocation not implemented yet");
-
-			// 	//we need to fetch the geo from the location first, before being able to use it in a nearby query. 
-			// 	//This requires 2 passes right?
-			// 	if (command.options.geo === undefined || command.opions.geo === undefined) {
-			// 		throw new Error("need geo for type: nearLocation");
-			// 	}
-			// 	command.path += "--expand.geo";
-			// 	command.queryVal = command.options.geo;
-			// 	break;
-
+			return filterQueryUtils.performSpatialPointQuery(options, this.spatial.path);
+		case "location":
+			return filterQueryUtils.performSpatialLookupQuery(options, this.spatial.path);
+		case "containedInPlace":
+			return filterQueryUtils.performSpatialLookupQuery(options, this.spatial.path);
 		default:
-			throw new Error("spatial type not implemented: " + command.type);
+			throw new Error("spatial type not supported: " + type);
 	}
-
-
-
-	return {
-		query: {
-			bool: {
-				must: wrapWithNestedQueryIfNeeed(command.query, command.path)
-			}
-		}
-	};
 };
 
 
@@ -543,35 +166,30 @@ FilterQuery.prototype.getFilter = function() {
 	var mustObj = query.query.bool.must = [];
 
 	var root = this.getRoot();
-	var propertiesNotAllowed = [];
 
-	_.each(this.filter, function(v, k) {
+	_.each(this.filter, function(v, compoundKey) {
 
-		var prop = rootPropertyMap[root][k];
+		var path = filterQueryUtils.getPathForCompoundKey(root, compoundKey.split("."));
 
-		//TODO: Disable property checking for now
-		// if (!prop) {
-		// 	return propertiesNotAllowed.push(k);
-		// }
+		if (!path) {
+			throw new Error("following filter key not allowed: " + compoundKey);
+		}
 
+		console.log(path);
 
-		//TODO: realy simple check of typeOfQuery.
-		//We likely want to do: 
-		//- check property type
-		//- based on property type decide candidate queryTypes. 
-		//- based on supplied query decide winner from candidates. 
-		//- error if query isn't supported by property
+		//TODO: #183 - if compoundkey is an entity or valueObject and `v` is an object, allow
+		//deep filtering inside nested object (which is either type = nested (multival) || type=object (singleval))
 
 		var typeOfQuery = _.isObject(v) ? "Range" : "Text";
 		var propFilter;
 
 		switch (typeOfQuery) {
 			case "Text":
-				propFilter = performTextQuery(v, k);
+				propFilter = filterQueryUtils.performTextQuery(v, path);
 				break;
 
 			case "Range":
-				propFilter = performRangeQuery(v, k);
+				propFilter = filterQueryUtils.performRangeQuery(v, path);
 				break;
 		}
 
@@ -579,9 +197,6 @@ FilterQuery.prototype.getFilter = function() {
 		mustObj.push(propFilter);
 	});
 
-	if (propertiesNotAllowed.length) {
-		throw new Error("following filter properties not allowed for root: " + propertiesNotAllowed.join(","));
-	}
 
 	return query;
 };
