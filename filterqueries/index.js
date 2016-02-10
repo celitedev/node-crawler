@@ -30,7 +30,8 @@ var roots = domainConfig.domain.roots;
 
 
 //FilterQueryUtils
-var filterQueryUtils = require("./utils")(generatedSchemas);
+var filterQueryUtils = require("./utils")(generatedSchemas, r);
+
 
 
 /////////////
@@ -175,8 +176,6 @@ FilterQuery.prototype.getFilter = function() {
 			throw new Error("following filter key not allowed: " + compoundKey);
 		}
 
-		console.log(path);
-
 		//TODO: #183 - if compoundkey is an entity or valueObject and `v` is an object, allow
 		//deep filtering inside nested object (which is either type = nested (multival) || type=object (singleval))
 
@@ -208,6 +207,8 @@ FilterQuery.prototype.wantRawESResults = function() {
 FilterQuery.prototype.performQuery = function() {
 	var self = this;
 
+	var root = self.getRoot();
+
 	return Promise.resolve()
 		.then(function() {
 
@@ -226,8 +227,6 @@ FilterQuery.prototype.performQuery = function() {
 				}
 			});
 
-			console.log(JSON.stringify(searchQuery.body));
-
 			return client.search(searchQuery);
 		})
 		.then(function(esResult) {
@@ -242,25 +241,58 @@ FilterQuery.prototype.performQuery = function() {
 						if (self.wantUnique) {
 							hits = esResult.hits.hits = hits.slice(0, 1);
 						}
+
 						return r.table(erdEntityTable).getAll.apply(erdEntityTable, _.pluck(hits, "_id"));
 					}
 				})
-				.then(function(entities) {
+				.then(function expandEntities(entities) {
+
+					var expand = {};
+
+					return Promise.resolve()
+						.then(function() {
+
+							//meta.refs.separate = true -> separate all refs in _.refs object
+							//meta.refs.expand -> expand refs, based on array of dot-notated paths
+							if (self.meta && self.meta.refs) {
+
+								var expandFields = self.meta.refs.expand || [];
+								expandFields = _.isArray(expandFields) ? expandFields : [expandFields];
+
+								return filterQueryUtils.recurseReferencesToExpand(entities, root, expandFields, expand, self.meta.refs);
+							}
+						})
+						.then(function() {
+							return [entities, expand];
+						});
+				})
+				.spread(function(entities, expand) {
 
 					entities = entities || {};
 
-					var obj = {
-						hits: self.wantUnique ? (entities.length ? entities[0] : null) : entities
-					};
+					var obj = {};
+
+					if (self.wantUnique) {
+						obj.hit = (entities.length ? entities[0] : null);
+					} else {
+						obj.hits = entities;
+					}
+
+					if (self.meta && self.meta.refs && self.meta.refs.expand) {
+						obj.expand = expand;
+					}
 
 					_.extend(obj, {
-						esMeta: _.extend(_.omit(esResult, "hits"), {
-							hits: _.omit(esResult.hits, "hits"),
-							raw: self.wantRawESResults() ?
-								(self.wantUnique ?
-									(hits.length ? hits[0] : null) :
-									hits) : undefined
-						})
+						meta: {
+							elasticsearch: _.extend(_.omit(esResult, "hits"), {
+								hits: _.omit(esResult.hits, "hits"),
+								raw: self.wantRawESResults() ?
+									(self.wantUnique ?
+										(hits.length ? hits[0] : null) :
+										hits) : undefined
+							})
+						}
+
 					});
 
 					return obj;
@@ -286,36 +318,12 @@ app.post('/', function(req, res, next) {
 			return filterQuery.performQuery();
 
 		})
-		.then(function success(resultObj) {
+		.then(function success(json) {
 
-			var json;
-
-			//UGLY AS FUCK
-			if (filterQuery.wantUnique) {
-				json = {
-					query: {
-						status: 200,
-						filterQuery: filterQuery
-					},
-					nrOfHits: resultObj.esMeta.hits.total,
-					hit: resultObj.hits, //DIFFERENCE HERE: hits vs hits
-					meta: _.extend({
-						elasticsearch: resultObj.esMeta
-					})
-				};
-			} else {
-				json = {
-					query: {
-						status: 200,
-						filterQuery: filterQuery
-					},
-					nrOfHits: resultObj.esMeta.hits.total,
-					hits: resultObj.hits,
-					meta: _.extend({
-						elasticsearch: resultObj.esMeta
-					})
-				};
-			}
+			json.meta.query = {
+				status: 200,
+				filterQuery: filterQuery
+			};
 
 			res.json(json);
 		})

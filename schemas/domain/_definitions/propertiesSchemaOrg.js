@@ -581,7 +581,7 @@ module.exports = {
 
 		//eventful events have multiple locations
 		//One of which is a map entry, which is wrong. #177
-		isMulti: true
+		isMulti: false
 	},
 	member: { //e.g.: org or persons
 		ambiguitySolvedBy: {
