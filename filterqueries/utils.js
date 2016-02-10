@@ -1,10 +1,14 @@
 var _ = require("lodash");
 
-module.exports = function(generatedSchemas) {
+module.exports = function(generatedSchemas, r) {
 
 	var erdConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
 	var domainConfig = require("../schemas/domain/_definitions/config");
 	var rootUtils = require("../schemas/domain/utils/rootUtils")(generatedSchemas);
+
+	var domainUtils = require("../schemas/domain/utils");
+	var erdEntityTable = r.table(domainUtils.statics.ERDTABLE);
+
 
 
 	//Get all possible properties per root (including the properties defined on subtypes of said root)
@@ -19,6 +23,7 @@ module.exports = function(generatedSchemas) {
 	//- ways to see if we can do range queries (either ordinal OR number)
 	//- ...
 	var roots = domainConfig.domain.roots;
+	var domainPropertyMap = {};
 	var rootPropertyMap = _.reduce(roots, function(agg, root) {
 
 		var calcPropNamesForRoot = _.reduce(erdConfig.propertiesCalculated, function(agg2, calcProp, name) {
@@ -55,6 +60,8 @@ module.exports = function(generatedSchemas) {
 				}
 			}
 
+			domainPropertyMap[key] = domainPropertyMap[key] || agg2[key];
+
 			return agg2;
 		}, {}), calcPropNamesForRoot);
 
@@ -79,11 +86,103 @@ module.exports = function(generatedSchemas) {
 			return inAgg;
 		}, agg[root]);
 
-
 		return agg;
 	}, {});
 
 
+	//dot-separated paths for all entities. Per root
+	var entityPathsPerRoot = _.reduce(rootPropertyMap, function(agg, propMap, rootName) {
+		agg[rootName] = _.reduce(propMap, function(agg, propVal, propName) {
+			if (propVal.isEntity) {
+				agg[(propVal.path ? propVal.path + "." : "") + propName] = propVal.rootName;
+			}
+			return agg;
+		}, {});
+		return agg;
+	}, {});
+
+
+	function getEntityPathsForRoot(rootName) {
+		return entityPathsPerRoot[rootName];
+	}
+
+	//Given 
+	//- paths: e.g: ["address.streetAdderess", "workFeatured"]
+	//- json = entity 
+	//
+	//- return a map with all flattened values grouped by path
+	function getValuesForPaths(paths, json, doRemove) {
+
+		var map = {};
+
+		rec(json, "");
+
+		function rec(obj, prefix) {
+			_.each(obj, function(v, k) {
+
+				var needlePath = prefix ? prefix + "." + k : k;
+
+				if (~paths.indexOf(needlePath)) { //complete path found 
+
+					//we try to keep the cardinality of the original structure
+
+					if (!map[needlePath]) {
+
+						map[needlePath] = v; //which is possible to do here
+
+					} else {
+						//but not here anympre. This happens only if parent is array, which for now is never
+						map[needlePath] = _.isArray(map[needlePath]) ? map[needlePath] : [map[needlePath]];
+						map[needlePath] = map[needlePath].concat(v);
+					}
+
+					if (doRemove) {
+						delete obj[k];
+					}
+
+				} else if (_.isObject(v)) {
+
+					//check if needlePath is prefix of path
+					//If so recurse down the value
+					_.each(paths, function(path) {
+						if (path.indexOf(needlePath) === 0) {
+							_.map(v, function(singleItem) {
+								rec(singleItem, needlePath);
+							});
+						}
+					});
+				}
+			});
+		}
+
+		return map;
+	}
+
+	function calcPathSuffix(pathSet, rootName) {
+
+		//given a pathset: all the paths to entities that should be resolved
+		//and a root, this: 
+		//
+		//- finds a map <prefixPath, root, ?pathSuffix-arr>
+
+		var pathMapOut = {};
+		var prefixForRoot = entityPathsPerRoot[rootName];
+
+		_.each(pathSet, function(path) {
+			_.each(prefixForRoot, function(refRootName, prefix) {
+				if (path.indexOf(prefix) === 0) {
+					pathMapOut[prefix] = pathMapOut[prefix] || {
+						root: refRootName,
+						suffixPaths: []
+					};
+					var suffixPath = path.substring(prefix.length + 1).trim();
+					pathMapOut[prefix].suffixPaths = _.uniq(_.compact(pathMapOut[prefix].suffixPaths.concat([suffixPath])));
+				}
+			});
+		});
+
+		return pathMapOut;
+	}
 
 	function wrapWithNestedQueryIfNeeed(query, k) {
 
@@ -103,10 +202,12 @@ module.exports = function(generatedSchemas) {
 			return query;
 		}
 
-		//We're talking majestic expanded objects here. 
+		//We're talking expanded objects here. 
 		//In Elasticsearch these are respresented as so-called nested objects, 
-		//which require a specific way of querying. 
+		//which require a specific way of querying.
 		//See: https://www.elastic.co/guide/en/elasticsearch/guide/current/nested-query.html
+		//
+
 
 		if (k.substring(0, expandObjNeedle).indexOf(".") !== -1) {
 			//Found expanded object but path doesn't start with it. 
@@ -114,11 +215,28 @@ module.exports = function(generatedSchemas) {
 			throw new Error("expanded object should be at beginning of query: " + k);
 		}
 
+		////////////////////////////////////////////////////////
+		//Only if multivalued are we talking a nested object! //
+		////////////////////////////////////////////////////////
+		var origPropName = k.substring(0, expandObjNeedle);
+		if (!generatedSchemas.properties[origPropName].isMulti) {
+			return query;
+		}
+
 		//nested path = name of expanded object, e.g.: workFeatured--expand
 		nestedQ.nested.path = k.substring(0, expandObjNeedle + EXPAND_NEEDLE.length);
 		nestedQ.nested.query = query;
 
 		return nestedQ;
+	}
+
+
+	function buildRecursiveObj(path, resultObj) {
+		var key = path.shift();
+		resultObj[key] = resultObj[key] || {};
+		if (path.length) {
+			buildRecursiveObj(path, resultObj[key]);
+		}
 	}
 
 
@@ -278,6 +396,87 @@ module.exports = function(generatedSchemas) {
 		return wrapWithNestedQueryIfNeeed(rangeQuery, k);
 	}
 
+
+	var mergeFN = function(a, b) {
+		return (a || []).concat(_.isArray(b) ? b : [b]);
+	};
+
+
+	function recurseReferencesToExpand(entities, root, fieldsToExpand, expandOut, options) {
+
+		//1. Move all refs to `_refs`, thereyby changing entities.
+		//2. Fetch all ids for those refs and store them in refMap
+		var pathsForRoot = getEntityPathsForRoot(root);
+		var refMap = {};
+		_.each(entities, function(entity) {
+
+			var refs = getValuesForPaths(_.keys(pathsForRoot), entity, options.separate);
+
+			//if options.separate -> we separate refs in `_refs` property
+			if (options.separate) {
+				entity._refs = refs;
+			}
+
+			_.merge(refMap, refs, mergeFN);
+		});
+
+		//datastruct for the paths that actually are requested for expansion. 
+		//- key = path (dot.notated) until entity reference, i.e.: the prefix
+		//- val : 
+		//  - root: rootName at this entity reference
+		//  - pathSuffix: path still left when prefix is subtracted. If there is still a suffix
+		//    it means we need to recurse
+		var suffixMap = calcPathSuffix(fieldsToExpand, root);
+
+		return Promise.resolve()
+			.then(function() {
+
+				//POTENTIAL OPTIMIZATION: lookup if we've already got refIds in `expand`
+
+				var refsToResolve = _.pick(refMap, _.keys(suffixMap));
+
+				if (!_.size(refsToResolve)) {
+					return [];
+				}
+
+				var refIds = _.compact(_.uniq(_.flatten(_.values(refsToResolve))));
+				return r.table(erdEntityTable).getAll.apply(erdEntityTable, refIds);
+			})
+			.then(function(refEntities) {
+
+				if (!refEntities.length) {
+					return; //breaker
+				}
+
+				//create identity map from refEntities
+				var referencesById = _.zipObject(_.pluck(refEntities, "id"), refEntities);
+
+				//add to `json.extend` which is exposed on output
+				_.extend(expandOut, referencesById);
+
+
+				//recurse for each property to: 
+				//- change entities so `_refs` is created
+				//- nested references are resolved
+
+				var promises = _.map(suffixMap, function(v, prefixPath) {
+
+					//get the ids of the entities as found at for prefixPath
+					var idsForPrefixPath = refMap[prefixPath];
+
+					//given the ids fetch the entities themselves
+					var refEntitiesForPath = _.values(_.pick(referencesById, idsForPrefixPath));
+
+					//recurse already
+					return recurseReferencesToExpand(refEntitiesForPath, v.root, v.suffixPaths, expandOut, options);
+				});
+
+				//execute the recurse
+				return Promise.all(promises);
+			});
+	}
+
+
 	return {
 		performTemporalQuery: performTemporalQuery,
 		performRangeQuery: performRangeQuery,
@@ -286,6 +485,11 @@ module.exports = function(generatedSchemas) {
 		performSpatialLookupQuery: performSpatialLookupQuery,
 		getPathForCompoundKey: getPathForCompoundKey,
 		wrapWithNestedQueryIfNeeed: wrapWithNestedQueryIfNeeed,
+		buildRecursiveObj: buildRecursiveObj,
+		getEntityPathsForRoot: getEntityPathsForRoot,
+		calcPathSuffix: calcPathSuffix,
+		getValuesForPaths: getValuesForPaths,
+		recurseReferencesToExpand: recurseReferencesToExpand
 	};
 
 };

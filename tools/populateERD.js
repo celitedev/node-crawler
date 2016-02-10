@@ -85,7 +85,25 @@ Promise.resolve()
 			prop.transform.push("lowercase");
 
 		});
+	})
+	.then(function resetState() {
+		if (argv.reset) {
+			console.log(("Resetting _state.modifiedERD for testing").yellow);
 
+			if (!argv.type) {
+				return tableCanonicalEntity.update({
+					_state: {
+						modifiedERD: null
+					}
+				});
+			} else {
+				return tableCanonicalEntity.filter(r.row('_type').contains(argv.type)).update({
+					_state: {
+						modifiedERD: null
+					}
+				});
+			}
+		}
 	})
 	.then(function processSourcesRecursive() {
 		return Promise.resolve()
@@ -105,29 +123,8 @@ Promise.resolve()
 							getAll = getAll.filter(r.row('_type').contains(argv.type));
 						}
 
-						return Promise.resolve()
-							.then(function resetStateWhenTesting() {
-								if (argv.reset) {
-									console.log(("Resetting _state.modifiedERD for testing").yellow);
+						return getAll.limit(data.state.batch);
 
-									if (!argv.type) {
-										return tableCanonicalEntity.update({
-											_state: {
-												modifiedERD: null
-											}
-										});
-									} else {
-										return tableCanonicalEntity.filter(r.row('_type').contains(argv.type)).update({
-											_state: {
-												modifiedERD: null
-											}
-										});
-									}
-								}
-							})
-							.then(function() {
-								return getAll.limit(data.state.batch);
-							});
 					})
 					.then(function createCanonicalEntities(results) {
 
