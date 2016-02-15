@@ -78,6 +78,9 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				//  - subtypes *might* also be populated from the 'tag'-property
 				props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
 
+				//we want root to be indexed to ES as well.
+				props.root = root;
+
 				//populate values from other fields.
 				_populate(props, root, false);
 
@@ -263,10 +266,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 		return Promise.resolve()
 			.then(function toERDRecursiveSingleItemCalcV() {
-
-				if (!v) {
-					console.log("SADASD");
-				}
 
 				if (!v._type) return v;
 
