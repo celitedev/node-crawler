@@ -102,19 +102,27 @@ module.exports = function(generatedSchemas) {
 					fields: ["name", "aggregateRating", "genre", "subtypes", "all_tags"],
 					// postPruneFields: ["genre", "subtypes"] //there are used to create `all_tags`
 				}
-			}
+			},
+
+
+
 		},
 
 		propertiesCalculated: {
 
-			testbla: {
+			//suggester: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-suggesters-completion.html
+			suggest: {
 				roots: true, //true (all) or (array of) rootNames
 				isMulti: false,
-				enum: vocabs.genre,
-				enumStrictSingleValued: true, //enum can mess up single-valued-ness.
+				mapping: mappings.suggestWithTypeAndLocationContext,
 				populate: {
-					fields: "genre",
+					fields: "name",
 				},
+			},
+
+			root: { //works since 'root' is specifically defined in CanonicalEntity
+				roots: true, //true (all) or (array of) rootNames
+				isMulti: false
 			},
 
 

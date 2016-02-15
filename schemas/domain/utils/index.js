@@ -19,6 +19,15 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 			//geopoints are expensive. We'll store them on disk instead of mem
 			//https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-memory.html#geo-memory
 			"doc_values": true
+		},
+
+
+		//https://www.elastic.co/guide/en/elasticsearch/reference/current/suggester-context.html#suggester-context-geo
+		suggestWithTypeAndLocationContext: {
+			"type": "completion",
+			"analyzer": "simple",
+			"search_analyzer": "simple",
+			"payloads": true
 		}
 	},
 
