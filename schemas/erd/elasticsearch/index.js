@@ -19,6 +19,8 @@ module.exports = function(generatedSchemas) {
 
 	var vocabs = require("../../../vocabularies")(generatedSchemas);
 
+
+
 	var obj = {
 
 		//when expanding refs in ERD, for increased perf on indexing we don't 
@@ -35,6 +37,44 @@ module.exports = function(generatedSchemas) {
 			//creative work
 			"aggregateRating", "genre"
 		],
+
+		//general index mapping
+		indexMapping: {
+			"settings": {
+				"number_of_shards": 1
+			},
+			"settings": {
+				//We don't coerce since we want everything to be explicit. 
+				//This is needed since we want to transform all queries through the same pipeline as indexing
+				"index.mapping.coerce": false,
+
+				"index": {
+					"analysis": {
+						"analyzer": {
+							"enum": {
+								"tokenizer": "keyword",
+								"filter": "lowercase"
+							}
+						}
+					}
+				}
+			},
+			"mappings": {
+				"type1": {
+
+					//no source
+					"_source": {
+						"enabled": true //for now. BTW seems to make indexing time slightly worse
+					},
+
+					//timestamp probably useful for Kibana: 
+					//https://www.elastic.co/guide/en/elasticsearch/reference/1.4/mapping-timestamp-field.html
+					"_timestamp": {
+						"enabled": true
+					}
+				}
+			}
+		},
 
 		properties: {
 
@@ -88,6 +128,11 @@ module.exports = function(generatedSchemas) {
 					// postPruneFields: ["containedInPlace"], //used to create containedInPlace--name
 					includeId: false,
 				}
+			},
+
+			"startDate": {
+				"type": "date",
+				"format": "yyyy-MM-dd"
 			},
 
 			performer: {
