@@ -18,42 +18,7 @@ var erdMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas)
 
 var client = new elasticsearch.Client(config.elasticsearch);
 
-var indexMapping = {
-	"settings": {
-		"number_of_shards": 1
-	},
-	"settings": {
-		//We don't coerce since we want everything to be explicit. 
-		//This is needed since we want to transform all queries through the same pipeline as indexing
-		"index.mapping.coerce": false,
-
-		"index": {
-			"analysis": {
-				"analyzer": {
-					"enum": {
-						"tokenizer": "keyword",
-						"filter": "lowercase"
-					}
-				}
-			}
-		}
-	},
-	"mappings": {
-		"type1": {
-
-			//no source
-			"_source": {
-				"enabled": true //for now
-			},
-
-			//timestamp probably useful for Kibana: 
-			//https://www.elastic.co/guide/en/elasticsearch/reference/1.4/mapping-timestamp-field.html
-			"_timestamp": {
-				"enabled": true
-			}
-		}
-	}
-};
+var indexMapping = erdMappingConfig.indexMapping;
 
 
 Promise.resolve()
@@ -112,10 +77,10 @@ Promise.resolve()
 				enumOnNonDatatypes.join(","));
 		}
 
-	if (populateNotMultivalued.length) {
-		throw new Error("ES property with 'populate' exists on singlevalued property: " +
-			populateNotMultivalued.join(","));
-	}
+		if (populateNotMultivalued.length) {
+			throw new Error("ES property with 'populate' exists on singlevalued property: " +
+				populateNotMultivalued.join(","));
+		}
 
 		//test / normalize all enums
 		var allProps = _.extend({}, erdMappingConfig.properties, erdMappingConfig.propertiesCalculated);
