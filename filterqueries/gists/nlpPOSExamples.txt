@@ -1,0 +1,65 @@
+ "parse": "(ROOT (SBARQ (WHADVP (WRB when)) (SQ (VBZ is) (NP (NP (JJ dark) (NN horse)) (S (VP (VB open))))) (. ?))) ",
+ "parse": "(ROOT (SBARQ (WHADVP (WRB when)) (SQ (VBZ is) (NP (NP (DT the) (JJ dark) (NN horse)) (S (VP (VB open))))) (. ?)))
+ "parse": "(ROOT (SBARQ (WHADVP (WRB when)) (SQ (VBZ is) (NP (DT the) (JJ dark) (NN horse) (NN tavern)) (VP (VB open))) (. ?))) ",
+
+
+ "(ROOT (SBARQ (WHNP (WDT which) (NP (JJ indian) (NNS restaurants))) (SQ (VP (VBP are) (ADJP (JJ open)) (PP (IN near) (NP (PRP me))) (NP-TMP (NN tonight)))) (. ?))) ",
+ 
+
+"which indian restaurants are open near me later this afteroon?"
+
+"parse": "(ROOT (SBARQ (WHNP (WDT which) (NP (JJ indian) (NNS restaurants))) (SQ (VP (VBP are) (ADJP (JJ open) (PP (IN near) (NP (NP (PRP me)) (ADVP (RBR later) (NP (DT this) (NN afteroon)))))))) (. ?))) "
+
+
+is the star bucks in soho still open?
+"(ROOT (S (S (VP (VBZ is) (NP (DT the) (NN star)))) (VP (VBZ bucks) (SBAR (IN in) (S (NP (NN soho)) (ADVP (RB still)) (VP (VB open))))) (. ?)))
+
+
+
+1. FIND NP (NOUN PHRASE) - sometimes these are not correct. e.g.: "the star bucks" -> NP = the star
+2. 'The' -> Specific entity -> do a search on n-grams starting from The to maximize recall in the above
+3. WDT = determiner: Other specific types of words: 'which' or 'any' denoting a group somehow..
+3. lookup Adjective and Adverbs in controlled vocabulary 
+
+
+(NP (DT this) (NN book)) DT = determiner, NN = Noun singular
+(NP (CD seventeen) (NNS books)) CD = cardinal, NNS = Noun plural
+(WHNP (WDT which) (NN book)) WDT = determiner,  WHNP =Introduces a clause with an NP gap
+
+
+
+
+Determiners: 
+ articles
+  definite: the  (DT)
+  indefinite: a , an (DT)
+ demonstratives: this, that (DT)
+ possesive: my (PRP$)
+ quantifiers: no (DT) some (DT), any (DT) many (JJ), few (JJ), most (jjs)
+ distributive: each, any (DT)
+
+
+ IMPORTANT:
+ - NOUN / PROPER NOUN / NOUN PHRASES 
+ - DETERMINERS (TALKING ABOUT 1 OR SEVERAL) CAN SOMETIMES BE TREATED AS ADJECTIVE (JJ)
+ - ADJECTIVE (JJ, JJR, JJS)
+ - Adjective, superlative (can sometimes be used as a scorer. The best / cheapest (jjs) restaurants)
+   In general adjectives may also sometimes be used for scoring.
+ - adverb (bijwoord)
+   RB - Adverb
+   RBR - Adverb, comparative
+   RBS - Adverb, superlative (again might be used for scoring)
+
+   Adverbs typically express manner, place, time, frequency, degree, level of certainty, etc., answering questions such as how?, in what way?, when?, where?, and to what extent?. 
+ - similarly the prhases: ADJP - Adjective Phrase. || ADVP - Adverb Phrase.
+
+
+ - Prepositions and Prepositional Phrases (IN || PP) - Seem to often be the way to narrow down spatially / temporally
+
+PP = Prepositional Phrase, act as ADVERB or ADJECTIVE to NP
+E.g: "on the left" or "at nine pm", "near me"
+
+Here 'on' and 'at' are IN (Preposition or subordinating conjunction)
+
+
+Either ... Or ((CC: coordinating conhunction))
