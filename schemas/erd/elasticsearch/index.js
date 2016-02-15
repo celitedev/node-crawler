@@ -110,23 +110,16 @@ module.exports = function(generatedSchemas) {
 
 		propertiesCalculated: {
 
-			//suggester: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-suggesters-completion.html
-			suggest: {
-				roots: true, //true (all) or (array of) rootNames
-				isMulti: false,
-				mapping: mappings.suggestWithTypeAndLocationContext,
-				populate: {
-					fields: "name",
-				},
-			},
-
 			root: { //works since 'root' is specifically defined in CanonicalEntity
 				roots: true, //true (all) or (array of) rootNames
 				isMulti: false
 			},
 
 
-			all_subtypes: {
+			////////////////////////////////////////
+			//Raw fields: use for vaocab creation //
+			////////////////////////////////////////
+			raw_subtypes: {
 				roots: true, //true (all) or (array of) rootNames
 				isMulti: true,
 				mapping: mappings.enum,
@@ -135,7 +128,7 @@ module.exports = function(generatedSchemas) {
 				},
 			},
 
-			all_genre: {
+			raw_genre: {
 				roots: "CreativeWork",
 				isMulti: true,
 				mapping: mappings.enum,
@@ -144,6 +137,10 @@ module.exports = function(generatedSchemas) {
 				},
 			},
 
+			//We don't use a suggester to lookup tags, since the result is deduped. 
+			//i.e.: only 1 result for genre:action is given
+			//Instead we probably create a separate index that let's you search for 
+			//tags / vocabulary terms.
 			all_tags: {
 				roots: true,
 				isMulti: true,
@@ -152,6 +149,38 @@ module.exports = function(generatedSchemas) {
 					fields: ["genre", "subtypes"]
 				},
 			},
+
+
+			///////////////
+			//SUGGESTERS //
+			///////////////
+
+			// https://www.elastic.co/guide/en/elasticsearch/reference/current/search-suggesters-completion.html
+			// https://www.elastic.co/guide/en/elasticsearch/reference/current/suggester-context.html
+
+			//suggester on name:
+			suggest: {
+				roots: true, //true (all) or (array of) rootNames
+				isMulti: false,
+				mapping: mappings.suggestWithRoot,
+				populate: {
+					fields: "name",
+				},
+				postReduce: function(val, props) {
+					return {
+						input: val,
+						// context: { //not needed since defined by path=root in mapping
+						// 	root: props.root
+						// },
+						payload: {
+							id: props.id,
+							root: props.root,
+							subtypes: props.subtypes
+						}
+					};
+				}
+			},
+
 
 		},
 
