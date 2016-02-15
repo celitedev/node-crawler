@@ -81,6 +81,9 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				//we want root to be indexed to ES as well.
 				props.root = root;
 
+				//we need id to be avail on root
+				props.id = self.id;
+
 				//populate values from other fields.
 				_populate(props, root, false);
 
@@ -90,6 +93,11 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 
 						//post populate
 						_populate(dto, root, true);
+
+						//optional post reduce values
+						//This is especially useful when wanting to bring a multi-valued value to 
+						//a concatted single-valued value in ERD.
+						_postReduce(dto, root);
 
 						_.extend(dto, {
 							id: self.id,
@@ -134,7 +142,8 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 					//fetch content of field
 					var fieldContents = props[field];
 
-					var val = fn(fieldContents);
+					//provide `props` as second arg as well in case we want to noop from entire context
+					var val = fn(fieldContents, props);
 					val = _.isArray(val) ? val : [val];
 
 					//fetch first item if it exists and set 
@@ -154,7 +163,7 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				props[propName] = _.uniq(_.reduce(fields, function populateReducer(arr, field) {
 					var fieldContents = props[field];
 
-					var val = fn(fieldContents);
+					var val = fn(fieldContents, props);
 					val = _.isArray(val) ? val : [val];
 
 					return fieldContents ? arr.concat(val) : arr;
@@ -163,6 +172,23 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 			}
 		});
 
+	}
+
+	//optional reduce which is executed AFTER Post-populate.
+	function _postReduce(props, root) {
+		_.each(entityUtils.calcPropertyOrderToPopulate(root), function populateLoop(propName) {
+			var prop = erdMappingConfig.properties[propName] || erdMappingConfig.propertiesCalculated[propName];
+
+			if (!prop) return;
+
+			if (!prop.postReduce) return;
+
+			var val = props[propName];
+			val = _.isArray(val) ? val : [val];
+
+			props[propName] = prop.postReduce(val, props);
+
+		});
 	}
 
 
@@ -438,6 +464,11 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				//post populate on Ref
 				_populate(objExpanded, refRoot, true);
 
+				//optional post reduce values
+				//This is especially useful when wanting to bring a multi-valued value to 
+				//a concatted single-valued value in ERD.
+				_postReduce(objExpanded, refRoot);
+
 				//After populate we need to prune to wanted fields again.
 				objExpanded = _.pick(objExpanded, expandObj.fields);
 
@@ -551,11 +582,6 @@ module.exports = function(generatedSchemas, AbstractEntity, r) {
 				if (!v.length) {
 					return undefined;
 				}
-
-				// if (v.length > 1) {
-				// 	console.log("WARN: `enumStrictSingleValued` set but multiple values found after enum, selecting first one (k, values)", k,
-				// 		v.join(","));
-				// }
 
 				return v[0];
 			}

@@ -23,11 +23,17 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
 
 
 		//https://www.elastic.co/guide/en/elasticsearch/reference/current/suggester-context.html#suggester-context-geo
-		suggestWithTypeAndLocationContext: {
+		suggestWithRoot: {
 			"type": "completion",
 			"analyzer": "simple",
 			"search_analyzer": "simple",
-			"payloads": true
+			"payloads": true,
+			"context": {
+				"root": {
+					"type": "category",
+					"path": "root" //defined as calculated field
+				}
+			}
 		}
 	},
 
