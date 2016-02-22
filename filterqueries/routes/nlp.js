@@ -62,29 +62,6 @@ module.exports = function(command) {
 
 	function createParseTree(tree, arr) {
 
-		// 	recurseParseTree(tree, 0, 0);
-
-		// 	function recurseParseTree(subtree, i, level) {
-
-		// 		var curIndex = i;
-		// 		var curLevel = level++;
-
-		// 		var part = _.reduce(subtree.children, function(arr, child) {
-		// 			return arr.concat([child.word || ""]).concat(recurseParseTree(child, ++i, level));
-		// 		}, []);
-
-		// 		arr.push({
-		// 			type: subtree.type,
-		// 			part: _.compact(part).join(" "),
-		// 			index: curIndex,
-		// 			level: curLevel
-		// 		});
-
-		// 		return part;
-		// 	}
-		// }
-
-
 		recurseParseTree(tree, 0, 0);
 
 		function recurseParseTree(subtree, i, level) {
