@@ -182,7 +182,8 @@ module.exports = function(command) {
 
 		_.each(this.filter, function(v, compoundKey) {
 
-			var path = filterQueryUtils.getPathForCompoundKey(root, compoundKey.split("."));
+			var splitSymbols = _.difference(compoundKey.split(/\.|--/), ["expand"]); //remove 'expand'
+			var path = filterQueryUtils.getPathForCompoundKey(root, splitSymbols);
 
 			if (!path) {
 				throw new Error("following filter key not allowed: " + compoundKey);
