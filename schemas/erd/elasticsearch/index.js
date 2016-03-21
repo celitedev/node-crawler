@@ -225,8 +225,6 @@ module.exports = function(generatedSchemas) {
 					};
 				}
 			},
-
-
 		},
 
 		defaultPropertyRelations: {

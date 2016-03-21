@@ -148,7 +148,7 @@ function outbound() {
 	}
 
 	if (argv.isTransitive) {
-		console.log(("--transitive IS specified").green);
+		console.log(("--isTransitive IS specified").green);
 
 		if (argv.roots) {
 			console.log(("Going with overwritten roots as defined through --roots-commandline: " + argv.roots).yellow);
@@ -156,7 +156,7 @@ function outbound() {
 			console.log(("Going with default roots as specified in Config: " + config.domain.roots.join(",")).yellow);
 		}
 	} else {
-		console.log(("--transitive NOT specified").green);
+		console.log(("--isTransitive NOT specified").green);
 	}
 
 	var roots = argv.roots ? argv.roots.split(",") : config.domain.roots;

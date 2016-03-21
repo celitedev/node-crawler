@@ -25,8 +25,7 @@ Promise.resolve()
 	.then(function() {
 
 		var nonExistPropNames = [],
-			enumOnNonDatatypes = [],
-			populateNotMultivalued = [];
+			enumOnNonDatatypes = [];
 
 		_.each(_.keys(erdMappingConfig.properties), function(propName) {
 			if (!~_.keys(generatedSchemas.properties).indexOf(propName)) {
@@ -44,26 +43,8 @@ Promise.resolve()
 						enumOnNonDatatypes.push(propName);
 					}
 				}
-
-				// if (!prop.isMulti) {
-				// 	if (prop.populate) {
-				// 		populateNotMultivalued.push(propName);
-				// 	}
-				// }
-
 			}
 		});
-
-		// //test for calculated fields that define enum -> should be isMulti=true
-		// _.each(erdMappingConfig.propertiesCalculated, function(prop, propName) {
-
-		// 	if (!prop.isMulti) {
-		// 		if (prop.populate) {
-		// 			populateNotMultivalued.push(propName);
-		// 		}
-		// 	}
-
-		// });
 
 		if (nonExistPropNames.length) {
 			throw new Error("ES property doesn't exit in definitions. " +
@@ -71,15 +52,9 @@ Promise.resolve()
 				nonExistPropNames.join(","));
 		}
 
-
 		if (enumOnNonDatatypes.length) {
 			throw new Error("ES property with 'enum' exists on non-datatype property: " +
 				enumOnNonDatatypes.join(","));
-		}
-
-		if (populateNotMultivalued.length) {
-			throw new Error("ES property with 'populate' exists on singlevalued property: " +
-				populateNotMultivalued.join(","));
 		}
 
 		//test / normalize all enums
@@ -96,8 +71,6 @@ Promise.resolve()
 					JSON.stringify(prop.enum));
 			}
 		});
-
-
 	})
 	.then(function() {
 
