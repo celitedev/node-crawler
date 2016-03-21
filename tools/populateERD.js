@@ -178,89 +178,92 @@ Promise.resolve()
 					return dtos;
 				});
 			})
-			.then(function populateRethinkERD(dtos) {
-				var start = new Date().getTime();
-				return Promise.resolve()
-					.then(function() {
+			.then(function populateERDS(dtos) {
 
-						function recurseObjectToRemoveExpandKeys(dto) {
+				function populateRethinkERD() {
+					var start = new Date().getTime();
+					return Promise.resolve()
+						.then(function() {
 
-							//dtos to rethink are the ES dtos with --expand + --* removed
-							return _.reduce(dto, function(agg, v, k) {
+							function recurseObjectToRemoveExpandKeys(dto) {
 
-								if (!~k.indexOf("--")) { //only keep stuff for which key doesn't have '--'
-									if (_.isArray(v)) {
+								//dtos to rethink are the ES dtos with --expand + --* removed
+								return _.reduce(dto, function(agg, v, k) {
 
-										v = _.compact(_.map(v, function(singleItem) {
-											var obj = _.isObject(singleItem) ? recurseObjectToRemoveExpandKeys(singleItem) : singleItem;
-											return _.size(obj) ? obj : undefined;
-										}));
+									if (!~k.indexOf("--")) { //only keep stuff for which key doesn't have '--'
+										if (_.isArray(v)) {
 
-										v = _.size(v) ? v : undefined;
+											v = _.compact(_.map(v, function(singleItem) {
+												var obj = _.isObject(singleItem) ? recurseObjectToRemoveExpandKeys(singleItem) : singleItem;
+												return _.size(obj) ? obj : undefined;
+											}));
 
-									} else {
-										v = _.isObject(v) ? recurseObjectToRemoveExpandKeys(v) : v;
+											v = _.size(v) ? v : undefined;
+
+										} else {
+											v = _.isObject(v) ? recurseObjectToRemoveExpandKeys(v) : v;
+										}
+										if (v !== undefined) {
+											agg[k] = v;
+										}
 									}
-									if (v !== undefined) {
-										agg[k] = v;
-									}
-								}
 
-								return agg;
-							}, {});
-						}
+									return agg;
+								}, {});
+							}
 
-						var dtosRethink = _.map(_.cloneDeep(dtos), recurseObjectToRemoveExpandKeys);
+							var dtosRethink = _.map(_.cloneDeep(dtos), recurseObjectToRemoveExpandKeys);
 
-						return tableERDEntity.insert(dtosRethink, {
-							conflict: "update"
+							return tableERDEntity.insert(dtosRethink, {
+								conflict: "update"
+							});
+						})
+						.then(function() {
+							data.time.populateRethinkERD += new Date().getTime() - start;
 						});
-					})
-					.then(function() {
-						data.time.populateRethinkERD += new Date().getTime() - start;
-					})
-					.then(function passDTOsToES() {
-						return dtos;
-					});
-			})
-			.then(function populateES(dtos) {
+				}
 
-				var start = new Date().getTime();
+				function populateES() {
 
-				var bulk = _.reduce(dtos, function(arr, dto) {
-					var meta = {
-						index: {
-							_index: "kwhen-" + dto._root.toLowerCase(),
-							_type: 'type1',
-							_id: dto.id
-						}
-					};
-					delete dto._root;
-					return arr.concat([meta, dto]);
-				}, []);
+					var start = new Date().getTime();
 
-				return Promise.resolve()
-					.then(function() {
-						if (bulk.length) {
-							return Promise.resolve().then(function() {
-									return client.bulk({
-										body: bulk
-									});
-								})
-								.then(function(results) {
-									if (results.errors) {
-										var errors = _.filter(results.items, function(result) {
-											return result.index.status >= 300;
+					var bulk = _.reduce(dtos, function(arr, dto) {
+						var meta = {
+							index: {
+								_index: "kwhen-" + dto._root.toLowerCase(),
+								_type: 'type1',
+								_id: dto.id
+							}
+						};
+						delete dto._root;
+						return arr.concat([meta, dto]);
+					}, []);
+
+					return Promise.resolve()
+						.then(function() {
+							if (bulk.length) {
+								return Promise.resolve().then(function() {
+										return client.bulk({
+											body: bulk
 										});
-										console.log("ERRORS IN ES BULK INSERT************************");
-										console.log(JSON.stringify(errors, null, 2));
-									}
-								});
-						}
-					})
-					.then(function() {
-						data.time.populateES += new Date().getTime() - start;
-					});
+									})
+									.then(function(results) {
+										if (results.errors) {
+											var errors = _.filter(results.items, function(result) {
+												return result.index.status >= 300;
+											});
+											console.log("ERRORS IN ES BULK INSERT************************");
+											console.log(JSON.stringify(errors, null, 2));
+										}
+									});
+							}
+						})
+						.then(function() {
+							data.time.populateES += new Date().getTime() - start;
+						});
+				}
+
+				return Promise.all([populateRethinkERD(), populateES()]);
 			})
 			.then(function updateStateOfEntities() {
 
