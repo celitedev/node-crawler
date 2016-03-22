@@ -56,7 +56,7 @@ app.use(function jsonErrorHandler(err, req, res, next) {
 	var status = 500;
 	res.status(status).json({
 		meta: {
-			status: 200,
+			status: status,
 			filterQuery: err.filterQuery
 		},
 		error: err.message

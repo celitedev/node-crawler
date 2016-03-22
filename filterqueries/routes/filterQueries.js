@@ -29,11 +29,17 @@ module.exports = function(command) {
 	});
 
 
-	app.post('/', function(req, res, next) {
+	app.post('/question', function(req, res, next) {
 
 		var filterQuery;
 		return Promise.resolve()
 			.then(function() {
+
+				if (!req.body.sort) {
+					throw new Error("sort required");
+				}
+
+				req.body.sort = _.isArray(req.body.sort) ? req.body.sort : [req.body.sort];
 
 				//create object
 				filterQuery = FilterQuery(req.body);
@@ -62,12 +68,6 @@ module.exports = function(command) {
 			});
 	});
 
-	var SortObject = t.struct({
-		type: t.String,
-		options: t.Object,
-		asc: t.Boolean,
-	}, 'SortObject');
-
 
 	var FilterQuery = t.struct({
 
@@ -91,7 +91,7 @@ module.exports = function(command) {
 		//sort is always required. Also for wantUnique = true: 
 		//if multiple values returned we look at score to see if we're confident
 		//enough to return the first item if multiple items we're to be returned
-		sort: t.maybe(SortObject),
+		sort: t.Array,
 
 		meta: t.maybe(t.Object)
 
@@ -106,6 +106,110 @@ module.exports = function(command) {
 		return "kwhen-" + this.getRoot().toLowerCase();
 	};
 
+	FilterQuery.prototype.getSort = function() {
+
+		var self = this;
+
+		//possible TODO: 
+		//- sort by nested: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-sort.html#nested-sorting
+		//- sort by script: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-sort.html#_script_based_sorting
+		//- track scores: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-sort.html#_track_scores
+		return {
+			sort: _.map(this.sort, function(s) {
+
+				var esSort = {};
+
+				function sortOnDistance() {
+					//filter on geo
+
+					//example
+					// "sort": {
+					// 	"type": "distance",
+					// 	"path": "location",
+					// 	"geo": [-73.9764,
+					// 		40.7434
+					// 	],
+					// 	"options": {
+					// 	  unit: "km" //default = mi
+					// 	}
+					// },
+
+					if (!s.geo) {
+						throw new Error("'geo'-attrib not defined on sort with type=distance||distanceUnser");
+					}
+					s.options = s.options || {};
+
+					esSort._geo_distance = {
+
+						unit: s.options.unit || "mi", //default 
+						order: s.asc === undefined ? "asc" : (s.asc ? "asc" : "desc"), //default to asc
+						"distance_type": "plane" //quicker and accurate enough on small distances.
+					};
+
+					//e.g.: path = 'location' -> location.geo for event
+					var path = s.path ? s.path + ".geo" : "geo";
+
+					//e.g location.geo ->
+					path = filterQueryUtils.getPathForCompoundKey("Event", path.split("."), true);
+
+					esSort._geo_distance[path] = s.geo;
+				}
+
+				switch (s.type) {
+
+					case "doc":
+						//filter by doc order
+						//This is the most efficient.
+						esSort._doc = {
+							order: s.asc === undefined ? "asc" : (s.asc ? "asc" : "desc")
+						};
+						break;
+
+					case "score":
+						//filter on score
+						esSort._score = {
+							order: s.asc === undefined ? "desc" : (s.asc ? "asc" : "desc") //default desc sort order
+						};
+						break;
+
+					case "field":
+						//filter on field
+						if (!s.field) {
+							throw new Error("sort of type='field' should have 'field' defined");
+						}
+						esSort[s.field] = {
+							order: s.asc === undefined ? "asc" : (s.asc ? "asc" : "desc")
+						};
+						break;
+
+
+					case "distance":
+
+						//filter on distance
+						sortOnDistance();
+						break;
+
+					case "distanceUser":
+
+						//filter on distance to user
+						if (!self.meta || !self.meta.user || !self.meta.user.geo) {
+							throw new Error("meta.user.geo needs to be defined for sort with type='distanceUser'");
+						}
+
+						s.geo = self.meta.user.geo;
+
+						sortOnDistance();
+						break;
+
+					default:
+						throw new Error("sort needs `type`-value of (doc,score,field,distance, distanceUser) but was: " + s.type);
+				}
+
+				return esSort;
+			})
+		};
+
+	};
 
 
 	FilterQuery.prototype.getTemporal = function() {
@@ -133,19 +237,19 @@ module.exports = function(command) {
 		}
 
 		if (!this.spatial.type) throw new Error("Spatial query needs `type` property");
-		if (!this.spatial.options) throw new Error("Spatial query needs `options` property");
 
-		var options = this.spatial.options;
 
-		options._root = this.getRoot();
-		options._type = this.spatial.type;
+		var options = _.defaults({
+			_root: this.getRoot(),
+			_type: this.spatial.type
+		}, this.spatial.options || {});
 
 		if (options._type === "nearUser") {
 			if (!this.meta || !this.meta.user || !this.meta.user.geo) {
 				throw new Error("need meta.user.geo for spatial type: nearUser");
 			}
 			options.geo = this.meta.user.geo;
-			type = "nearPoint";
+			options._type = "nearPoint";
 		}
 
 		switch (options._type) {
@@ -156,7 +260,7 @@ module.exports = function(command) {
 			case "containedInPlace":
 				return filterQueryUtils.performSpatialLookupQuery(options, this.spatial.path);
 			default:
-				throw new Error("spatial type not supported: " + type);
+				throw new Error("spatial type not supported: " + options._type);
 		}
 	};
 
@@ -234,11 +338,13 @@ module.exports = function(command) {
 				//getFilter exends body. Can set: 
 				//- query
 				//- filter
-				_.merge(searchQuery.body, self.getFilter(), self.getTemporal(), self.getSpatial(), function(a, b) {
+				_.merge(searchQuery.body, self.getFilter(), self.getTemporal(), self.getSpatial(), self.getSort(), function(a, b) {
 					if (_.isArray(a)) {
 						return a.concat(b);
 					}
 				});
+
+				console.log(JSON.stringify(searchQuery, null, 2));
 
 				return esClient.search(searchQuery);
 			})
@@ -265,7 +371,6 @@ module.exports = function(command) {
 						return Promise.resolve()
 							.then(function() {
 
-								//meta.refs.separate = true -> separate all refs in _.refs object
 								//meta.refs.expand -> expand refs, based on array of dot-notated paths
 								if (self.meta && self.meta.refs) {
 

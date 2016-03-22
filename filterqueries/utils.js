@@ -298,7 +298,7 @@ module.exports = function(generatedSchemas, r) {
 
 	function performSpatialPointQuery(options, path) {
 
-		if (!options.geo) throw new Error("need `options.geo` for spatial type: nearPoint");
+		if (!options.geo) throw new Error("need `options.geo` for spatial type: nearPoint/nearUser");
 
 		path = path ? path + ".geo" : "geo"; //add `geo` to path if defined                  	               
 
@@ -306,7 +306,7 @@ module.exports = function(generatedSchemas, r) {
 
 		var query = {
 			geo_distance: {
-				distance: options.distance || "2km",
+				distance: options.distance || "1mi", //1 mile
 
 				//https://www.elastic.co/guide/en/elasticsearch/guide/current/geo-distance.html
 				//Faster lookups. This is ok since we're searching really close so can treat earth as a plane
