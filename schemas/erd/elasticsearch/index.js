@@ -237,5 +237,38 @@ module.exports = function (generatedSchemas) {
   //should be propagated to all stuff referencing it.
   singleton = singleton || obj;
 
+  if (singleton !== obj) return singleton;
+
+  /////////////////////////////////////////
+  //First require -> do some processing. //
+  /////////////////////////////////////////
+
+  var allProps = _.extend({}, obj.properties, obj.propertiesCalculated);
+
+  ///
+  ///Enum-config is normalized. 
+  ///- add lowercase to `transform` 
+  _.each(allProps, function (prop, propName) {
+
+    //set isMulti for all erd-properties
+    if (obj.properties[propName]) {
+      if (prop.isMulti !== undefined) throw new Error("isMulti not allowed on ERD-properties, unless they're calculated: " + propName);
+      var propDef = generatedSchemas.properties[propName];
+      if (!propDef) throw new Error("non-calculated ERD-poprety should be defined in domain: " + propName);
+      prop.isMulti = !!propDef.isMulti;
+    } else {
+      //calculated ERD field
+      prop.isMulti = !!prop.isMulti; //make false explicit as well to be clear
+    }
+
+    if (!prop.enum) return;
+
+    // if mapping has an enum we should always do a lowercase transform
+    // This is the same for the search-end
+    prop.transform = prop.transform || [];
+    prop.transform = _.isArray(prop.transform) ? prop.transform : [prop.transform];
+    prop.transform.push("lowercase");
+  });
+
   return singleton;
 };

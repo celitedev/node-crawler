@@ -51,41 +51,6 @@ var data = _.cloneDeep({
 var start = new Date().getTime();
 
 Promise.resolve()
-  .then(function warmPopulate() {
-    var roots = domainConfig.domain.roots;
-
-    _.each(roots, entityUtils.calcPropertyOrderToPopulate);
-
-    var allProps = _.extend({}, erdMappingConfig.properties, erdMappingConfig.propertiesCalculated);
-
-    ///
-    ///Enum-config is normalized. 
-    ///
-    ///- add lowercase to `transform` 
-    _.each(allProps, function (prop, propName) {
-
-
-      //set isMulti for all erd-properties
-      if (erdMappingConfig.properties[propName]) {
-        if (prop.isMulti !== undefined) throw new Error("isMulti not allowed on ERD-properties, unless they're calculated: " + propName);
-        var propDef = generatedSchemas.properties[propName];
-        if (!propDef) throw new Error("non-calculated ERD-poprety should be defined in domain: " + propName);
-        prop.isMulti = !!propDef.isMulti;
-      } else {
-        //calculated ERD field
-        prop.isMulti = !!prop.isMulti; //make false explicit as well to be clear
-      }
-
-      if (!prop.enum) return;
-
-      // if mapping has an enum we should always do a lowercase transform
-      // This is the same for the search-end
-      prop.transform = prop.transform || [];
-      prop.transform = _.isArray(prop.transform) ? prop.transform : [prop.transform];
-      prop.transform.push("lowercase");
-
-    });
-  })
   .then(function resetState() {
     if (argv.reset) {
       console.log(("Resetting _state.modifiedERD for testing").yellow);
