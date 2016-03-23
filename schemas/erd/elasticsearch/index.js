@@ -17,9 +17,9 @@ var mappings = require("../../domain/utils").mappings;
 var singleton;
 module.exports = function (generatedSchemas) {
 
+  if (singleton) return singleton; //important! since we'll modify below object, which is not idempotent.
+
   var vocabs = require("../../../vocabularies")(generatedSchemas);
-
-
 
   var obj = {
 
@@ -232,12 +232,6 @@ module.exports = function (generatedSchemas) {
     }
   };
 
-  //Need for singleton (instead of local copy) 
-  //because we change this object in process, and this change
-  //should be propagated to all stuff referencing it.
-  singleton = singleton || obj;
-
-  if (singleton !== obj) return singleton;
 
   /////////////////////////////////////////
   //First require -> do some processing. //
@@ -269,6 +263,8 @@ module.exports = function (generatedSchemas) {
     prop.transform = _.isArray(prop.transform) ? prop.transform : [prop.transform];
     prop.transform.push("lowercase");
   });
+
+  singleton = obj;
 
   return singleton;
 };
