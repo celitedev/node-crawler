@@ -264,6 +264,26 @@ module.exports = function (generatedSchemas) {
     prop.transform.push("lowercase");
   });
 
+
+
+  //Given propName, for which we look up vocab if defined, strip enumSynonyms based on said vocab.
+  //We should probably already call this method on 'raw'-data for all props that have enums. 
+  obj.stripEnumSynonyms = function (propName, enumValues) {
+    var enums = allProps[propName].enum;
+    if (!enums) return values;
+
+    //enums.vocabulary is a map containing <key, values> where values are all the synonyms
+    //Process: 
+    //1. fetch all the bins for each of the values. (do a static reverse index for this?)
+    //2. return the first element of each found bin
+
+    return _.uniq(_.reduce(_.values(_.pick(enums.inverseMap, enumValues)), function (arr, val) {
+      return arr.concat(val);
+    }, []));
+
+  };
+
+
   singleton = obj;
 
   return singleton;

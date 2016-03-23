@@ -10,6 +10,7 @@ var domainConfig = require("../../schemas/domain/_definitions/config");
 //DomainConfig
 var roots = domainConfig.domain.roots;
 
+var erdMappingConfig;
 
 var simpleCardFormatters = {
   placewithopeninghours: function (out, json, expand) {
@@ -19,7 +20,7 @@ var simpleCardFormatters = {
     var movie = expand[json.workFeatured];
     var theater = expand[json.location];
     return {
-      category: movie.genre.join(", "),
+      category: erdMappingConfig.stripEnumSynonyms("genre", movie.genre).join(", "),
       identifiers1: movie.name,
       identifiers2: [
         theater.name,
@@ -76,6 +77,8 @@ module.exports = function (command) {
   //FilterQueryUtils
   var filterQueryUtils = require("../utils")(generatedSchemas, r);
 
+  //ERD
+  erdMappingConfig = require("../../schemas/erd/elasticsearch")(generatedSchemas);
 
   app.get('/', function (req, res) {
     res.send('Use POST silly');

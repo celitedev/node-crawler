@@ -95,7 +95,16 @@ module.exports = function (generatedSchemas) {
 
       return agg;
     }, {});
+
+    vocab.inverseMap = _.reduce(vocab.vocabulary, function (agg, value, valueName) {
+      _.each(value.values, function (singleItem) {
+        var arr = agg[singleItem] = agg[singleItem] || [];
+        arr.push(valueName);
+      });
+      return agg;
+    }, {});
   });
+
 
 
   //result: 
