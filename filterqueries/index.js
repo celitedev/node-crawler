@@ -1,11 +1,11 @@
 var elasticsearch = require('elasticsearch');
 
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
-	checkSoundness: true,
-	config: require("../schemas/domain/_definitions/config"),
-	properties: require("../schemas/domain/_definitions").properties,
-	types: require("../schemas/domain/_definitions").types,
-	schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
+  checkSoundness: true,
+  config: require("../schemas/domain/_definitions/config"),
+  properties: require("../schemas/domain/_definitions").properties,
+  types: require("../schemas/domain/_definitions").types,
+  schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
 });
 
 
@@ -34,11 +34,11 @@ app.use(methodOverride());
 
 
 var command = {
-	app: app,
-	generatedSchemas: generatedSchemas,
-	r: r,
-	config: config,
-	esClient: esClient
+  app: app,
+  generatedSchemas: generatedSchemas,
+  r: r,
+  config: config,
+  esClient: esClient
 };
 
 ///////////////
@@ -53,24 +53,24 @@ require("./routes/filterQueries")(command);
 //Error HAndling //
 ///////////////////
 app.use(function jsonErrorHandler(err, req, res, next) {
-	console.error(err.stack);
+  console.error(err.stack);
 
-	var status = 500;
-	res.status(status).json({
-		meta: {
-			status: status,
-			filterQuery: err.filterQuery
-		},
-		error: err.message
-	});
+  var status = 500;
+  res.status(status).json({
+    meta: {
+      status: status,
+      filterQuery: err.filterQuery
+    },
+    error: err.message
+  });
 });
 
 
 /////////////////
 //Start Server //
 /////////////////
-app.server = app.listen(3000, function() {
-	console.log(('Tester for Kwhen FilterQueries. Do a POST to localhost:3000 to get started').yellow);
+app.server = app.listen(3000, function () {
+  console.log(('Tester for Kwhen FilterQueries. Do a POST to localhost:3000 to get started').yellow);
 });
 
 
@@ -80,23 +80,23 @@ app.server = app.listen(3000, function() {
 /////////////////////
 function exitHandler(options, err) {
 
-	if (options.cleanup) {
-		app.server.close();
-		r.getPoolMaster().drain(); //quit
-	}
-	if (err) console.log(err.stack);
-	if (options.exit) {
-		console.log("Quitting");
-		process.exit();
-	}
+  if (options.cleanup) {
+    app.server.close();
+    r.getPoolMaster().drain(); //quit
+  }
+  if (err) console.log(err.stack);
+  if (options.exit) {
+    console.log("Quitting");
+    process.exit();
+  }
 }
 
 //do something when app is closing
 process.on('exit', exitHandler.bind(null, {
-	cleanup: true
+  cleanup: true
 }));
 
 //catches ctrl+c event
 process.on('SIGINT', exitHandler.bind(null, {
-	exit: true
+  exit: true
 }));
