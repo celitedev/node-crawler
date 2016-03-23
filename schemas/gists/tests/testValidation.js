@@ -3,11 +3,11 @@ var _ = require("lodash");
 
 
 var generatedSchemas = require("../../domain/createDomainSchemas.js")({
-	checkSoundness: true,
-	config: require("../../domain/_definitions/config"),
-	properties: require("../../domain/_definitions").properties,
-	types: require("../../domain/_definitions").types,
-	schemaOrgDef: require("../../domain/_definitions/schemaOrgDef")
+  checkSoundness: true,
+  config: require("../../domain/_definitions/config"),
+  properties: require("../../domain/_definitions").properties,
+  types: require("../../domain/_definitions").types,
+  schemaOrgDef: require("../../domain/_definitions/schemaOrgDef")
 });
 
 var entities = require("../../domain/entities")(generatedSchemas);
@@ -34,42 +34,42 @@ var domainUtils = require("../../domain/utils");
 
 
 var domainObject = new SourceEntity({
-	type: ["Restaurant", "BarOrPub"],
-	sourceType: "eventful",
-	sourceUrl: "url of entity as known at source", //required
-	sourceId: "id of entity as known at source" //optional
+  type: ["Restaurant", "BarOrPub"],
+  sourceType: "eventful",
+  sourceUrl: "url of entity as known at source", //required
+  sourceId: "id of entity as known at source" //optional
 });
 
 domainObject.set({
-	address: {
-		addressLocality: "Tilburg",
-		postalCode: "5021 GW",
-		streetAddress: "stuivesantplein 7",
-		email: "GBRITS@ASDASD.COM"
-	},
-	geo: {
-		latitude: 43.123123,
-		longitude: 12.123213,
-		elevation: 1,
-		// test: 43.123123,
-	},
-	name: "testasd",
-	menu: "italian",
-	alternateName: ["asd", "asd"],
+  address: {
+    addressLocality: "Tilburg",
+    postalCode: "5021 GW",
+    streetAddress: "stuivesantplein 7",
+    email: "GBRITS@ASDASD.COM"
+  },
+  geo: {
+    latitude: 43.123123,
+    longitude: 12.123213,
+    elevation: 1,
+    // test: 43.123123,
+  },
+  name: "testasd",
+  menu: "italian",
+  alternateName: ["asd", "asd"],
 });
 
 
 
-domainObject.commit(function(err) {
-	if (err) {
-		//validation errors are an error on commit
-		console.log(domainObject._state.errors);
-		throw err;
-	}
-	//POST: isDirty = false
-	// console.log(JSON.stringify(domainObject, null, 2));
-	console.log(JSON.stringify(domainObject.toDataObject(), null, 2));
-	// console.log(JSON.stringify(domainObject.toSimple(), null, 2));
+domainObject.commit(function (err) {
+  if (err) {
+    //validation errors are an error on commit
+    console.log(domainObject._state.errors);
+    throw err;
+  }
+  //POST: isDirty = false
+  // console.log(JSON.stringify(domainObject, null, 2));
+  console.log(JSON.stringify(domainObject.toDataObject(), null, 2));
+  // console.log(JSON.stringify(domainObject.toSimple(), null, 2));
 });
 
 

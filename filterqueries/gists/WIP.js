@@ -73,71 +73,71 @@
 
 var spatialOptions = {
 
-	//Can be used on Place, PlaceWithOpeningHours, Event (by extension of `location`)
-	nearPoint: {
-		type: "nearPoint",
-		options: {
-			latitude: "<lat>",
-			longitude: "<lng>",
-			radius: 3,
-			radiusMetric: "km"
-		}
-	},
+  //Can be used on Place, PlaceWithOpeningHours, Event (by extension of `location`)
+  nearPoint: {
+    type: "nearPoint",
+    options: {
+      latitude: "<lat>",
+      longitude: "<lng>",
+      radius: 3,
+      radiusMetric: "km"
+    }
+  },
 
-	//Can be used on roots: Place, PlaceWithOpeningHours, Event (by extension of `location`)
-	containedInPlace: {
-		//uses containedInPlace -property or any derived property such as containedInPlace--name
-		type: "containedInPlace",
-		options: {
-			A: {
-				//if id is known, it can be passed directly to the options-property. 
-				//containsInPlace-property is used to lookup. 
-				//NOTE: containsInPlace-property MUST exist. 
-				//TBD: what happens if containsInPlace-property doesn't exist?
-				options: "<id>"
-			},
-			B: {
-				//alternatively options-property may be an object, containing properties by which 
-				//the containedInPlace is to be looked-up. 
-				//
-				//By default the ThingIndex is used to do this lookup. 
-				//
-				//This is needed since containedInPlace as ambiguous in type: it can both ref a 
-				//Place or a PlaceWithOpeningHours which are separate roots. 
-				//
-				//Alternatively, if options-object only contains a single property, in this example `name`
-				//we can spare a lookup if a calculated field `containedInPlace--<propName>` exists
-				//The queryplanner should be able to see if `containedInPlace--<propName>` exists and use
-				//that. If not default to ThingIndex-lookup.
-				options: {
-					name: "soho"
-				}
-			}
-		}
-	},
+  //Can be used on roots: Place, PlaceWithOpeningHours, Event (by extension of `location`)
+  containedInPlace: {
+    //uses containedInPlace -property or any derived property such as containedInPlace--name
+    type: "containedInPlace",
+    options: {
+      A: {
+        //if id is known, it can be passed directly to the options-property. 
+        //containsInPlace-property is used to lookup. 
+        //NOTE: containsInPlace-property MUST exist. 
+        //TBD: what happens if containsInPlace-property doesn't exist?
+        options: "<id>"
+      },
+      B: {
+        //alternatively options-property may be an object, containing properties by which 
+        //the containedInPlace is to be looked-up. 
+        //
+        //By default the ThingIndex is used to do this lookup. 
+        //
+        //This is needed since containedInPlace as ambiguous in type: it can both ref a 
+        //Place or a PlaceWithOpeningHours which are separate roots. 
+        //
+        //Alternatively, if options-object only contains a single property, in this example `name`
+        //we can spare a lookup if a calculated field `containedInPlace--<propName>` exists
+        //The queryplanner should be able to see if `containedInPlace--<propName>` exists and use
+        //that. If not default to ThingIndex-lookup.
+        options: {
+          name: "soho"
+        }
+      }
+    }
+  },
 
-	//Can be used on PersonAndOrganization and CreativeWork
-	//
-	//Uses performedTable (M-N) in RethinkDB or something. 
-	//Alternatively *might* be able to use Events to look this up, 
-	//but events aren't kept for past history presumably... so we'd need
-	//performedTable for those. 
-	//
-	//E.g.: 
-	//- (when) has X performed in Soho 
-	//- when does shakira perform in ...
-	//- when is this movie played in... 
-	performedIn: {
-		type: "performedIn",
-		options: {
-			A: {
-				options: "<id>"
-			},
-			B: {
-				options: {
-					name: "soho"
-				}
-			}
-		}
-	}
+  //Can be used on PersonAndOrganization and CreativeWork
+  //
+  //Uses performedTable (M-N) in RethinkDB or something. 
+  //Alternatively *might* be able to use Events to look this up, 
+  //but events aren't kept for past history presumably... so we'd need
+  //performedTable for those. 
+  //
+  //E.g.: 
+  //- (when) has X performed in Soho 
+  //- when does shakira perform in ...
+  //- when is this movie played in... 
+  performedIn: {
+    type: "performedIn",
+    options: {
+      A: {
+        options: "<id>"
+      },
+      B: {
+        options: {
+          name: "soho"
+        }
+      }
+    }
+  }
 };
