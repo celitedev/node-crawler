@@ -10,6 +10,59 @@ var domainConfig = require("../../schemas/domain/_definitions/config");
 //DomainConfig
 var roots = domainConfig.domain.roots;
 
+
+var simpleCardFormatters = {
+  placewithopeninghours: function (out, json, expand) {
+
+  },
+  screeningevent: function (out, json, expand) {
+    var movie = expand[json.workFeatured];
+    var theater = expand[json.location];
+    return {
+      category: movie.genre.join(", "),
+      identifiers1: movie.name,
+      identifiers2: [
+        theater.name,
+        //"x min by foot" //TODO: based on user info. What if not supplied? 
+      ],
+      headsup1: "Friday, February 19, 2016 ",
+      headsup2: "Released: February 12, 2016",
+      databits1: "$$$, ****",
+      databits2: [
+        "Michael mooore"
+      ],
+      whyshown: "SEE ALL CRITIC REVIEWS"
+    };
+  },
+  event: function (out, json, expand) {
+    return out;
+  },
+
+  thing: function (out, json, expand) {
+    //if category not yet defined, simply use the fist (most specific) type
+    out.category = out.category || json.types[0];
+    return out;
+  }
+};
+
+function generateCardFormatDTO(json, expand) {
+
+  var types = ["thing", json.root.toLowerCase()].concat(json.subtypes);
+  types.reverse(); //types from most specific to most generic.
+
+  json.types = types;
+
+  return _.reduce(types, function (agg, type) {
+    if (simpleCardFormatters[type]) {
+      agg = simpleCardFormatters[type](agg, json, expand);
+    }
+    return agg;
+  }, {});
+
+}
+
+
+
 module.exports = function (command) {
 
   var app = command.app;
@@ -32,6 +85,7 @@ module.exports = function (command) {
   function createRelatedFilterQueries(filterQuery) {
     return [filterQuery, filterQuery, filterQuery];
   }
+
 
   //used by Answer page. 
   app.post('/question', function (req, res, next) {
@@ -85,18 +139,7 @@ module.exports = function (command) {
             results: _.map(json.hits, function (hit) {
               return {
                 raw: hit,
-                formatted: {
-                  category: "Documentary",
-                  identifiers1: "Where to Invade Next",
-                  identifiers2: ["Angelika Film Center ", "20 min by foot"],
-                  headsup1: "Friday, February 19, 2016 ",
-                  headsup2: "Released: February 12, 2016",
-                  databits1: "$$$, ****",
-                  databits2: [
-                    "Michael mooore"
-                  ],
-                  whyshown: "SEE ALL CRITIC REVIEWS"
-                }
+                formatted: generateCardFormatDTO(hit, json.expand)
               };
             }),
             expand: json.expand,
@@ -400,7 +443,7 @@ module.exports = function (command) {
           }
         });
 
-        console.log(JSON.stringify(searchQuery, null, 2));
+        // console.log(JSON.stringify(searchQuery, null, 2));
 
         return esClient.search(searchQuery);
       })
