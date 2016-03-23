@@ -23,10 +23,12 @@ var esClient = new elasticsearch.Client(config.elasticsearch);
 /////////////
 
 var express = require('express');
+var cors = require('cors');
 var app = express();
 var bodyParser = require('body-parser');
 var methodOverride = require('method-override');
 
+app.use(cors());
 app.use(bodyParser());
 app.use(methodOverride());
 
