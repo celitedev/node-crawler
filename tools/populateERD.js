@@ -137,7 +137,22 @@ Promise.resolve()
         var start = new Date().getTime();
 
         return Promise.all(_.map(data.entities, function (entity) {
-          return entity.toERDObject(refMap);
+
+          return entity.toERDObject(refMap)
+            .then(function hackToGetInImage(dto) {
+              //TODO: HACK: adding in 'image' which is _ref
+              //Got to find a good way to do this
+              if (entity._props.image) {
+                var imageArr = _.compact(_.pluck(entity._props.image, "_ref.url"));
+                if (imageArr.length) {
+                  dto.image = imageArr;
+                  console.log(dto);
+                }
+              }
+
+              return dto;
+            });
+
         })).then(function (dtos) {
           data.time.createDTOS += new Date().getTime() - start;
           return dtos;
@@ -200,6 +215,10 @@ Promise.resolve()
                 _id: dto.id
               }
             };
+
+            //PART OF HACK
+            // delete dto.image;
+
             delete dto._root;
             return arr.concat([meta, dto]);
           }, []);
