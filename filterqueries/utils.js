@@ -431,7 +431,10 @@ module.exports = function (generatedSchemas, r) {
         }
 
         var refIds = _.compact(_.uniq(_.flatten(_.values(refsToResolve))));
-        return r.table(erdEntityTable).getAll.apply(erdEntityTable, refIds);
+        return r.table(erdEntityTable).getAll.apply(erdEntityTable, refIds)
+          .then(function (entities) {
+            return _.map(entities, erdConfig.cleanupRethinkDTO);
+          });
       })
       .then(function (refEntities) {
 

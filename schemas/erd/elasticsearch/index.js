@@ -268,21 +268,47 @@ module.exports = function (generatedSchemas) {
 
   //Given propName, for which we look up vocab if defined, strip enumSynonyms based on said vocab.
   //We should probably already call this method on 'raw'-data for all props that have enums. 
-  obj.stripEnumSynonyms = function (propName, enumValues) {
-    var enums = allProps[propName].enum;
-    if (!enums) return values;
+  function stripEnumSynonyms(enums, enumValues) {
 
     //enums.vocabulary is a map containing <key, values> where values are all the synonyms
     //Process: 
     //1. fetch all the bins for each of the values. (do a static reverse index for this?)
     //2. return the first element of each found bin
 
-    return _.uniq(_.reduce(_.values(_.pick(enums.inverseMap, enumValues)), function (arr, val) {
+    return _.compact(_.uniq(_.reduce(_.values(_.pick(enums.inverseMap, enumValues)), function (arr, val) {
       return arr.concat(val);
-    }, []));
+    }, [])));
 
+  }
+
+  /**
+   * @param  {[type]} dto - direct dto input from Rethink
+   * @return {[type]}     [description]
+   */
+  obj.cleanupRethinkDTO = function (dto) {
+    dto = _.reduce(dto, function (agg, propVal, propName) {
+
+      var propDef = allProps[propName];
+      if (!propDef) return agg; //for id
+
+      ///////////////////////////////////////////
+      // Check for enum and dedupe enum values //
+      ///////////////////////////////////////////
+      var enumObj = propDef.enum;
+      if (!enumObj) return agg;
+
+      var isSingleItemOrig = !_.isArray(propVal);
+      propVal = stripEnumSynonyms(enumObj, _.isArray(propVal) ? propVal : [propVal]);
+
+      if (isSingleItemOrig && !propVal.length) return agg;
+      
+      agg[propName] = isSingleItemOrig ? propVal[0] : propVal;
+
+      return agg;
+    }, dto);
+
+    return dto;
   };
-
 
   singleton = obj;
 
