@@ -14,13 +14,38 @@ var erdMappingConfig;
 
 var simpleCardFormatters = {
   placewithopeninghours: function (out, json, expand) {
-
+    return {
+      identifiers1: json.name,
+      identifiers2: _.compact([
+        json.address.streetAddress,
+        json.address.addressLocality,
+        json.address.postalCode,
+        json.address.Region
+        //"x min by foot" //TODO: based on user info. What if not supplied? 
+      ]),
+      // headsup2: _.compact([json.contentRating].concat(json.genre)), //if omitted space will be truncated in frontend.
+      // databits2: _.compact([movie.contentRating].concat(movie.genre)), //if omitted space will be truncated in frontend.
+      // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
+    };
+  },
+  movie: function (out, json, expand) {
+    return {
+      identifiers1: json.name,
+      // identifiers2: [
+      //   theater.name,
+      //   //"x min by foot" //TODO: based on user info. What if not supplied? 
+      // ],
+      headsup1: "Rating: " + (Math.round(json.aggregateRating.ratingValue * 10) / 10) + "/5 (" + json.aggregateRating.ratingCount + ")",
+      headsup2: _.compact([json.contentRating].concat(json.genre)), //if omitted space will be truncated in frontend.
+      // databits2: _.compact([movie.contentRating].concat(movie.genre)), //if omitted space will be truncated in frontend.
+      // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
+    };
   },
   screeningevent: function (out, json, expand) {
     var movie = expand[json.workFeatured];
     var theater = expand[json.location];
     return {
-      category: "movie screening",
+      category: "movie screening", //overwrite 'screening event'
       identifiers1: movie.name,
       identifiers2: [
         theater.name,
@@ -40,6 +65,7 @@ var simpleCardFormatters = {
   thing: function (out, json, expand) {
     //if category not yet defined, simply use the fist (most specific) type
     out.category = out.category || json.types[0];
+    out.databits1 = out.databits1 || "$$$, ****"; //TODO: NOTE: THIS IS A HARD FIX SO FRONTEND DOESN'T TRIP! THIS IS TEMPORARY
     return out;
   }
 };
