@@ -2,7 +2,7 @@ var _ = require("lodash");
 var Promise = require("bluebird");
 var colors = require("colors");
 var t = require("tcomb");
-
+var moment = require("moment");
 
 var domainUtils = require("../../schemas/domain/utils");
 var domainConfig = require("../../schemas/domain/_definitions/config");
@@ -20,19 +20,17 @@ var simpleCardFormatters = {
     var movie = expand[json.workFeatured];
     var theater = expand[json.location];
     return {
-      category: movie.genre.join(", "),
+      category: "movie screening",
       identifiers1: movie.name,
       identifiers2: [
         theater.name,
         //"x min by foot" //TODO: based on user info. What if not supplied? 
       ],
-      headsup1: "Friday, February 19, 2016 ",
-      headsup2: "Released: February 12, 2016",
-      databits1: "$$$, ****",
-      databits2: [
-        "Michael mooore"
-      ],
-      whyshown: "SEE ALL CRITIC REVIEWS"
+      headsup1: moment(json.startDate).format('MMMM Do YYYY, h:mm:ss a'),
+      // headsup2: "Released: February 12, 2016", //if omitted space will be truncated in frontend.
+      databits1: "Rating: " + (Math.round(movie.aggregateRating.ratingValue * 10) / 10) + "/5 (" + movie.aggregateRating.ratingCount + "), ****",
+      databits2: _.compact([movie.contentRating].concat(movie.genre)),
+      // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
     };
   },
   event: function (out, json, expand) {
