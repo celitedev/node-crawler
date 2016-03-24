@@ -19,6 +19,11 @@ var simpleCardFormatters = {
   screeningevent: function (out, json, expand) {
     var movie = expand[json.workFeatured];
     var theater = expand[json.location];
+    if (!movie) {
+      console.log(json);
+      console.log("NO MOVIE FOR SCREEN", json.id, json.workFeatured);
+
+    }
     return {
       category: erdMappingConfig.stripEnumSynonyms("genre", movie.genre).join(", "),
       identifiers1: movie.name,
@@ -100,6 +105,7 @@ module.exports = function (command) {
     //TODO: this shouldn't belong here.
     req.body.sort = _.isArray(req.body.sort) ? req.body.sort : [req.body.sort];
 
+    console.log(JSON.stringify(req.body, null, 2));
     //create filterQuery object
     var filterQuery = FilterQuery(req.body);
 
