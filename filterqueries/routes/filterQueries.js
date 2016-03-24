@@ -19,13 +19,8 @@ var simpleCardFormatters = {
   screeningevent: function (out, json, expand) {
     var movie = expand[json.workFeatured];
     var theater = expand[json.location];
-    if (!movie) {
-      console.log(json);
-      console.log("NO MOVIE FOR SCREEN", json.id, json.workFeatured);
-
-    }
     return {
-      category: erdMappingConfig.stripEnumSynonyms("genre", movie.genre).join(", "),
+      category: movie.genre.join(", "),
       identifiers1: movie.name,
       identifiers2: [
         theater.name,
@@ -469,7 +464,10 @@ module.exports = function (command) {
                 hits = esResult.hits.hits = hits.slice(0, 1);
               }
 
-              return r.table(erdEntityTable).getAll.apply(erdEntityTable, _.pluck(hits, "_id"));
+              return r.table(erdEntityTable).getAll.apply(erdEntityTable, _.pluck(hits, "_id"))
+                .then(function (entities) {
+                  return _.map(entities, erdMappingConfig.cleanupRethinkDTO);
+                });
             }
           })
           .then(function expandEntities(entities) {
