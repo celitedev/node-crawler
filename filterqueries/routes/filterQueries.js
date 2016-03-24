@@ -29,6 +29,7 @@ var simpleCardFormatters = {
     };
   },
   movie: function (out, json, expand) {
+    // console.log(json);
     return {
       identifiers1: json.name,
       // identifiers2: [
@@ -66,6 +67,10 @@ var simpleCardFormatters = {
     //if category not yet defined, simply use the fist (most specific) type
     out.category = out.category || json.types[0];
     out.databits1 = out.databits1 || "$$$, ****"; //TODO: NOTE: THIS IS A HARD FIX SO FRONTEND DOESN'T TRIP! THIS IS TEMPORARY
+    if (json.image && json.image.length) {
+      console.log(json.image);
+      out.image = out.image || json.image[0];
+    }
     return out;
   }
 };
@@ -165,6 +170,9 @@ module.exports = function (command) {
               }
             },
             results: _.map(json.hits, function (hit) {
+
+              //TODO: temporary since detail page is static
+              hit.id = 1;
               return {
                 raw: hit,
                 formatted: generateCardFormatDTO(hit, json.expand)
@@ -490,7 +498,7 @@ module.exports = function (command) {
 
               return r.table(erdEntityTable).getAll.apply(erdEntityTable, _.pluck(hits, "_id"))
                 .then(function (entities) {
-                  return _.map(entities, erdMappingConfig.cleanupRethinkDTO);
+                  return Promise.all(_.map(entities, erdMappingConfig.cleanupRethinkDTO));
                 });
             }
           })

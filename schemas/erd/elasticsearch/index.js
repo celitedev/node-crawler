@@ -301,11 +301,13 @@ module.exports = function (generatedSchemas) {
       propVal = stripEnumSynonyms(enumObj, _.isArray(propVal) ? propVal : [propVal]);
 
       if (isSingleItemOrig && !propVal.length) return agg;
-      
+
       agg[propName] = isSingleItemOrig ? propVal[0] : propVal;
 
       return agg;
     }, dto);
+
+
 
     return dto;
   };
