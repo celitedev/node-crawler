@@ -111,7 +111,7 @@ module.exports = function (generatedSchemas, r) {
   //- json = entity 
   //
   //- return a map with all flattened values grouped by path
-  function getValuesForPaths(paths, json, doRemove) {
+  function getValuesForPaths(paths, json) {
 
     var map = {};
 
@@ -134,10 +134,6 @@ module.exports = function (generatedSchemas, r) {
             //but not here anympre. This happens only if parent is array, which for now is never
             map[needlePath] = _.isArray(map[needlePath]) ? map[needlePath] : [map[needlePath]];
             map[needlePath] = map[needlePath].concat(v);
-          }
-
-          if (doRemove) {
-            delete obj[k];
           }
 
         } else if (_.isObject(v)) {
@@ -410,12 +406,7 @@ module.exports = function (generatedSchemas, r) {
     var refMap = {};
     _.each(entities, function (entity) {
 
-      var refs = getValuesForPaths(_.keys(pathsForRoot), entity, options.separate);
-
-      //if options.separate -> we separate refs in `_refs` property
-      if (options.separate) {
-        entity._refs = refs;
-      }
+      var refs = getValuesForPaths(_.keys(pathsForRoot), entity);
 
       _.merge(refMap, refs, mergeFN);
     });
