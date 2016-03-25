@@ -170,6 +170,10 @@ module.exports = function (command) {
       throw new Error("sort required");
     }
 
+    if (req.body.meta.includeCardFormatting && (!req.body.meta || !req.body.meta.refs || !req.body.meta.refs.expand)) {
+      throw new Error("'includeCardFormatting' requires meta.refs.expand to be defined");
+    }
+
     //TODO: this shouldn't belong here.
     req.body.sort = _.isArray(req.body.sort) ? req.body.sort : [req.body.sort];
 
@@ -213,16 +217,28 @@ module.exports = function (command) {
                 userProximity: "asc"
               }
             },
-            results: _.map(json.hits, function (hit) {
+            results: (function () {
 
-              var obj = {
-                raw: hit,
-                formatted: {}
-              };
+              if (!req.body.meta.includeCardFormatting) {
+                return json.hits;
+              }
 
-              return enrichViewModel(obj, json.expand);
+              //format each result into {
+              //  raw: <orig>
+              //  formatted: <for cards>
+              //}
+              return _.map(json.hits, function (hit) {
 
-            }),
+                var obj = {
+                  raw: hit,
+                  formatted: {}
+                };
+
+                return enrichViewModel(obj, json.expand);
+
+              });
+
+            }()),
             expand: json.expand,
             meta: json.meta
           };
