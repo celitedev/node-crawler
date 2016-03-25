@@ -162,6 +162,37 @@ module.exports = function (command) {
     return [filterQuery, filterQuery, filterQuery];
   }
 
+  function generateResults(req, json) {
+    if (!req.body.meta.includeCardFormatting) {
+      return req.body.wantUnique ? json.hit : json.hits;
+    }
+
+    //format each result into {
+    //  raw: <orig>
+    //  formatted: <for cards>
+    //}
+    if (req.body.wantUnique) {
+      var obj = {
+        raw: json.hit,
+        formatted: {}
+      };
+
+      return enrichViewModel(obj, json.expand);
+    }
+
+    return _.map(json.hits, function (hit) {
+
+      var obj = {
+        raw: hit,
+        formatted: {}
+      };
+
+      return enrichViewModel(obj, json.expand);
+
+    });
+  }
+
+
   //Single Item
   app.get("/entities/:id", function (req, res, next) {
 
@@ -189,8 +220,82 @@ module.exports = function (command) {
           expand: {}
         });
       });
-
   });
+
+
+  //used by Search page. 
+  app.post('/search', function (req, res, next) {
+
+    if (!req.body.sort) {
+      throw new Error("sort required");
+    }
+
+    if (req.body.meta.includeCardFormatting && (!req.body.meta || !req.body.meta.refs || !req.body.meta.refs.expand)) {
+      throw new Error("'includeCardFormatting' requires meta.refs.expand to be defined");
+    }
+
+    //TODO: 
+    // - IF includeCardFormatting -> lookup in static map which entities to expand. These are needed for generating 'formatted'
+
+    //TODO: this shouldn't belong here.
+    req.body.sort = _.isArray(req.body.sort) ? req.body.sort : [req.body.sort];
+
+    console.log(JSON.stringify(req.body, null, 2));
+
+    //create filterQuery object
+    var filterQuery = FilterQuery(req.body);
+
+    //asserts
+    if (!~roots.indexOf(filterQuery.type)) {
+      throw new Error("filterQuery.type should be a known root: " + roots.join(","));
+    }
+
+    return Promise.resolve()
+      .then(function () {
+        //perform query
+        return filterQuery.performQuery();
+      })
+      .then(function transformResults(json) {
+
+        var dto = {
+          query: {
+            //TODO: what is this used for?
+          },
+
+          //TODO: actual filterContext from question. Used for: 
+          //- creating link to search
+          //- possibly showing pills/tags
+          filterContext: {
+            filters: {
+              subtype: "Bar",
+              neighborhood: "Soho"
+            },
+            sort: {
+              userProximity: "asc"
+            }
+          },
+          results: generateResults(req, json),
+          expand: json.expand,
+          meta: json.meta
+        };
+
+        if (req.body.wantUnique) {
+          dto.result = dto.results;
+          delete dto.results;
+        }
+
+        return dto;
+      })
+      .then(function returnDTO(dto) {
+
+        res.json(dto);
+      })
+      .catch(function (err) {
+        err.filterQuery = filterQuery;
+        return next(err);
+      });
+  });
+
 
   //used by Answer page. 
   app.post('/question', function (req, res, next) {
@@ -246,37 +351,7 @@ module.exports = function (command) {
                 userProximity: "asc"
               }
             },
-            results: (function () {
-
-              if (!req.body.meta.includeCardFormatting) {
-                return req.body.wantUnique ? json.hit : json.hits;
-              }
-
-              //format each result into {
-              //  raw: <orig>
-              //  formatted: <for cards>
-              //}
-              if (req.body.wantUnique) {
-                var obj = {
-                  raw: json.hit,
-                  formatted: {}
-                };
-
-                return enrichViewModel(obj, json.expand);
-              }
-
-              return _.map(json.hits, function (hit) {
-
-                var obj = {
-                  raw: hit,
-                  formatted: {}
-                };
-
-                return enrichViewModel(obj, json.expand);
-
-              });
-
-            }()),
+            results: generateResults(req, json),
             expand: json.expand,
             meta: json.meta
           };
