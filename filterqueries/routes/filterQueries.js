@@ -162,6 +162,35 @@ module.exports = function (command) {
     return [filterQuery, filterQuery, filterQuery];
   }
 
+  //Single Item
+  app.get("/entities/:id", function (req, res, next) {
+
+    var includeCardFormatting = req.query.includeCardFormatting;
+
+    Promise.resolve()
+      .then(function () {
+        return erdEntityTable.get(req.params.id);
+      })
+      .then(function (entity) {
+        return erdMappingConfig.cleanupRethinkDTO(entity);
+      })
+      .then(function (entity) {
+
+        if (includeCardFormatting) {
+
+          //TODO: 
+          //- define a static list of refs per subtype, needed to render said subtype. 
+          //e.g.: event -> workFeatured, location, location.containedInPlace. 
+          //This is needed to render the card. 
+        }
+
+        res.json({
+          result: entity,
+          expand: {}
+        });
+      });
+
+  });
 
   //used by Answer page. 
   app.post('/question', function (req, res, next) {
@@ -197,7 +226,7 @@ module.exports = function (command) {
           return filterQuery.performQuery();
 
         })
-        .then(function transformResultsForAnswerPage(json) {
+        .then(function transformResults(json) {
 
           var dto = {
             query: {
@@ -220,13 +249,22 @@ module.exports = function (command) {
             results: (function () {
 
               if (!req.body.meta.includeCardFormatting) {
-                return json.hits;
+                return req.body.wantUnique ? json.hit : json.hits;
               }
 
               //format each result into {
               //  raw: <orig>
               //  formatted: <for cards>
               //}
+              if (req.body.wantUnique) {
+                var obj = {
+                  raw: json.hit,
+                  formatted: {}
+                };
+
+                return enrichViewModel(obj, json.expand);
+              }
+
               return _.map(json.hits, function (hit) {
 
                 var obj = {
@@ -242,6 +280,11 @@ module.exports = function (command) {
             expand: json.expand,
             meta: json.meta
           };
+
+          if (req.body.wantUnique) {
+            dto.result = dto.results;
+            delete dto.results;
+          }
 
           return dto;
         });
