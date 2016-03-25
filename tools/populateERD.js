@@ -146,7 +146,6 @@ Promise.resolve()
                 var imageArr = _.compact(_.pluck(entity._props.image, "_ref.url"));
                 if (imageArr.length) {
                   dto.image = imageArr;
-                  console.log(dto);
                 }
               }
 
@@ -208,6 +207,7 @@ Promise.resolve()
           var start = new Date().getTime();
 
           var bulk = _.reduce(dtos, function (arr, dto) {
+
             var meta = {
               index: {
                 _index: "kwhen-" + dto._root.toLowerCase(),
@@ -215,9 +215,6 @@ Promise.resolve()
                 _id: dto.id
               }
             };
-
-            //PART OF HACK
-            // delete dto.image;
 
             delete dto._root;
             return arr.concat([meta, dto]);
