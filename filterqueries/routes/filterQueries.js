@@ -68,9 +68,9 @@ var middleware = {
 
 function conditionalEnrichWithCardViewmodel(req, json) {
   if (!req.includeCardFormatting) {
-    return req.body.wantUnique ? json.hit : json.hits;
+    return json.hits;
   }
-  var results = _.map(json.hits || [json.hit], function (hit) {
+  var results = _.map(json.hits, function (hit) {
     var obj = {
       raw: hit,
       formatted: {}
@@ -78,7 +78,7 @@ function conditionalEnrichWithCardViewmodel(req, json) {
     return cardViewModel.enrichViewModel(obj, json.expand);
   });
 
-  return req.body.wantUnique ? results[0] : results;
+  return results;
 }
 
 
@@ -167,11 +167,6 @@ module.exports = function (command) {
           meta: json.meta
         };
 
-        if (req.body.wantUnique) {
-          dto.result = dto.results;
-          delete dto.results;
-        }
-
         return dto;
       })
       .then(function returnDTO(dto) {
@@ -222,11 +217,6 @@ module.exports = function (command) {
             expand: json.expand,
             meta: json.meta
           };
-
-          if (req.body.wantUnique) {
-            dto.result = dto.results;
-            delete dto.results;
-          }
 
           return dto;
         });
