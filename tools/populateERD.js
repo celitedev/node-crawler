@@ -140,6 +140,7 @@ Promise.resolve()
 
           return entity.toERDObject(refMap)
             .then(function hackToGetInImage(dto) {
+
               //TODO: HACK: adding in 'image' which is _ref
               //Got to find a good way to do this
               if (entity._props.image) {
@@ -191,7 +192,20 @@ Promise.resolve()
                 }, {});
               }
 
-              var dtosRethink = _.map(_.cloneDeep(dtos), recurseObjectToRemoveExpandKeys);
+              var dtosRethink = _.map(_.cloneDeep(dtos), function createGeoInObjectForm(dto) {
+
+                //transform from internal (ES/GEOJSON) format [long,lat] to readable format
+                if (dto.geo) {
+                  dto.geo = {
+                    latitude: dto.geo[1],
+                    longitude: dto.geo[0],
+                  };
+                }
+                return dto;
+              });
+
+              dtosRethink = _.map(dtosRethink, recurseObjectToRemoveExpandKeys);
+
 
               return tableERDEntity.insert(dtosRethink, {
                 conflict: "update"
