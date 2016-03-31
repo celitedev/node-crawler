@@ -298,6 +298,8 @@ module.exports = function (command) {
 
             if (hits.length) {
 
+              ////////////
+              //TODO: we want to check for confidence level between top result and rest
               if (self.wantUnique) {
                 hits = esResult.hits.hits = hits.slice(0, 1);
               }
@@ -330,15 +332,9 @@ module.exports = function (command) {
           })
           .spread(function (entities, expand) {
 
-            entities = entities || {};
-
-            var obj = {};
-
-            if (self.wantUnique) {
-              obj.hit = (entities.length ? entities[0] : null);
-            } else {
-              obj.hits = entities;
-            }
+            var obj = {
+              hits: entities || []
+            };
 
             if (self.meta && self.meta.refs && self.meta.refs.expand) {
               obj.expand = expand;
@@ -348,10 +344,7 @@ module.exports = function (command) {
               meta: {
                 elasticsearch: _.extend(_.omit(esResult, "hits"), {
                   hits: _.omit(esResult.hits, "hits"),
-                  raw: self.wantRawESResults() ?
-                    (self.wantUnique ?
-                      (hits.length ? hits[0] : null) :
-                      hits) : undefined
+                  raw: self.wantRawESResults() ? hits : undefined
                 })
               }
 
