@@ -207,11 +207,11 @@ module.exports = function (command) {
 
 
   FilterQuery.prototype.getFilter = function () {
-    if (!this.filter) {
-      return {
 
-      };
+    if (!this.filter) {
+      return {};
     }
+
     var query = {
       query: {
         bool: {}
