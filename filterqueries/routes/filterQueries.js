@@ -19,15 +19,153 @@ var expandMap = {
     "location.containedInPlace",
     "location",
     "workFeatured"
-  ]
+  ],
+  PlaceWithOpeninghours: []
 };
+
+
+function createDTOS(command) {
+  return function (json) {
+
+    return {
+      results: {
+
+        query: {
+          //TODO: what is this used for?
+        },
+        answerNLP: "TODO: below should be a DIFFERENT filtercontext. It's not very useful now", //TODO
+
+        //TODO: actual filterContext from question. Used for: 
+        //- creating link to search
+        //- possibly showing pills/tags
+        filterContext: generateFilterContextFromResponse(json),
+
+        //conditionally enrich results with cardViewModel
+        results: conditionalEnrichWithCardViewmodel(command, json),
+
+        totalResults: json.meta.elasticsearch.hits.total,
+
+        expand: json.expand,
+
+        meta: json.meta
+      },
+      original: json
+    };
+  };
+}
+
+
+function enrichWithSearchStuff(command) {
+  return function (combinedResult) {
+
+    //combinedResult.original contains the original results from query
+    //keys: hits, expand, meta.
+    //
+    return _.extend(combinedResult.results, {
+      sortOptions: [{
+        name: "userProximity",
+        label: "proximity to user",
+        isAcending: true, //ascending or decending,
+        help: "tooltip with more help" //optiona;
+      }, {
+        name: "rating",
+        label: "rating",
+        isAcending: true //ascending or decending,
+      }],
+
+      facets: [{
+        name: "subtype",
+        label: "type of place", //used for display
+        type: "enum",
+        values: [{
+          name: "Restaurant",
+          nr: 42
+        }, {
+          name: "Bar",
+          nr: 13
+        }]
+      }, {
+        name: "neighborhood",
+        label: "neighborhood",
+        help: "what neighborhood bla bla description", //used for tooltip
+        type: "enum",
+        values: [{
+          name: "Soho",
+          nr: 48
+        }, {
+          name: "Brooklyn",
+          nr: 38
+        }, {
+          name: "Astoria",
+          nr: 38
+        }, {
+          name: "Brooklyn",
+          nr: 38
+        }, {
+          name: "Astoria",
+          nr: 38
+        }, {
+          name: "Brooklyn",
+          nr: 38
+        }, {
+          name: "Astoria",
+          nr: 38
+        }]
+      }, {
+        name: "subtype",
+        label: "price range", //used for display
+        type: "range",
+        min: 10,
+        max: 5000,
+        prefix: '$',
+        postfix: ''
+      }]
+
+    });
+  };
+}
+
+function conditionalEnrichWithCardViewmodel(command, json) {
+  if (!command.includeCardFormatting) {
+    return json.hits;
+  }
+  var results = _.map(json.hits, function (hit) {
+    var obj = {
+      raw: hit,
+      formatted: {}
+    };
+    return cardViewModel.enrichViewModel(obj, json.expand);
+  });
+
+  return results;
+}
+
+function generateFilterContextFromResponse(json) {
+  return {
+    type: "PlaceWithOpeninghours",
+    filters: {
+      // subtype: "Bar",
+      // neighborhood: "Soho"
+    },
+    sort: {
+      userProximity: "asc"
+    }
+  };
+}
+
 
 var middleware = {
   createFilterQuery: function createFilterQuery(req, res, next) {
-    if (!req.body.sort) {
-      throw new Error("sort required");
-    }
+
+    //default sort
+    req.body.sort = req.body.sort || {
+      type: "doc"
+    };
+
+    //sort is an array
     req.body.sort = _.isArray(req.body.sort) ? req.body.sort : [req.body.sort];
+
+    req.filter = req.filter || req.filters; //filter and filters are both supported
 
     //create filterQuery object
     req.filterQuery = FilterQuery(req.body);
@@ -63,23 +201,6 @@ var middleware = {
     next();
   }
 };
-
-
-
-function conditionalEnrichWithCardViewmodel(req, json) {
-  if (!req.includeCardFormatting) {
-    return json.hits;
-  }
-  var results = _.map(json.hits, function (hit) {
-    var obj = {
-      raw: hit,
-      formatted: {}
-    };
-    return cardViewModel.enrichViewModel(obj, json.expand);
-  });
-
-  return results;
-}
 
 
 module.exports = function (command) {
@@ -138,39 +259,19 @@ module.exports = function (command) {
 
     var filterQuery = req.filterQuery;
 
+    var command = {
+      includeCardFormatting: req.includeCardFormatting
+    };
+
     return Promise.resolve()
       .then(function () {
         //perform query
         return filterQuery.performQuery();
       })
-      .then(function transformResults(json) {
-
-        var dto = {
-          query: {
-            //TODO: what is this used for?
-          },
-
-          //TODO: actual filterContext from question. Used for: 
-          //- creating link to search
-          //- possibly showing pills/tags
-          filterContext: {
-            filters: {
-              subtype: "Bar",
-              neighborhood: "Soho"
-            },
-            sort: {
-              userProximity: "asc"
-            }
-          },
-          results: conditionalEnrichWithCardViewmodel(req, json),
-          expand: json.expand,
-          meta: json.meta
-        };
-
-        return dto;
-      })
+      .then(createDTOS(command))
+      .then(enrichWithSearchStuff(command))
       .then(function returnDTO(dto) {
-
+        console.log("SEARCH response with attribs", _.keys(dto));
         res.json(dto);
       })
       .catch(function (err) {
@@ -188,37 +289,14 @@ module.exports = function (command) {
     var promises = _.map(filterQueries, function (filterQuery) {
       return Promise.resolve()
         .then(function () {
-
           //perform query
           return filterQuery.performQuery();
-
         })
-        .then(function transformResults(json) {
-
-          var dto = {
-            query: {
-              //TODO: what is this used for?
-            },
-            answerNLP: "TODO: below should be a DIFFERENT filtercontext. It's not very useful now", //TODO
-
-            //TODO: actual filterContext from question. Used for: 
-            //- creating link to search
-            //- possibly showing pills/tags
-            filterContext: {
-              filters: {
-                subtype: "Bar",
-                neighborhood: "Soho"
-              },
-              sort: {
-                userProximity: "asc"
-              }
-            },
-            results: conditionalEnrichWithCardViewmodel(req, json),
-            expand: json.expand,
-            meta: json.meta
-          };
-
-          return dto;
+        .then(createDTOS({
+          includeCardFormatting: req.includeCardFormatting
+        }))
+        .then(function (combinedResult) {
+          return combinedResult.results;
         });
     });
 
@@ -230,6 +308,8 @@ module.exports = function (command) {
         var outputJson = _.extend(firstFilterResult, {
           related: jsons
         });
+
+        console.log("ANSWER response with attribs", _.keys(outputJson));
 
         res.json(outputJson);
 
