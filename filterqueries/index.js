@@ -56,9 +56,16 @@ app.use(function jsonErrorHandler(err, req, res, next) {
   console.error(err.stack);
 
   var status = err.status || 500;
+  var statusInBody = status;
+
+  //if status = 400 (bad request) and frontend wishes bad request to be passed as 200
+  //-> let's do that then.
+  if (req.body.badRequestIs200 && status === 400) {
+    status = 200;
+  }
   res.status(status).json({
     meta: {
-      status: status,
+      status: statusInBody,
       filterQuery: err.filterQuery
     },
     error: err.message
