@@ -24,6 +24,7 @@ var expandMap = {
 };
 
 
+//used for answer and search
 function createDTOS(command) {
   return function (json) {
 
@@ -53,6 +54,7 @@ function createDTOS(command) {
     };
   };
 }
+
 
 
 function enrichWithSearchStuff(command) {
@@ -132,11 +134,13 @@ function conditionalEnrichWithCardViewmodel(command, json) {
   if (!command.includeCardFormatting) {
     return json.hits;
   }
+
   var results = _.map(json.hits, function (hit) {
     var obj = {
       raw: hit,
       formatted: {}
     };
+
     return cardViewModel.enrichViewModel(obj, json.expand);
   });
 
@@ -214,6 +218,8 @@ module.exports = function (command) {
   var r = command.r;
   var erdEntityTable = r.table(domainUtils.statics.ERDTABLE);
 
+  var filterQueryUtils = require("../utils")(generatedSchemas, r);
+
   //ERD
   var erdMappingConfig = require("../../schemas/erd/elasticsearch")(generatedSchemas);
 
@@ -221,7 +227,7 @@ module.exports = function (command) {
     r: command.r,
     erdEntityTable: erdEntityTable,
     erdMappingConfig: erdMappingConfig,
-    filterQueryUtils: require("../utils")(generatedSchemas, r),
+    filterQueryUtils: filterQueryUtils,
     esClient: command.esClient,
   });
 
@@ -237,22 +243,50 @@ module.exports = function (command) {
         return erdEntityTable.get(req.params.id);
       })
       .then(function (entity) {
-        return erdMappingConfig.cleanupRethinkDTO(entity);
-      })
-      .then(function (entity) {
 
-        if (req.includeCardFormatting) {
-
-          //TODO: 
-          //- define a static list of refs per subtype, needed to render said subtype. 
-          //e.g.: event -> workFeatured, location, location.containedInPlace. 
-          //This is needed to render the card. 
+        //if entity not found return a 404
+        if (null) {
+          var err = new Error("Entity not found");
+          err.status = 404;
+          throw err;
         }
 
-        res.json({
-          result: entity,
-          expand: {}
-        });
+        //fetch root and get the to-be-expanded fields
+        var root = entity.root;
+        var fieldsToExpand = expandMap[root];
+        var entities = [entity];
+        var expand = {};
+
+        if (!fieldsToExpand) {
+          throw new Error("'type' not found in auto-expand map for type: " + root);
+        }
+
+        //fetch the expanded entities
+        return Promise.resolve()
+          .then(function () {
+            return filterQueryUtils.recurseReferencesToExpand(entities, root, fieldsToExpand, expand);
+          })
+          .then(function () {
+            return {
+              hits: entities,
+              expand: expand
+            };
+          });
+      })
+      .then(function (json) {
+        return conditionalEnrichWithCardViewmodel({
+          includeCardFormatting: true
+        }, json);
+      })
+      .then(function (entities) {
+
+        if (!entities.length) {
+          throw new Error("Sanity check: entities.length = 0 but we've found an entity before?!");
+        }
+        res.json(entities[0]);
+      })
+      .catch(function (err) {
+        next(err);
       });
   });
 

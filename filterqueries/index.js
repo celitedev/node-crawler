@@ -55,7 +55,7 @@ require("./routes/filterQueries")(command);
 app.use(function jsonErrorHandler(err, req, res, next) {
   console.error(err.stack);
 
-  var status = 500;
+  var status = err.status || 500;
   res.status(status).json({
     meta: {
       status: status,
