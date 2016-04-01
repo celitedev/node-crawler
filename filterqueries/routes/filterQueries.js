@@ -20,7 +20,8 @@ var expandMap = {
     "location",
     "workFeatured"
   ],
-  PlaceWithOpeninghours: []
+  PlaceWithOpeninghours: [],
+  CreativeWork: []
 };
 
 
@@ -161,8 +162,112 @@ function generateFilterContextFromResponse(json) {
 }
 
 
+//simply the most fantastic NLP stuff evarrr..
+var subtypeToFilterQuery = {
+
+  //top level types
+  "creativework": {
+    type: "CreativeWork"
+  },
+  "event": {
+    type: "Event"
+  },
+  "place": {
+    type: "PlaceWithOpeninghours"
+  },
+
+  //some synonyms for place...
+  "business": {
+    type: "PlaceWithOpeninghours"
+  },
+  "localbusiness": {
+    type: "PlaceWithOpeninghours"
+  },
+  "placewithopeninghours": {
+    type: "PlaceWithOpeninghours"
+  },
+  "movie": {
+    type: "CreativeWork",
+    filter: {
+      subtypes: "Movie"
+    }
+  },
+
+  //movie showing
+  "movieshowing": {
+    type: "Event",
+    filter: {
+      subtypes: "ScreeningEvent"
+    }
+  },
+  "movieevent": {
+    type: "Event",
+    filter: {
+      subtypes: "ScreeningEvent"
+    }
+  },
+  "screeningevent": {
+    type: "Event",
+    filter: {
+      subtypes: "ScreeningEvent"
+    }
+  },
+
+  //place
+  restaurant: {
+    type: "PlaceWithOpeninghours",
+    filter: {
+      subtypes: "Restaurant"
+    }
+  },
+  bar: {
+    type: "PlaceWithOpeninghours",
+    filter: {
+      subtypes: "Bar"
+    }
+  },
+  store: {
+    type: "PlaceWithOpeninghours",
+    filter: {
+      subtypes: "Store"
+    }
+  },
+  movietheater: {
+    type: "PlaceWithOpeninghours",
+    filter: {
+      subtypes: "movietheater"
+    }
+  },
+  "movie theater": {
+    type: "PlaceWithOpeninghours",
+    filter: {
+      subtypes: "movietheater"
+    }
+  }
+};
+
+
 var middleware = {
+
+  superSweetNLP: function superSweetNLP(req, res, next) {
+    if (req.body.question) {
+      var filterContext = subtypeToFilterQuery[req.body.question.toLowerCase()];
+      if (!filterContext) {
+        var err = new Error("Not sure what you mean! try to search for something like `movie theater`");
+        err.status = 400;
+        return next(err);
+      }
+      _.extend(req.body, filterContext, {
+        wantUnique: false
+      });
+    }
+    next();
+  },
   createFilterQuery: function createFilterQuery(req, res, next) {
+
+    if (!req.body.type) {
+      throw new Error("req.body.type shoud be defined");
+    }
 
     //default sort
     req.body.sort = req.body.sort || {
@@ -319,7 +424,7 @@ module.exports = function (command) {
   });
 
   //used by Answer page. 
-  app.post('/question', middleware.addExpand, middleware.createFilterQuery, function (req, res, next) {
+  app.post('/question', middleware.superSweetNLP, middleware.addExpand, middleware.createFilterQuery, function (req, res, next) {
 
     //create related filter queries.
     var filterQueries = createRelatedFilterQueries(req.filterQuery);
