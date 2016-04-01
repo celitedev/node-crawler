@@ -398,7 +398,7 @@ module.exports = function (generatedSchemas, r) {
   };
 
 
-  function recurseReferencesToExpand(entities, root, fieldsToExpand, expandOut, options) {
+  function recurseReferencesToExpand(entities, root, fieldsToExpand, expandOut) {
 
     //1. Move all refs to `_refs`, thereyby changing entities.
     //2. Fetch all ids for those refs and store them in refMap
@@ -462,7 +462,7 @@ module.exports = function (generatedSchemas, r) {
           var refEntitiesForPath = _.values(_.pick(referencesById, idsForPrefixPath));
 
           //recurse already
-          return recurseReferencesToExpand(refEntitiesForPath, v.root, v.suffixPaths, expandOut, options);
+          return recurseReferencesToExpand(refEntitiesForPath, v.root, v.suffixPaths, expandOut);
         });
 
         //execute the recurse

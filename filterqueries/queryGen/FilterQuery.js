@@ -323,7 +323,7 @@ module.exports = function (command) {
                   var expandFields = self.meta.refs.expand || [];
                   expandFields = _.isArray(expandFields) ? expandFields : [expandFields];
 
-                  return filterQueryUtils.recurseReferencesToExpand(entities, root, expandFields, expand, self.meta.refs);
+                  return filterQueryUtils.recurseReferencesToExpand(entities, root, expandFields, expand);
                 }
               })
               .then(function () {
