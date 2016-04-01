@@ -255,7 +255,7 @@ module.exports = function (generatedSchemas, r) {
     if (!prop) {
       //Don't think we want this, since NLP - > FilterContext should be smart enough to query for Events instead of CreativeWorks
       //when location is involved. Similar for Persons -> Event
-      throw new Error("magic path lookup not implemented yet. I.e.: specifycing `location` on CreativeWork, would go through Event");
+      throw new Error("property not found on schema for type (root, propName): " + root + ", " + propName);
     }
 
     if (prop.isValueObject) {
