@@ -60,7 +60,7 @@ function enrichWithSearchStuff(command) {
 
     //combinedResult.original contains the original results from query
     //keys: hits, expand, meta.
-    //
+
     return _.extend(combinedResult.results, {
       sortOptions: [{
         name: "userProximity",
@@ -74,10 +74,13 @@ function enrichWithSearchStuff(command) {
       }],
 
       facets: [{
-        name: "subtype",
-        label: "type of place", //used for display
+        name: "subtypes",
+        label: "type", //used for display
         type: "enum",
         values: [{
+          name: "Movietheater",
+          nr: combinedResult.results.totalResults
+        }, {
           name: "Restaurant",
           nr: 42
         }, {
@@ -112,7 +115,7 @@ function enrichWithSearchStuff(command) {
           nr: 38
         }]
       }, {
-        name: "subtype",
+        name: "price",
         label: "price range", //used for display
         type: "range",
         min: 10,
@@ -144,7 +147,7 @@ function generateFilterContextFromResponse(json) {
   return {
     type: "PlaceWithOpeninghours",
     filters: {
-      // subtype: "Bar",
+      // subtypes: "Bar",
       // neighborhood: "Soho"
     },
     sort: {
@@ -165,7 +168,7 @@ var middleware = {
     //sort is an array
     req.body.sort = _.isArray(req.body.sort) ? req.body.sort : [req.body.sort];
 
-    req.filter = req.filter || req.filters; //filter and filters are both supported
+    req.body.filter = req.body.filter || req.body.filters; //filter and filters are both supported
 
     //create filterQuery object
     req.filterQuery = FilterQuery(req.body);
@@ -272,6 +275,7 @@ module.exports = function (command) {
       .then(enrichWithSearchStuff(command))
       .then(function returnDTO(dto) {
         console.log("SEARCH response with attribs", _.keys(dto));
+        console.log("nr of results: ", dto.totalResults);
         res.json(dto);
       })
       .catch(function (err) {
