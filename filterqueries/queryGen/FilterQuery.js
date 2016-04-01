@@ -34,6 +34,8 @@ module.exports = function (command) {
     //enough to return the first item if multiple items we're to be returned
     sort: t.Array,
 
+    page: t.maybe(t.Number),
+
     meta: t.maybe(t.Object)
 
   }, 'FilterQuery');
@@ -205,6 +207,11 @@ module.exports = function (command) {
     }
   };
 
+  FilterQuery.prototype.getPage = function () {
+    return {
+      from: 10 * (this.page || 0)
+    };
+  };
 
   FilterQuery.prototype.getFilter = function () {
 
@@ -279,7 +286,7 @@ module.exports = function (command) {
         //getFilter exends body. Can set: 
         //- query
         //- filter
-        _.merge(searchQuery.body, self.getFilter(), self.getTemporal(), self.getSpatial(), self.getSort(), function (a, b) {
+        _.merge(searchQuery.body, self.getPage(), self.getFilter(), self.getTemporal(), self.getSpatial(), self.getSort(), function (a, b) {
           if (_.isArray(a)) {
             return a.concat(b);
           }
