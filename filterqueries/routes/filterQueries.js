@@ -256,7 +256,7 @@ var middleware = {
     if (req.body.question) {
       var filterContext = subtypeToFilterQuery[req.body.question.toLowerCase()];
       if (!filterContext) {
-        var err = new Error("Not sure what you mean! try to search for something like `movie theater`");
+        var err = new Error("Not sure what you mean! try to search for something like `movie theater` or `events`");
         err.status = 400;
         return next(err);
       }
