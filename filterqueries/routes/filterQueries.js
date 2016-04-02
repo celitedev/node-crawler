@@ -404,7 +404,6 @@ module.exports = function (command) {
       .then(enrichWithSearchStuff(command))
       .then(function returnDTO(dto) {
         console.log("SEARCH response with attribs", _.keys(dto));
-        console.log("nr of results: ", dto.totalResults);
         res.json(dto);
       })
       .catch(function (err) {
