@@ -37,10 +37,7 @@ function createDTOS(command) {
         },
         answerNLP: "TODO: below should be a DIFFERENT filtercontext. It's not very useful now", //TODO
 
-        //TODO: actual filterContext from question. Used for: 
-        //- creating link to search
-        //- possibly showing pills/tags
-        filterContext: generateFilterContextFromResponse(json),
+        filterContext: command.filterContext,
 
         //conditionally enrich results with cardViewModel
         results: conditionalEnrichWithCardViewmodel(command, json),
@@ -147,20 +144,6 @@ function conditionalEnrichWithCardViewmodel(command, json) {
 
   return results;
 }
-
-function generateFilterContextFromResponse(json) {
-  return {
-    type: "PlaceWithOpeninghours",
-    filters: {
-      // subtypes: "Bar",
-      // neighborhood: "Soho"
-    },
-    sort: {
-      userProximity: "asc"
-    }
-  };
-}
-
 
 //simply the most fantastic NLP stuff evarrr..
 var subtypeToFilterQuery = {
@@ -271,6 +254,8 @@ var middleware = {
     if (!req.body.type) {
       throw new Error("req.body.type shoud be defined");
     }
+
+    req.body.page = req.body.page || 0;
 
     //default sort
     req.body.sort = req.body.sort || {
@@ -405,6 +390,8 @@ module.exports = function (command) {
     var filterQuery = req.filterQuery;
 
     var command = {
+      //NOTE: here filterQuery and filterContext are the same
+      filterContext: filterQuery,
       includeCardFormatting: req.includeCardFormatting
     };
 
@@ -439,6 +426,7 @@ module.exports = function (command) {
           return filterQuery.performQuery();
         })
         .then(createDTOS({
+          filterContext: filterQuery,
           includeCardFormatting: req.includeCardFormatting
         }))
         .then(function (combinedResult) {
