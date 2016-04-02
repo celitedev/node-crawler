@@ -70,6 +70,11 @@ var simpleCardFormatters = {
       raw.image = raw.image || workFeatured.image;
     }
 
+    //set geo of event based on location if event doesn't have geo set yet
+    var location = expand[raw.location];
+    if (location) {
+      raw.geo = raw.geo || location.geo;
+    }
 
     _.defaults(json.formatted, {
       //default to name of event. Sometimes this is rather meaningless, so we might already set this in subtypes
