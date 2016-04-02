@@ -93,7 +93,7 @@ module.exports = function (command) {
           var path = s.path ? s.path + ".geo" : "geo";
 
           //e.g location.geo ->
-          path = filterQueryUtils.getPathForCompoundKey("Event", path.split("."), true);
+          path = filterQueryUtils.getPathForCompoundKey(self.getRoot(), path.split("."), true);
 
           esSort._geo_distance[path] = s.geo;
         }

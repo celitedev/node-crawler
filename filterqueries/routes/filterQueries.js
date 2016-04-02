@@ -253,7 +253,7 @@ subtypeToFilterQuery.theaters = subtypeToFilterQuery.movietheater;
 
 var middleware = {
   superSweetNLP: function superSweetNLP(req, res, next) {
-    if (req.body.question) {
+    if (!req.type && req.body.question) { //change question into filtercontext if filtercontext not already present
       var filterContext = subtypeToFilterQuery[req.body.question.toLowerCase()];
       if (!filterContext) {
         var err = new Error("Not sure what you mean! try to search for something like `movie theater` or `events`");
