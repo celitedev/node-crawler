@@ -26,15 +26,18 @@ var simpleCardFormatters = {
 
     _.defaults(json.formatted, {
       identifiers1: raw.name,
-      // identifiers2: [
-      //   theater.name,
-      //   //"x min by foot" //TODO: based on user info. What if not supplied? 
-      // ],
-      headsup1: "Rating: " + (Math.round(raw.aggregateRating.ratingValue * 10) / 10) + "/5 (" + raw.aggregateRating.ratingCount + ")",
+      headsup1: (function () {
+        if (raw.aggregateRating.ratingValue) {
+          return "Rating: " + (Math.round(raw.aggregateRating.ratingValue * 10) / 10) + "/5 (" + raw.aggregateRating.ratingCount + ")";
+        } else {
+          return "No Reviews yet";
+        }
+      }()),
       headsup2: _.compact([raw.contentRating].concat(raw.genre)), //if omitted space will be truncated in frontend.
       // databits2: _.compact([movie.contentRating].concat(movie.genre)), //if omitted space will be truncated in frontend.
       // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
     });
+
   },
   screeningevent: function (json, expand) {
 
@@ -54,7 +57,15 @@ var simpleCardFormatters = {
       ],
       headsup1: moment(raw.startDate).format('MMMM Do YYYY, h:mm:ss a'),
       // headsup2: "Released: February 12, 2016", //if omitted space will be truncated in frontend.
-      databits1: "Rating: " + (Math.round(movie.aggregateRating.ratingValue * 10) / 10) + "/5 (" + movie.aggregateRating.ratingCount + "), ****",
+      databits1: (function () {
+        var databits;
+        if (movie.aggregateRating.ratingValue) {
+          databits = "Rating: " + (Math.round(movie.aggregateRating.ratingValue * 10) / 10) + "/5 (" + movie.aggregateRating.ratingCount + ")";
+        } else {
+          databits = "No Reviews yet";
+        }
+        databits += ", ****"; //TODO: HORRIBLE. NEEDS TO BE IN THIS FORMAT FOR FRONTEND. 
+      }()),
       databits2: _.compact([movie.contentRating].concat(movie.genre)),
       // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
     });
