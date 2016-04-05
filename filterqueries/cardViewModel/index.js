@@ -102,7 +102,7 @@ var simpleCardFormatters = {
 
     //if category not yet defined, simply use the fist (most specific) type
     formatted.category = formatted.category || raw.types[0];
-    formatted.databits1 = formatted.databits1 || "$$$, ****"; //TODO: NOTE: THIS IS A HARD FIX SO FRONTEND DOESN'T TRIP! THIS IS TEMPORARY
+    formatted.databits1 = formatted.databits1;
 
     //if imagePrimaryURL not set explicitly, set it to the first element in the image-array
     if (!raw.imagePrimaryUrl && raw.image && raw.image.length) {
