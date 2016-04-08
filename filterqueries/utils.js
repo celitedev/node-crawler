@@ -407,22 +407,38 @@ module.exports = function (generatedSchemas, r) {
 
     //1. Move all refs to `_refs`, thereyby changing entities.
     //2. Fetch all ids for those refs and store them in refMap
-    var pathsForRoot = getEntityPathsForRoot(root);
+
+    var suffixMap = {};
     var refMap = {};
+    var pathsForRoot;
+
+    //Normally all entities have the same root instead of 'all'. 
+    //In that case, calc them here since otherwise we're redoing calculations
+    if (root !== "all") {
+
+      pathsForRoot = getEntityPathsForRoot(root);
+
+      //datastruct for the paths that actually are requested for expansion. 
+      //- key = path (dot.notated) until entity reference, i.e.: the prefix
+      //- val : 
+      //  - root: rootName at this entity reference
+      //  - pathSuffix: path still left when prefix is subtracted. If there is still a suffix
+      //    it means we need to recurse
+      suffixMap = calcPathSuffix(fieldsToExpand, root);
+    }
+
     _.each(entities, function (entity) {
 
+      var localRoot = root !== "all" ? root : entity.root;
+      pathsForRoot = root !== "all" ? pathsForRoot : getEntityPathsForRoot(localRoot);
       var refs = getValuesForPaths(_.keys(pathsForRoot), entity);
 
+      //Extend on suffixmap while iterating different tyoes works because any prefixref (i.e.: location.containedInPlace)
+      //is resovled to exact same types (because of universal definition of these references)
+      _.extend(suffixMap, calcPathSuffix(fieldsToExpand, localRoot));
       _.merge(refMap, refs, mergeFN);
     });
 
-    //datastruct for the paths that actually are requested for expansion. 
-    //- key = path (dot.notated) until entity reference, i.e.: the prefix
-    //- val : 
-    //  - root: rootName at this entity reference
-    //  - pathSuffix: path still left when prefix is subtracted. If there is still a suffix
-    //    it means we need to recurse
-    var suffixMap = calcPathSuffix(fieldsToExpand, root);
 
     return Promise.resolve()
       .then(function () {
