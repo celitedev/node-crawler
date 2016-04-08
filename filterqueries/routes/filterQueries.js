@@ -55,75 +55,76 @@ function createDTOS(command) {
 
 
 
-function enrichWithSearchStuff(command) {
+function enrichWithSchema(command) {
   return function (combinedResult) {
 
     //combinedResult.original contains the original results from query
     //keys: hits, expand, meta.
 
     return _.extend(combinedResult.results, {
-      sortOptions: [{
-        name: "userProximity",
-        label: "proximity to user",
-        isAcending: true, //ascending or decending,
-        help: "tooltip with more help" //optiona;
-      }, {
-        name: "rating",
-        label: "rating",
-        isAcending: true //ascending or decending,
-      }],
+      schema: {
+        sort: [{
+          name: "userProximity",
+          label: "proximity to user",
+          isAcending: true, //ascending or decending,
+          help: "tooltip with more help" //optiona;
+        }, {
+          name: "rating",
+          label: "rating",
+          isAcending: true //ascending or decending,
+        }],
 
-      facets: [{
-        name: "subtypes",
-        label: "type", //used for display
-        type: "enum",
-        values: [{
-          name: "Movietheater",
-          nr: combinedResult.results.totalResults
+        filters: [{
+          name: "subtypes",
+          label: "type", //used for display
+          type: "enum",
+          values: [{
+            val: "Movietheater",
+            nr: combinedResult.results.totalResults
+          }, {
+            val: "Restaurant",
+            nr: 42
+          }, {
+            val: "Bar",
+            nr: 13
+          }]
         }, {
-          name: "Restaurant",
-          nr: 42
+          name: "neighborhood",
+          label: "neighborhood",
+          help: "what neighborhood bla bla description", //used for tooltip
+          type: "enum",
+          values: [{
+            val: "Soho",
+            nr: 48
+          }, {
+            val: "Brooklyn",
+            nr: 38
+          }, {
+            val: "Astoria",
+            nr: 38
+          }, {
+            val: "Brooklyn",
+            nr: 38
+          }, {
+            val: "Astoria",
+            nr: 38
+          }, {
+            val: "Brooklyn",
+            nr: 38
+          }, {
+            val: "Astoria",
+            nr: 38
+          }]
         }, {
-          name: "Bar",
-          nr: 13
+          name: "price",
+          label: "price range", //used for display
+          type: "range",
+          min: 10,
+          max: 5000,
+          prefix: '$',
+          postfix: ''
         }]
-      }, {
-        name: "neighborhood",
-        label: "neighborhood",
-        help: "what neighborhood bla bla description", //used for tooltip
-        type: "enum",
-        values: [{
-          name: "Soho",
-          nr: 48
-        }, {
-          name: "Brooklyn",
-          nr: 38
-        }, {
-          name: "Astoria",
-          nr: 38
-        }, {
-          name: "Brooklyn",
-          nr: 38
-        }, {
-          name: "Astoria",
-          nr: 38
-        }, {
-          name: "Brooklyn",
-          nr: 38
-        }, {
-          name: "Astoria",
-          nr: 38
-        }]
-      }, {
-        name: "price",
-        label: "price range", //used for display
-        type: "range",
-        min: 10,
-        max: 5000,
-        prefix: '$',
-        postfix: ''
-      }]
-
+      }
     });
   };
 }
@@ -401,7 +402,7 @@ module.exports = function (command) {
         return filterQuery.performQuery();
       })
       .then(createDTOS(command))
-      .then(enrichWithSearchStuff(command))
+      .then(enrichWithSchema(command))
       .then(function returnDTO(dto) {
         console.log("SEARCH response with attribs", _.keys(dto));
         res.json(dto);
