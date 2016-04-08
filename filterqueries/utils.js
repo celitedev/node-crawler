@@ -2,7 +2,7 @@ var _ = require("lodash");
 
 module.exports = function (generatedSchemas, r) {
 
-  var erdConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
+  var erdConfig = require("../schemas/es_schema")(generatedSchemas);
   var domainConfig = require("../schemas/domain/_definitions/config");
   var rootUtils = require("../schemas/domain/utils/rootUtils")(generatedSchemas);
 
@@ -100,7 +100,6 @@ module.exports = function (generatedSchemas, r) {
     }, {});
     return agg;
   }, {});
-
 
   function getEntityPathsForRoot(rootName) {
     return entityPathsPerRoot[rootName];
@@ -350,7 +349,8 @@ module.exports = function (generatedSchemas, r) {
     };
   }
 
-  function performTextQuery(v, k) {
+
+  function performTextQuery(v, k, isFuzzy) {
 
     var matchQuery = {
       match: {}
@@ -366,6 +366,11 @@ module.exports = function (generatedSchemas, r) {
       //- https://www.elastic.co/guide/en/elasticsearch/guide/current/bool-query.html#_controlling_precision
       operator: "and"
     };
+
+    //allow fuzziness.
+    if (isFuzzy) {
+      matchQuery.match[k].fuzziness = "AUTO";
+    }
 
     return wrapWithNestedQueryIfNeeed(matchQuery, k);
   }
@@ -433,7 +438,7 @@ module.exports = function (generatedSchemas, r) {
         var refIds = _.compact(_.uniq(_.flatten(_.values(refsToResolve))));
         return r.table(erdEntityTable).getAll.apply(erdEntityTable, refIds)
           .then(function (entities) {
-            return Promise.all(_.map(entities, erdConfig.cleanupRethinkDTO));
+            return Promise.all(_.map(entities, erdConfig.cleanupEnumSynonymsInRethinkDTO));
           });
       })
       .then(function (refEntities) {

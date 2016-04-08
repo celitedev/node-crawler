@@ -9,6 +9,8 @@ var roots = domainConfig.domain.roots;
 var cardViewModel = require("../cardViewModel");
 var FilterQuery;
 
+var subtypeToFilterQuery = require("../queryGen/fakeNLP").subtypeToFilterQuery;
+
 function createRelatedFilterQueries(filterQuery) {
   return [filterQuery, filterQuery, filterQuery];
 }
@@ -146,104 +148,45 @@ function conditionalEnrichWithCardViewmodel(command, json) {
   return results;
 }
 
-//simply the most fantastic NLP stuff evarrr..
-var subtypeToFilterQuery = {
-
-  //top level types
-  "creativework": {
-    type: "CreativeWork"
-  },
-  "event": {
-    type: "Event"
-  },
-  "place": {
-    type: "PlaceWithOpeninghours"
-  },
-  "movie": {
-    type: "CreativeWork",
-    filter: {
-      subtypes: "Movie"
-    }
-  },
-
-  //movie showing
-  "screeningevent": {
-    type: "Event",
-    filter: {
-      subtypes: "ScreeningEvent"
-    }
-  },
-
-  //place
-  restaurant: {
-    type: "PlaceWithOpeninghours",
-    filter: {
-      subtypes: "Restaurant"
-    }
-  },
-  bar: {
-    type: "PlaceWithOpeninghours",
-    filter: {
-      subtypes: "Bar"
-    }
-  },
-  store: {
-    type: "PlaceWithOpeninghours",
-    filter: {
-      subtypes: "Store"
-    }
-  },
-  movietheater: {
-    type: "PlaceWithOpeninghours",
-    filter: {
-      subtypes: "movietheater"
-    }
-  },
-};
-
-/////////////
-//synonyms //
-/////////////
-subtypeToFilterQuery.creativeworks = subtypeToFilterQuery.creativework;
-subtypeToFilterQuery.events = subtypeToFilterQuery.event;
-subtypeToFilterQuery.places = subtypeToFilterQuery.place;
-
-subtypeToFilterQuery.placewithopeninghours = subtypeToFilterQuery.place;
-subtypeToFilterQuery.placeswithopeninghours = subtypeToFilterQuery.place;
-subtypeToFilterQuery.localbusiness = subtypeToFilterQuery.place;
-subtypeToFilterQuery.localbusinesses = subtypeToFilterQuery.place;
-subtypeToFilterQuery["local businesses"] = subtypeToFilterQuery.place;
-subtypeToFilterQuery["local business"] = subtypeToFilterQuery.place;
-
-subtypeToFilterQuery.movies = subtypeToFilterQuery.movie;
-
-subtypeToFilterQuery.screeningevents = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery.movieshowing = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery.movieshowings = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery["movie showing"] = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery["movie showings"] = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery["movie screening"] = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery["movie screenings"] = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery.moviescreening = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery.moviescreenings = subtypeToFilterQuery.screeningevent;
-
-subtypeToFilterQuery.restaurants = subtypeToFilterQuery.restaurant;
-
-subtypeToFilterQuery.movietheaters = subtypeToFilterQuery.movietheater;
-subtypeToFilterQuery["movie theaters"] = subtypeToFilterQuery.movietheater;
-subtypeToFilterQuery["movie theater"] = subtypeToFilterQuery.movietheater;
-subtypeToFilterQuery.theater = subtypeToFilterQuery.movietheater;
-subtypeToFilterQuery.theaters = subtypeToFilterQuery.movietheater;
-
 var middleware = {
   superSweetNLP: function superSweetNLP(req, res, next) {
-    if (!req.type && req.body.question) { //change question into filtercontext if filtercontext not already present
-      var filterContext = subtypeToFilterQuery[req.body.question.toLowerCase()];
-      if (!filterContext) {
+    if (!req.type && req.body.question !== undefined) { //change question into filtercontext if filtercontext not already present
+
+      var lowerBodySplit = _.compact(req.body.question.toLowerCase().split(" ")); //remove empty
+
+      if (!lowerBodySplit.length) {
         var err = new Error("Not sure what you mean! try to search for something like `movie theater` or `events`");
         err.status = 400;
         return next(err);
       }
+
+      //lookup on type
+      var termFound;
+      var filterContext = _.reduce(lowerBodySplit, function (agg, term) {
+        if (agg) return agg; //if already found
+        var fc = subtypeToFilterQuery[term];
+        if (fc) {
+          termFound = term;
+        }
+        return fc;
+      }, null);
+
+      //if type no found to a 'all-type' query
+      //Also make sure 'filter' object exists
+      filterContext = _.defaults(filterContext || {}, {
+        type: "all",
+        filter: {}
+      });
+
+      //termFound was used for type-lookup. Remove that for lookup of name
+      if (termFound) {
+        lowerBodySplit = _.difference(lowerBodySplit, [termFound]);
+      }
+
+      if (lowerBodySplit.length) {
+        filterContext.filter.name = lowerBodySplit.join(" ").trim();
+      }
+
       _.extend(req.body, filterContext, {
         wantUnique: false
       });
@@ -315,7 +258,7 @@ module.exports = function (command) {
   var filterQueryUtils = require("../utils")(generatedSchemas, r);
 
   //ERD
-  var erdMappingConfig = require("../../schemas/erd/elasticsearch")(generatedSchemas);
+  var erdMappingConfig = require("../../schemas/es_schema")(generatedSchemas);
 
   FilterQuery = require("../queryGen/FilterQuery")({
     r: command.r,
@@ -416,6 +359,7 @@ module.exports = function (command) {
   //used by Answer page. 
   app.post('/question', middleware.superSweetNLP, middleware.addExpand, middleware.createFilterQuery, function (req, res, next) {
 
+    console.log("ASDASD");
     //create related filter queries.
     var filterQueries = createRelatedFilterQueries(req.filterQuery);
 
