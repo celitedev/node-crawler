@@ -148,9 +148,6 @@ module.exports = function (generatedSchemas) {
           // postPruneFields: ["genre", "subtypes"] //there are used to create `all_tags`
         }
       },
-
-
-
     },
 
     propertiesCalculated: {
