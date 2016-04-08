@@ -7,11 +7,11 @@ var elasticsearch = require('elasticsearch');
 var colors = require("colors");
 
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
-	checkSoundness: true,
-	config: require("../schemas/domain/_definitions/config"),
-	properties: require("../schemas/domain/_definitions").properties,
-	types: require("../schemas/domain/_definitions").types,
-	schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
+  checkSoundness: true,
+  config: require("../schemas/domain/_definitions/config"),
+  properties: require("../schemas/domain/_definitions").properties,
+  types: require("../schemas/domain/_definitions").types,
+  schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
 });
 
 var domainConfig = require("../schemas/domain/_definitions/config");
@@ -33,284 +33,282 @@ var client = new elasticsearch.Client(config.elasticsearch);
 
 
 var data = _.cloneDeep({
-	state: {
-		total: 0,
-		batch: 1000,
-		nrOfResults: 0
-	},
-	time: {
-		getEntities: 0,
-		fetchRefs: 0,
-		createDTOS: 0,
-		populateRethinkERD: 0,
-		populateES: 0,
-		updateStateOfEntities: 0
-	}
+  state: {
+    total: 0,
+    batch: 1000,
+    nrOfResults: 0
+  },
+  time: {
+    getEntities: 0,
+    fetchRefs: 0,
+    createDTOS: 0,
+    populateRethinkERD: 0,
+    populateES: 0,
+    updateStateOfEntities: 0
+  }
 });
 
 var start = new Date().getTime();
 
 Promise.resolve()
-	.then(function warmPopulate() {
-		var roots = domainConfig.domain.roots;
+  .then(function resetState() {
+    if (argv.reset) {
+      console.log(("Resetting _state.modifiedERD for testing").yellow);
 
-		_.each(roots, entityUtils.calcPropertyOrderToPopulate);
+      if (!argv.type) {
+        return tableCanonicalEntity.update({
+          _state: {
+            modifiedERD: null
+          }
+        });
+      } else {
+        return tableCanonicalEntity.filter(r.row('_type').contains(argv.type)).update({
+          _state: {
+            modifiedERD: null
+          }
+        });
+      }
+    }
+  })
+  .then(function processSourcesRecursive() {
+    return Promise.resolve()
+      .then(function getEntities() {
+        var start = new Date().getTime();
 
-		var allProps = _.extend({}, erdMappingConfig.properties, erdMappingConfig.propertiesCalculated);
+        return Promise.resolve()
+          .then(function fetchRows() {
 
-		///
-		///Enum-config is normalized. 
-		///
-		///- add lowercase to `transform` 
-		_.each(allProps, function(prop, propName) {
+            // var .filter(r.row('_type').contains("Movie"))
+            var getAll = tableCanonicalEntity.getAll(true, {
+              index: "modifiedERD"
+            });
+
+            if (argv.type) {
+              console.log(("Only processing: + " + argv.type).yellow);
+              getAll = getAll.filter(r.row('_type').contains(argv.type));
+            }
+
+            return getAll.limit(data.state.batch);
+
+          })
+          .then(function createCanonicalEntities(results) {
+
+            //skip building aliases since that's not needed
+            var options = {
+              skipAlias: true
+            };
+
+            return _.map(results, function (result) {
+              return new CanonicalEntity({
+                id: result.id,
+                type: result._type
+              }, result, options);
+            });
+          })
+          .then(function (results) {
+            data.time.getEntities += new Date().getTime() - start;
+            return results;
+          });
+      })
+      .then(function calcStats(entities) {
+        data.state.nrOfResults = entities.length;
+        data.state.total += data.state.nrOfResults;
+        console.log("Process CanonicalEntities", data.state.total);
+        return entities;
+      })
+      .then(function resetDataObject(entities) {
+        data.entities = entities;
+      })
+      .then(function fetchRefs() {
+
+        var start = new Date().getTime();
+
+        return Promise.resolve()
+          .then(function () {
+            return CanonicalEntity.fetchRefs(data.entities, true);
+          })
+          .then(function (refMap) {
+            data.time.fetchRefs += new Date().getTime() - start;
+            return refMap;
+          });
+
+      })
+      .then(function createDTOS(refMap) {
+        var start = new Date().getTime();
+
+        return Promise.all(_.map(data.entities, function (entity) {
+
+          return entity.toERDObject(refMap)
+            .then(function hackToGetInImage(dto) {
+
+              //TODO: HACK: adding in 'image' which is _ref
+              //Got to find a good way to do this
+              if (entity._props.image) {
+                var imageArr = _.compact(_.pluck(entity._props.image, "_ref.url"));
+                if (imageArr.length) {
+                  dto.image = imageArr;
+                }
+              }
+
+              return dto;
+            });
+
+        })).then(function (dtos) {
+          data.time.createDTOS += new Date().getTime() - start;
+          return dtos;
+        });
+      })
+      .then(function populateERDS(dtos) {
+
+        function populateRethinkERD() {
+          var start = new Date().getTime();
+          return Promise.resolve()
+            .then(function () {
+
+              function recurseObjectToRemoveExpandKeys(dto) {
+
+                //dtos to rethink are the ES dtos with --expand + --* removed
+                return _.reduce(dto, function (agg, v, k) {
+
+                  if (!~k.indexOf("--")) { //only keep stuff for which key doesn't have '--'
+                    if (_.isArray(v)) {
+
+                      v = _.compact(_.map(v, function (singleItem) {
+                        var obj = _.isObject(singleItem) ? recurseObjectToRemoveExpandKeys(singleItem) : singleItem;
+                        return _.size(obj) ? obj : undefined;
+                      }));
+
+                      v = _.size(v) ? v : undefined;
+
+                    } else {
+                      v = _.isObject(v) ? recurseObjectToRemoveExpandKeys(v) : v;
+                    }
+                    if (v !== undefined) {
+                      agg[k] = v;
+                    }
+                  }
+
+                  return agg;
+                }, {});
+              }
+
+              var dtosRethink = _.map(_.cloneDeep(dtos), function createGeoInObjectForm(dto) {
+
+                //transform from internal (ES/GEOJSON) format [long,lat] to readable format
+                if (dto.geo) {
+                  dto.geo = {
+                    latitude: dto.geo[1],
+                    longitude: dto.geo[0],
+                  };
+                }
+                return dto;
+              });
+
+              dtosRethink = _.map(dtosRethink, recurseObjectToRemoveExpandKeys);
 
 
-			//set isMulti for all erd-properties
-			if (erdMappingConfig.properties[propName]) {
-				if (prop.isMulti !== undefined) throw new Error("isMulti not allowed on ERD-properties, unless they're calculated: " + propName);
-				var propDef = generatedSchemas.properties[propName];
-				if (!propDef) throw new Error("non-calculated ERD-poprety should be defined in domain: " + propName);
-				prop.isMulti = !!propDef.isMulti;
-			} else {
-				//calculated ERD field
-				prop.isMulti = !!prop.isMulti; //make false explicit as well to be clear
-			}
+              return tableERDEntity.insert(dtosRethink, {
+                conflict: "update"
+              });
+            })
+            .then(function () {
+              data.time.populateRethinkERD += new Date().getTime() - start;
+            });
+        }
 
-			if (!prop.enum) return;
+        function populateES() {
 
-			// if mapping has an enum we should always do a lowercase transform
-			// This is the same for the search-end
-			prop.transform = prop.transform || [];
-			prop.transform = _.isArray(prop.transform) ? prop.transform : [prop.transform];
-			prop.transform.push("lowercase");
+          var start = new Date().getTime();
 
-		});
-	})
-	.then(function resetState() {
-		if (argv.reset) {
-			console.log(("Resetting _state.modifiedERD for testing").yellow);
+          var bulk = _.reduce(dtos, function (arr, dto) {
 
-			if (!argv.type) {
-				return tableCanonicalEntity.update({
-					_state: {
-						modifiedERD: null
-					}
-				});
-			} else {
-				return tableCanonicalEntity.filter(r.row('_type').contains(argv.type)).update({
-					_state: {
-						modifiedERD: null
-					}
-				});
-			}
-		}
-	})
-	.then(function processSourcesRecursive() {
-		return Promise.resolve()
-			.then(function getEntities() {
-				var start = new Date().getTime();
+            var meta = {
+              index: {
+                _index: "kwhen-" + dto._root.toLowerCase(),
+                _type: 'type1',
+                _id: dto.id
+              }
+            };
 
-				return Promise.resolve()
-					.then(function fetchRows() {
+            delete dto._root;
+            return arr.concat([meta, dto]);
+          }, []);
 
-						// var .filter(r.row('_type').contains("Movie"))
-						var getAll = tableCanonicalEntity.getAll(true, {
-							index: "modifiedERD"
-						});
+          return Promise.resolve()
+            .then(function () {
+              if (bulk.length) {
+                return Promise.resolve().then(function () {
+                    return client.bulk({
+                      body: bulk
+                    });
+                  })
+                  .then(function (results) {
+                    if (results.errors) {
+                      var errors = _.filter(results.items, function (result) {
+                        return result.index.status >= 300;
+                      });
+                      console.log("ERRORS IN ES BULK INSERT************************");
+                      console.log(JSON.stringify(errors, null, 2));
+                    }
+                  });
+              }
+            })
+            .then(function () {
+              data.time.populateES += new Date().getTime() - start;
+            });
+        }
 
-						if (argv.type) {
-							console.log(("Only processing: + " + argv.type).yellow);
-							getAll = getAll.filter(r.row('_type').contains(argv.type));
-						}
+        return Promise.all([populateRethinkERD(), populateES()]);
+      })
+      .then(function updateStateOfEntities() {
 
-						return getAll.limit(data.state.batch);
+        var start = new Date().getTime();
+        var d = new Date();
 
-					})
-					.then(function createCanonicalEntities(results) {
+        var updatedEntitiesDTO = _.map(data.entities, function (v) {
+          return {
+            id: v.id,
+            _state: {
+              modifiedERD: d
+            }
+          };
+        });
 
-						//skip building aliases since that's not needed
-						var options = {
-							skipAlias: true
-						};
+        return Promise.resolve()
+          .then(function () {
+            return tableCanonicalEntity.insert(updatedEntitiesDTO, {
+              conflict: "update"
+            });
+          })
+          .then(function () {
+            data.time.updateStateOfEntities += new Date().getTime() - start;
+          });
 
-						return _.map(results, function(result) {
-							return new CanonicalEntity({
-								id: result.id,
-								type: result._type
-							}, result, options);
-						});
-					})
-					.then(function(results) {
-						data.time.getEntities += new Date().getTime() - start;
-						return results;
-					});
-			})
-			.then(function calcStats(entities) {
-				data.state.nrOfResults = entities.length;
-				data.state.total += data.state.nrOfResults;
-				console.log("Process CanonicalEntities", data.state.total);
-				return entities;
-			})
-			.then(function resetDataObject(entities) {
-				data.entities = entities;
-			})
-			.then(function fetchRefs() {
-
-				var start = new Date().getTime();
-
-				return Promise.resolve()
-					.then(function() {
-						return CanonicalEntity.fetchRefs(data.entities, true);
-					})
-					.then(function(refMap) {
-						data.time.fetchRefs += new Date().getTime() - start;
-						return refMap;
-					});
-
-			})
-			.then(function createDTOS(refMap) {
-				var start = new Date().getTime();
-
-				return Promise.all(_.map(data.entities, function(entity) {
-					return entity.toERDObject(refMap);
-				})).then(function(dtos) {
-					data.time.createDTOS += new Date().getTime() - start;
-					return dtos;
-				});
-			})
-			.then(function populateRethinkERD(dtos) {
-				var start = new Date().getTime();
-				return Promise.resolve()
-					.then(function() {
-
-						function recurseObjectToRemoveExpandKeys(dto) {
-
-							//dtos to rethink are the ES dtos with --expand + --* removed
-							return _.reduce(dto, function(agg, v, k) {
-
-								if (!~k.indexOf("--")) { //only keep stuff for which key doesn't have '--'
-									if (_.isArray(v)) {
-
-										v = _.compact(_.map(v, function(singleItem) {
-											var obj = _.isObject(singleItem) ? recurseObjectToRemoveExpandKeys(singleItem) : singleItem;
-											return _.size(obj) ? obj : undefined;
-										}));
-
-										v = _.size(v) ? v : undefined;
-
-									} else {
-										v = _.isObject(v) ? recurseObjectToRemoveExpandKeys(v) : v;
-									}
-									if (v !== undefined) {
-										agg[k] = v;
-									}
-								}
-
-								return agg;
-							}, {});
-						}
-
-						var dtosRethink = _.map(_.cloneDeep(dtos), recurseObjectToRemoveExpandKeys);
-
-						return tableERDEntity.insert(dtosRethink, {
-							conflict: "update"
-						});
-					})
-					.then(function() {
-						data.time.populateRethinkERD += new Date().getTime() - start;
-					})
-					.then(function passDTOsToES() {
-						return dtos;
-					});
-			})
-			.then(function populateES(dtos) {
-
-				var start = new Date().getTime();
-
-				var bulk = _.reduce(dtos, function(arr, dto) {
-					var meta = {
-						index: {
-							_index: "kwhen-" + dto._root.toLowerCase(),
-							_type: 'type1',
-							_id: dto.id
-						}
-					};
-					delete dto._root;
-					return arr.concat([meta, dto]);
-				}, []);
-
-				return Promise.resolve()
-					.then(function() {
-						if (bulk.length) {
-							return Promise.resolve().then(function() {
-									return client.bulk({
-										body: bulk
-									});
-								})
-								.then(function(results) {
-									if (results.errors) {
-										var errors = _.filter(results.items, function(result) {
-											return result.index.status >= 300;
-										});
-										console.log("ERRORS IN ES BULK INSERT************************");
-										console.log(JSON.stringify(errors, null, 2));
-									}
-								});
-						}
-					})
-					.then(function() {
-						data.time.populateES += new Date().getTime() - start;
-					});
-			})
-			.then(function updateStateOfEntities() {
-
-				var start = new Date().getTime();
-				var d = new Date();
-
-				var updatedEntitiesDTO = _.map(data.entities, function(v) {
-					return {
-						id: v.id,
-						_state: {
-							modifiedERD: d
-						}
-					};
-				});
-
-				return Promise.resolve()
-					.then(function() {
-						return tableCanonicalEntity.insert(updatedEntitiesDTO, {
-							conflict: "update"
-						});
-					})
-					.then(function() {
-						data.time.updateStateOfEntities += new Date().getTime() - start;
-					});
-
-			})
-			.then(timerStats(data, start))
-			.then(function() {
-				//process all new sources by recursively fetching and processing all sourceEntities in batches
-				if (data.state.nrOfResults === data.state.batch) {
-					return processSourcesRecursive();
-				}
-			});
-	})
-	.catch(function(err) {
-		throw err;
-	})
-	.finally(function() {
-		console.log("QUITTING");
-		r.getPoolMaster().drain(); //quit
-	});
+      })
+      .then(timerStats(data, start))
+      .then(function () {
+        //process all new sources by recursively fetching and processing all sourceEntities in batches
+        if (data.state.nrOfResults === data.state.batch) {
+          return processSourcesRecursive();
+        }
+      });
+  })
+  .catch(function (err) {
+    throw err;
+  })
+  .finally(function () {
+    console.log("QUITTING");
+    r.getPoolMaster().drain(); //quit
+  });
 
 
 function timerStats(data, start) {
-	return function calcStats() {
-		var stats = _.reduce(data.time, function(agg, v, k) {
-			agg[k] = v / 1000;
-			return agg;
-		}, {});
-		stats.TOTAL = (new Date().getTime() - start) / 1000;
-		console.log("Stats", JSON.stringify(stats, undefined, 2));
-	};
+  return function calcStats() {
+    var stats = _.reduce(data.time, function (agg, v, k) {
+      agg[k] = v / 1000;
+      return agg;
+    }, {});
+    stats.TOTAL = (new Date().getTime() - start) / 1000;
+    console.log("Stats", JSON.stringify(stats, undefined, 2));
+  };
 }

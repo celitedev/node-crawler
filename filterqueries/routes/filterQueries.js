@@ -1,315 +1,458 @@
 var _ = require("lodash");
 var Promise = require("bluebird");
 var colors = require("colors");
-var t = require("tcomb");
-
 
 var domainUtils = require("../../schemas/domain/utils");
 var domainConfig = require("../../schemas/domain/_definitions/config");
-
-//DomainConfig
 var roots = domainConfig.domain.roots;
 
-module.exports = function(command) {
+var cardViewModel = require("../cardViewModel");
+var FilterQuery;
+
+function createRelatedFilterQueries(filterQuery) {
+  return [filterQuery, filterQuery, filterQuery];
+}
+
+//This map statically defines per type which references should be expanded
+var expandMap = {
+  Event: [
+    "location.containedInPlace",
+    "location",
+    "workFeatured"
+  ],
+  PlaceWithOpeninghours: [],
+  CreativeWork: []
+};
+
+
+//used for answer and search
+function createDTOS(command) {
+  return function (json) {
+
+    return {
+      results: {
+
+        query: {
+          //TODO: what is this used for?
+        },
+        answerNLP: "TODO: below should be a DIFFERENT filtercontext. It's not very useful now", //TODO
+
+        filterContext: command.filterContext,
+
+        //conditionally enrich results with cardViewModel
+        results: conditionalEnrichWithCardViewmodel(command, json),
+
+        totalResults: json.meta.elasticsearch.hits.total,
+
+        expand: json.expand,
+
+        meta: json.meta
+      },
+      original: json
+    };
+  };
+}
+
+
+
+function enrichWithSchema(command) {
+  return function (combinedResult) {
+
+    //combinedResult.original contains the original results from query
+    //keys: hits, expand, meta.
+
+    return _.extend(combinedResult.results, {
+      schema: {
+        sort: [{
+          name: "userProximity",
+          label: "proximity to user",
+          isAcending: true, //ascending or decending,
+          help: "tooltip with more help" //optiona;
+        }, {
+          name: "rating",
+          label: "rating",
+          isAcending: true //ascending or decending,
+        }],
+
+        filters: [{
+          name: "subtypes",
+          label: "type", //used for display
+          type: "enum",
+          values: [{
+            val: "Movietheater",
+            nr: combinedResult.results.totalResults
+          }, {
+            val: "Restaurant",
+            nr: 42
+          }, {
+            val: "Bar",
+            nr: 13
+          }]
+        }, {
+          name: "neighborhood",
+          label: "neighborhood",
+          help: "what neighborhood bla bla description", //used for tooltip
+          type: "enum",
+          values: [{
+            val: "Soho",
+            nr: 48
+          }, {
+            val: "Brooklyn",
+            nr: 38
+          }, {
+            val: "Astoria",
+            nr: 38
+          }, {
+            val: "Brooklyn",
+            nr: 38
+          }, {
+            val: "Astoria",
+            nr: 38
+          }, {
+            val: "Brooklyn",
+            nr: 38
+          }, {
+            val: "Astoria",
+            nr: 38
+          }]
+        }, {
+          name: "price",
+          label: "price range", //used for display
+          type: "range",
+          min: 10,
+          max: 5000,
+          prefix: '$',
+          postfix: ''
+        }]
+      }
+    });
+  };
+}
+
+function conditionalEnrichWithCardViewmodel(command, json) {
+  if (!command.includeCardFormatting) {
+    return json.hits;
+  }
+
+  var results = _.map(json.hits, function (hit) {
+    var obj = {
+      raw: hit,
+      formatted: {}
+    };
+
+    return cardViewModel.enrichViewModel(obj, json.expand);
+  });
+
+  return results;
+}
+
+//simply the most fantastic NLP stuff evarrr..
+var subtypeToFilterQuery = {
+
+  //top level types
+  "creativework": {
+    type: "CreativeWork"
+  },
+  "event": {
+    type: "Event"
+  },
+  "place": {
+    type: "PlaceWithOpeninghours"
+  },
+  "movie": {
+    type: "CreativeWork",
+    filter: {
+      subtypes: "Movie"
+    }
+  },
+
+  //movie showing
+  "screeningevent": {
+    type: "Event",
+    filter: {
+      subtypes: "ScreeningEvent"
+    }
+  },
+
+  //place
+  restaurant: {
+    type: "PlaceWithOpeninghours",
+    filter: {
+      subtypes: "Restaurant"
+    }
+  },
+  bar: {
+    type: "PlaceWithOpeninghours",
+    filter: {
+      subtypes: "Bar"
+    }
+  },
+  store: {
+    type: "PlaceWithOpeninghours",
+    filter: {
+      subtypes: "Store"
+    }
+  },
+  movietheater: {
+    type: "PlaceWithOpeninghours",
+    filter: {
+      subtypes: "movietheater"
+    }
+  },
+};
+
+/////////////
+//synonyms //
+/////////////
+subtypeToFilterQuery.creativeworks = subtypeToFilterQuery.creativework;
+subtypeToFilterQuery.events = subtypeToFilterQuery.event;
+subtypeToFilterQuery.places = subtypeToFilterQuery.place;
+
+subtypeToFilterQuery.placewithopeninghours = subtypeToFilterQuery.place;
+subtypeToFilterQuery.placeswithopeninghours = subtypeToFilterQuery.place;
+subtypeToFilterQuery.localbusiness = subtypeToFilterQuery.place;
+subtypeToFilterQuery.localbusinesses = subtypeToFilterQuery.place;
+subtypeToFilterQuery["local businesses"] = subtypeToFilterQuery.place;
+subtypeToFilterQuery["local business"] = subtypeToFilterQuery.place;
+
+subtypeToFilterQuery.movies = subtypeToFilterQuery.movie;
+
+subtypeToFilterQuery.screeningevents = subtypeToFilterQuery.screeningevent;
+subtypeToFilterQuery.movieshowing = subtypeToFilterQuery.screeningevent;
+subtypeToFilterQuery.movieshowings = subtypeToFilterQuery.screeningevent;
+subtypeToFilterQuery["movie showing"] = subtypeToFilterQuery.screeningevent;
+subtypeToFilterQuery["movie showings"] = subtypeToFilterQuery.screeningevent;
+subtypeToFilterQuery["movie screening"] = subtypeToFilterQuery.screeningevent;
+subtypeToFilterQuery["movie screenings"] = subtypeToFilterQuery.screeningevent;
+subtypeToFilterQuery.moviescreening = subtypeToFilterQuery.screeningevent;
+subtypeToFilterQuery.moviescreenings = subtypeToFilterQuery.screeningevent;
+
+subtypeToFilterQuery.restaurants = subtypeToFilterQuery.restaurant;
+
+subtypeToFilterQuery.movietheaters = subtypeToFilterQuery.movietheater;
+subtypeToFilterQuery["movie theaters"] = subtypeToFilterQuery.movietheater;
+subtypeToFilterQuery["movie theater"] = subtypeToFilterQuery.movietheater;
+subtypeToFilterQuery.theater = subtypeToFilterQuery.movietheater;
+subtypeToFilterQuery.theaters = subtypeToFilterQuery.movietheater;
+
+var middleware = {
+  superSweetNLP: function superSweetNLP(req, res, next) {
+    if (!req.type && req.body.question) { //change question into filtercontext if filtercontext not already present
+      var filterContext = subtypeToFilterQuery[req.body.question.toLowerCase()];
+      if (!filterContext) {
+        var err = new Error("Not sure what you mean! try to search for something like `movie theater` or `events`");
+        err.status = 400;
+        return next(err);
+      }
+      _.extend(req.body, filterContext, {
+        wantUnique: false
+      });
+    }
+    next();
+  },
+  createFilterQuery: function createFilterQuery(req, res, next) {
+
+    if (!req.body.type) {
+      throw new Error("req.body.type shoud be defined");
+    }
+
+    req.body.page = req.body.page || 0;
+
+    //default sort
+    req.body.sort = req.body.sort || {
+      type: "doc"
+    };
+
+    //sort is an array
+    req.body.sort = _.isArray(req.body.sort) ? req.body.sort : [req.body.sort];
+
+    req.body.filter = req.body.filter || req.body.filters; //filter and filters are both supported
+
+    //create filterQuery object
+    req.filterQuery = FilterQuery(req.body);
+
+    //asserts
+    if (!~roots.indexOf(req.filterQuery.type)) {
+      throw new Error("filterQuery.type should be a known root: " + roots.join(","));
+    }
+
+    next();
+  },
+  addExpand: function addExpand(req, res, next) {
+    req.body.meta = req.body.meta || {};
+    req.includeCardFormatting = req.body.meta.includeCardFormatting || req.query.includeCardFormatting;
+
+    if (req.includeCardFormatting) {
+
+      var type = req.body.type;
+
+      if (!type) {
+        next(new Error("'type' not defined. Needed if 'includeCardFormatting' defined "));;
+      }
+
+      var refs = req.body.meta.refs = req.body.meta.refs || {};
+
+      //Create the expand map automatically as default
+      refs.expand = refs.expand || expandMap[type];
+
+      if (!refs.expand) {
+        next(new Error("'type' not found in auto-expand map. Used for 'includeCardFormatting=true'. For type: " + type));;
+      }
+    }
+    next();
+  }
+};
+
+
+module.exports = function (command) {
+
+  var app = command.app;
+  var config = command.config;
+  var generatedSchemas = command.generatedSchemas;
+  var r = command.r;
+  var erdEntityTable = r.table(domainUtils.statics.ERDTABLE);
+
+  var filterQueryUtils = require("../utils")(generatedSchemas, r);
+
+  //ERD
+  var erdMappingConfig = require("../../schemas/erd/elasticsearch")(generatedSchemas);
+
+  FilterQuery = require("../queryGen/FilterQuery")({
+    r: command.r,
+    erdEntityTable: erdEntityTable,
+    erdMappingConfig: erdMappingConfig,
+    filterQueryUtils: filterQueryUtils,
+    esClient: command.esClient,
+  });
+
+  app.get('/', function (req, res) {
+    res.send('Use POST silly');
+  });
+
+  //Single Item
+  app.get("/entities/:id", middleware.addExpand, function (req, res, next) {
+
+    Promise.resolve()
+      .then(function () {
+        return erdEntityTable.get(req.params.id);
+      })
+      .then(function (entity) {
+
+        //if entity not found return a 404
+        if (null) {
+          var err = new Error("Entity not found");
+          err.status = 404;
+          throw err;
+        }
+
+        //fetch root and get the to-be-expanded fields
+        var root = entity.root;
+        var fieldsToExpand = expandMap[root];
+        var entities = [entity];
+        var expand = {};
+
+        if (!fieldsToExpand) {
+          throw new Error("'type' not found in auto-expand map for type: " + root);
+        }
+
+        //fetch the expanded entities
+        return Promise.resolve()
+          .then(function () {
+            return filterQueryUtils.recurseReferencesToExpand(entities, root, fieldsToExpand, expand);
+          })
+          .then(function () {
+            return {
+              hits: entities,
+              expand: expand
+            };
+          });
+      })
+      .then(function (json) {
+        return conditionalEnrichWithCardViewmodel({
+          includeCardFormatting: true
+        }, json);
+      })
+      .then(function (entities) {
+
+        if (!entities.length) {
+          throw new Error("Sanity check: entities.length = 0 but we've found an entity before?!");
+        }
+        res.json(entities[0]);
+      })
+      .catch(function (err) {
+        next(err);
+      });
+  });
+
+
+  //used by Search page. 
+  app.post('/search', middleware.addExpand, middleware.createFilterQuery, function (req, res, next) {
+
+    var filterQuery = req.filterQuery;
+
+    var command = {
+      //NOTE: here filterQuery and filterContext are the same
+      filterContext: filterQuery,
+      includeCardFormatting: req.includeCardFormatting
+    };
+
+    return Promise.resolve()
+      .then(function () {
+        //perform query
+        return filterQuery.performQuery();
+      })
+      .then(createDTOS(command))
+      .then(enrichWithSchema(command))
+      .then(function returnDTO(dto) {
+        console.log("SEARCH response with attribs", _.keys(dto));
+        res.json(dto);
+      })
+      .catch(function (err) {
+        err.filterQuery = filterQuery;
+        return next(err);
+      });
+  });
+
+  //used by Answer page. 
+  app.post('/question', middleware.superSweetNLP, middleware.addExpand, middleware.createFilterQuery, function (req, res, next) {
+
+    //create related filter queries.
+    var filterQueries = createRelatedFilterQueries(req.filterQuery);
+
+    var promises = _.map(filterQueries, function (filterQuery) {
+      return Promise.resolve()
+        .then(function () {
+          //perform query
+          return filterQuery.performQuery();
+        })
+        .then(createDTOS({
+          filterContext: filterQuery,
+          includeCardFormatting: req.includeCardFormatting
+        }))
+        .then(function (combinedResult) {
+          return combinedResult.results;
+        });
+    });
+
+    return Promise.all(promises)
+      .then(function (jsons) {
+
+        var firstFilterResult = jsons.shift();
+
+        var outputJson = _.extend(firstFilterResult, {
+          related: jsons
+        });
+
+        console.log("ANSWER response with attribs", _.keys(outputJson));
+
+        res.json(outputJson);
+
+      })
+      .catch(function (err) {
+        err.filterQuery = req.filterQuery;
+        return next(err);
+      });
+  });
 
-	var app = command.app;
-	var config = command.config;
-	var generatedSchemas = command.generatedSchemas;
-	var r = command.r;
-	var esClient = command.esClient;
-
-	var erdEntityTable = r.table(domainUtils.statics.ERDTABLE);
-
-	//FilterQueryUtils
-	var filterQueryUtils = require("../utils")(generatedSchemas, r);
-
-
-	app.get('/', function(req, res) {
-		res.send('Use POST silly');
-	});
-
-
-	app.post('/', function(req, res, next) {
-
-		var filterQuery;
-		return Promise.resolve()
-			.then(function() {
-
-				//create object
-				filterQuery = FilterQuery(req.body);
-
-				//asserts
-				if (!~roots.indexOf(filterQuery.type)) {
-					throw new Error("filterQuery.type should be a known root: " + roots.join(","));
-				}
-
-				//perform query
-				return filterQuery.performQuery();
-
-			})
-			.then(function success(json) {
-
-				json.meta.query = {
-					status: 200,
-					filterQuery: filterQuery
-				};
-
-				res.json(json);
-			})
-			.catch(function(err) {
-				err.filterQuery = filterQuery;
-				return next(err);
-			});
-	});
-
-	var SortObject = t.struct({
-		type: t.String,
-		options: t.Object,
-		asc: t.Boolean,
-	}, 'SortObject');
-
-
-	var FilterQuery = t.struct({
-
-		//A known root. This should be calculated out-of-band 
-		type: t.String,
-
-		//do we want a unique result or a list of results?
-		wantUnique: t.Boolean,
-
-		//How should we filter the returned results
-		filter: t.maybe(t.Object),
-
-		spatial: t.maybe(t.Object),
-
-		temporal: t.maybe(t.Object),
-
-		//return items similar to the items defined in filterObject. 
-		//If similarTo and filter are both defined, similarTo is executed first
-		similarTo: t.maybe(t.Object),
-
-		//sort is always required. Also for wantUnique = true: 
-		//if multiple values returned we look at score to see if we're confident
-		//enough to return the first item if multiple items we're to be returned
-		sort: t.maybe(SortObject),
-
-		meta: t.maybe(t.Object)
-
-	}, 'FilterQuery');
-
-
-	FilterQuery.prototype.getRoot = function() {
-		return this.type;
-	};
-
-	FilterQuery.prototype.getESIndex = function() {
-		return "kwhen-" + this.getRoot().toLowerCase();
-	};
-
-
-
-	FilterQuery.prototype.getTemporal = function() {
-
-		if (!this.temporal) {
-			return {};
-		}
-
-		//TODO: all the checking on values, properties given root and all that.
-		//NOTE startDate hardcoded
-		return {
-			query: {
-				bool: {
-					must: filterQueryUtils.performTemporalQuery(this.temporal, "startDate")
-				}
-			}
-		};
-
-	};
-
-	FilterQuery.prototype.getSpatial = function() {
-
-		if (!this.spatial) {
-			return {};
-		}
-
-		if (!this.spatial.type) throw new Error("Spatial query needs `type` property");
-		if (!this.spatial.options) throw new Error("Spatial query needs `options` property");
-
-		var options = this.spatial.options;
-
-		options._root = this.getRoot();
-		options._type = this.spatial.type;
-
-		if (options._type === "nearUser") {
-			if (!this.meta || !this.meta.user || !this.meta.user.geo) {
-				throw new Error("need meta.user.geo for spatial type: nearUser");
-			}
-			options.geo = this.meta.user.geo;
-			type = "nearPoint";
-		}
-
-		switch (options._type) {
-			case "nearPoint":
-				return filterQueryUtils.performSpatialPointQuery(options, this.spatial.path);
-			case "location":
-				return filterQueryUtils.performSpatialLookupQuery(options, this.spatial.path);
-			case "containedInPlace":
-				return filterQueryUtils.performSpatialLookupQuery(options, this.spatial.path);
-			default:
-				throw new Error("spatial type not supported: " + type);
-		}
-	};
-
-
-	FilterQuery.prototype.getFilter = function() {
-		if (!this.filter) {
-			return {
-
-			};
-		}
-		var query = {
-			query: {
-				bool: {}
-			}
-		};
-
-		//For now we only support AND
-		//TODO: Should support arbitary nested AND / OR, 
-		//which should already be encoded as a nested structure in supplied filter object
-		var mustObj = query.query.bool.must = [];
-
-		var root = this.getRoot();
-
-		_.each(this.filter, function(v, compoundKey) {
-
-			var path = filterQueryUtils.getPathForCompoundKey(root, compoundKey.split("."));
-
-			if (!path) {
-				throw new Error("following filter key not allowed: " + compoundKey);
-			}
-
-			//TODO: #183 - if compoundkey is an entity or valueObject and `v` is an object, allow
-			//deep filtering inside nested object (which is either type = nested (multival) || type=object (singleval))
-
-			var typeOfQuery = _.isObject(v) ? "Range" : "Text";
-			var propFilter;
-
-			switch (typeOfQuery) {
-				case "Text":
-					propFilter = filterQueryUtils.performTextQuery(v, path);
-					break;
-
-				case "Range":
-					propFilter = filterQueryUtils.performRangeQuery(v, path);
-					break;
-			}
-
-			//add filter to AND
-			mustObj.push(propFilter);
-		});
-
-
-		return query;
-	};
-
-	FilterQuery.prototype.wantRawESResults = function() {
-		return this.meta && this.meta.elasticsearch && this.meta.elasticsearch.showRaw;
-	};
-
-	FilterQuery.prototype.performQuery = function() {
-		var self = this;
-
-		var root = self.getRoot();
-
-		return Promise.resolve()
-			.then(function() {
-
-				var searchQuery = {
-					index: self.getESIndex(),
-					type: 'type1',
-					body: {}
-				};
-
-				//getFilter exends body. Can set: 
-				//- query
-				//- filter
-				_.merge(searchQuery.body, self.getFilter(), self.getTemporal(), self.getSpatial(), function(a, b) {
-					if (_.isArray(a)) {
-						return a.concat(b);
-					}
-				});
-
-				return esClient.search(searchQuery);
-			})
-			.then(function(esResult) {
-
-				var hits = esResult.hits.hits;
-
-				return Promise.resolve()
-					.then(function() {
-
-						if (hits.length) {
-
-							if (self.wantUnique) {
-								hits = esResult.hits.hits = hits.slice(0, 1);
-							}
-
-							return r.table(erdEntityTable).getAll.apply(erdEntityTable, _.pluck(hits, "_id"));
-						}
-					})
-					.then(function expandEntities(entities) {
-
-						var expand = {};
-
-						return Promise.resolve()
-							.then(function() {
-
-								//meta.refs.separate = true -> separate all refs in _.refs object
-								//meta.refs.expand -> expand refs, based on array of dot-notated paths
-								if (self.meta && self.meta.refs) {
-
-									var expandFields = self.meta.refs.expand || [];
-									expandFields = _.isArray(expandFields) ? expandFields : [expandFields];
-
-									return filterQueryUtils.recurseReferencesToExpand(entities, root, expandFields, expand, self.meta.refs);
-								}
-							})
-							.then(function() {
-								return [entities, expand];
-							});
-					})
-					.spread(function(entities, expand) {
-
-						entities = entities || {};
-
-						var obj = {};
-
-						if (self.wantUnique) {
-							obj.hit = (entities.length ? entities[0] : null);
-						} else {
-							obj.hits = entities;
-						}
-
-						if (self.meta && self.meta.refs && self.meta.refs.expand) {
-							obj.expand = expand;
-						}
-
-						_.extend(obj, {
-							meta: {
-								elasticsearch: _.extend(_.omit(esResult, "hits"), {
-									hits: _.omit(esResult.hits, "hits"),
-									raw: self.wantRawESResults() ?
-										(self.wantUnique ?
-											(hits.length ? hits[0] : null) :
-											hits) : undefined
-								})
-							}
-
-						});
-
-						return obj;
-					});
-			});
-	};
 
 };
