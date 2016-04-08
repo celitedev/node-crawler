@@ -2,6 +2,9 @@ var t = require("tcomb");
 var _ = require("lodash");
 var Promise = require("bluebird");
 
+var domainConfig = require("../../schemas/domain/_definitions/config");
+var roots = domainConfig.domain.roots;
+
 module.exports = function (command) {
 
   var r = command.r,
@@ -36,7 +39,9 @@ module.exports = function (command) {
 
     page: t.maybe(t.Number),
 
-    meta: t.maybe(t.Object)
+    meta: t.maybe(t.Object),
+
+    allTypesQuery: t.maybe(t.Boolean)
 
   }, 'FilterQuery');
 
@@ -45,8 +50,8 @@ module.exports = function (command) {
     return this.type;
   };
 
-  FilterQuery.prototype.getESIndex = function () {
-    return "kwhen-" + this.getRoot().toLowerCase();
+  FilterQuery.prototype.getESIndex = function (index) {
+    return "kwhen-" + (index || this.getRoot()).toLowerCase();
   };
 
   FilterQuery.prototype.getSort = function () {
@@ -289,7 +294,36 @@ module.exports = function (command) {
     return Promise.resolve()
       .then(function () {
 
-        var searchQuery = {
+        var searchQuery;
+
+        ////////////////////////////////////
+        //This is guaranteed to be a filter solely consisting of 'name' query
+        //TEMPORARY / HACK CONSTRUCT
+        if (self.allTypesQuery) {
+
+          var indices = _.map(roots, function (rootName) {
+            return self.getESIndex(rootName);
+          });
+
+          searchQuery = {
+            index: indices.join(","), //query on all the indices at the same time
+            type: 'type1',
+            body: {}
+          };
+
+          var query = {
+            "query": filterQueryUtils.performTextQuery(self.filter.name, "name", true)
+          };
+
+          _.merge(searchQuery.body, self.getPage(), query, self.getSort());
+
+          return esClient.search(searchQuery);
+        }
+        ////////////
+        ///END HACK
+        ////////////
+
+        searchQuery = {
           index: self.getESIndex(),
           type: 'type1',
           body: {}
@@ -303,8 +337,6 @@ module.exports = function (command) {
             return a.concat(b);
           }
         });
-
-        // console.log(JSON.stringify(searchQuery, null, 2));
 
         return esClient.search(searchQuery);
       })

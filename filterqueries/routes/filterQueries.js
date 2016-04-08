@@ -153,9 +153,10 @@ var middleware = {
     if (!req.type && req.body.question !== undefined) { //change question into filtercontext if filtercontext not already present
 
       var lowerBodySplit = _.compact(req.body.question.toLowerCase().split(" ")); //remove empty
+      var err;
 
       if (!lowerBodySplit.length) {
-        var err = new Error("Not sure what you mean! try to search for something like `movie theater` or `events`");
+        err = new Error("Not sure what you mean! try to search for something like `movie theater` or `events`");
         err.status = 400;
         return next(err);
       }
@@ -187,6 +188,19 @@ var middleware = {
         filterContext.filter.name = lowerBodySplit.join(" ").trim();
       }
 
+      //Make a all types query. 
+      //This will exectute on a separate code path, since we need to query 
+      //multiple/all indices at the same time. 
+      if (filterContext.type === "all") {
+        var filterNames = _.keys(filterContext.filter);
+        if (filterNames.length !== 1 || !filterContext.filter.name) {
+          err = new Error("multi-type query only allowed with exactly 1 filter of type='name'");
+          err.status = 400;
+          return next(err);
+        }
+        filterContext.allTypesQuery = true;
+      }
+
       _.extend(req.body, filterContext, {
         wantUnique: false
       });
@@ -215,13 +229,14 @@ var middleware = {
     req.filterQuery = FilterQuery(req.body);
 
     //asserts
-    if (!~roots.indexOf(req.filterQuery.type)) {
+    if (!~roots.indexOf(req.filterQuery.type) && !req.filterQuery.allTypesQuery) {
       throw new Error("filterQuery.type should be a known root: " + roots.join(","));
     }
 
     next();
   },
   addExpand: function addExpand(req, res, next) {
+
     req.body.meta = req.body.meta || {};
     req.includeCardFormatting = req.body.meta.includeCardFormatting || req.query.includeCardFormatting;
 
@@ -235,8 +250,17 @@ var middleware = {
 
       var refs = req.body.meta.refs = req.body.meta.refs || {};
 
+
       //Create the expand map automatically as default
-      refs.expand = refs.expand || expandMap[type];
+      if (type === "all") {
+        //HACK : need to hack this as well. Relates to #206
+        refs.expand = refs.expand || _.uniq(_.reduce(expandMap, function (arr, v) {
+          return arr.concat(v);
+        }, []));
+
+      } else {
+        refs.expand = refs.expand || expandMap[type];
+      }
 
       if (!refs.expand) {
         next(new Error("'type' not found in auto-expand map. Used for 'includeCardFormatting=true'. For type: " + type));;
@@ -359,7 +383,6 @@ module.exports = function (command) {
   //used by Answer page. 
   app.post('/question', middleware.superSweetNLP, middleware.addExpand, middleware.createFilterQuery, function (req, res, next) {
 
-    console.log("ASDASD");
     //create related filter queries.
     var filterQueries = createRelatedFilterQueries(req.filterQuery);
 
