@@ -14,7 +14,7 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
   var domainUtils = require("../utils");
   var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
 
-  var erdMappingConfig = require("../../erd/elasticsearch")(generatedSchemas);
+  var erdMappingConfig = require("../../es_schema")(generatedSchemas);
   var entityUtils = require("./utils")(generatedSchemas);
   var validator = require("../validation")(generatedSchemas);
 

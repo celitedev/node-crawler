@@ -19,8 +19,6 @@ var domainConfig = require("../schemas/domain/_definitions/config");
 var config = require("../config");
 var r = require('rethinkdbdash')(config.rethinkdb);
 
-var erdMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
-
 var domainUtils = require("../schemas/domain/utils");
 var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
 var tableERDEntity = r.table(domainUtils.statics.ERDTABLE);

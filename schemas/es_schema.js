@@ -4,22 +4,20 @@ var _ = require("lodash");
 //Each domain-property that IS NOT described here, is mapped verbatim. 
 //If a domain-property should NOT be indexed in ES it should be made explicit here. 
 //
-//TODO: Calculated properties should also be allowed. 
-//These is likely seperate config altogether, since we must
-//loop them separately in renewEsMapping and populateES jobs
+//This config also allows for calculated fields
 
 
 //Elasticsearch mappings which may be included by reference. 
 //We first implemented this by string lookup but this gave some weird errors
 //on geo-mapping. This seems cleaner anyway.
-var mappings = require("../../domain/utils").mappings;
+var mappings = require("./domain/utils").mappings;
 
 var singleton;
 module.exports = function (generatedSchemas) {
 
   if (singleton) return singleton; //important! since we'll modify below object, which is not idempotent.
 
-  var vocabs = require("../../../vocabularies")(generatedSchemas);
+  var vocabs = require("../vocabularies")(generatedSchemas);
 
   var obj = {
 
@@ -108,6 +106,8 @@ module.exports = function (generatedSchemas) {
       name: {
         mapping: {
           type: "string",
+          //uses 'standard analyzer'
+          //https://www.elastic.co/guide/en/elasticsearch/guide/current/analysis-intro.html
         },
         fields: {
           "raw": mappings.notAnalyzed
@@ -282,7 +282,7 @@ module.exports = function (generatedSchemas) {
    * @param  {[type]} dto - direct dto input from Rethink
    * @return {[type]}     [description]
    */
-  obj.cleanupRethinkDTO = function (dto) {
+  obj.cleanupEnumSynonymsInRethinkDTO = function (dto) {
     dto = _.reduce(dto, function (agg, propVal, propName) {
 
       var propDef = allProps[propName];

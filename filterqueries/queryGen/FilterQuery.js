@@ -245,9 +245,21 @@ module.exports = function (command) {
       //deep filtering inside nested object (which is either type = nested (multival) || type=object (singleval))
 
       var typeOfQuery = _.isObject(v) ? "Range" : "Text";
+
+      //special path for name: free-text
+      if (compoundKey === "name") {
+        //TODO: should we allow other free text fields such as address?
+        typeOfQuery = "FreeText";
+      }
+
       var propFilter;
 
       switch (typeOfQuery) {
+        case "FreeText":
+          var isFuzzy = true;
+          propFilter = filterQueryUtils.performTextQuery(v, path, isFuzzy);
+          break;
+
         case "Text":
           propFilter = filterQueryUtils.performTextQuery(v, path);
           break;
@@ -313,7 +325,7 @@ module.exports = function (command) {
 
               return r.table(erdEntityTable).getAll.apply(erdEntityTable, _.pluck(hits, "_id"))
                 .then(function (entities) {
-                  return Promise.all(_.map(entities, erdMappingConfig.cleanupRethinkDTO));
+                  return Promise.all(_.map(entities, erdMappingConfig.cleanupEnumSynonymsInRethinkDTO));
                 });
             }
           })

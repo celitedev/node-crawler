@@ -6,7 +6,7 @@ var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
 module.exports = function (generatedSchemas) {
 
-  var erdMappingConfig = require("../../../erd/elasticsearch")(generatedSchemas);
+  var erdMappingConfig = require("../../../es_schema")(generatedSchemas);
 
 
 

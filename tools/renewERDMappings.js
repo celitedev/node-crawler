@@ -14,7 +14,7 @@ var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
   schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
 });
 
-var erdMappingConfig = require("../schemas/erd/elasticsearch")(generatedSchemas);
+var erdMappingConfig = require("../schemas/es_schema")(generatedSchemas);
 
 var client = new elasticsearch.Client(config.elasticsearch);
 
