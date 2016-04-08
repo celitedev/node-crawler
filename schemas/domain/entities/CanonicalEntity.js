@@ -6,690 +6,690 @@ var UUID = require("pure-uuid");
 var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
 
-module.exports = function(generatedSchemas, AbstractEntity, r) {
+module.exports = function (generatedSchemas, AbstractEntity, r) {
 
-	var refMapCalc = {};
-	var refsInProgress = [];
+  var refMapCalc = {};
+  var refsInProgress = [];
 
-	var domainUtils = require("../utils");
-	var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
+  var domainUtils = require("../utils");
+  var tableCanonicalEntity = r.table(domainUtils.statics.CANONICALTABLE);
 
-	var erdMappingConfig = require("../../erd/elasticsearch")(generatedSchemas);
-	var entityUtils = require("./utils")(generatedSchemas);
-	var validator = require("../validation")(generatedSchemas);
+  var erdMappingConfig = require("../../erd/elasticsearch")(generatedSchemas);
+  var entityUtils = require("./utils")(generatedSchemas);
+  var validator = require("../validation")(generatedSchemas);
 
-	function CanonicalEntity(state, bootstrapObj, options) {
-		this._kind = domainUtils.enums.kind.CANONICAL;
-		this._sourceTable = domainUtils.statics.CANONICALTABLE;
-		CanonicalEntity.super_.call(this, state, bootstrapObj, options);
+  function CanonicalEntity(state, bootstrapObj, options) {
+    this._kind = domainUtils.enums.kind.CANONICAL;
+    this._sourceTable = domainUtils.statics.CANONICALTABLE;
+    CanonicalEntity.super_.call(this, state, bootstrapObj, options);
 
-		//FOR NOW: canonical id is derived from canonical
-		if (!state.id) {
-			throw new Error("'state.id' should be defined on CanonicalEntity");
-		}
+    //FOR NOW: canonical id is derived from canonical
+    if (!state.id) {
+      throw new Error("'state.id' should be defined on CanonicalEntity");
+    }
 
-		this.id = state.id;
-		if (bootstrapObj) {
-			this.state = bootstrapObj._state;
-		}
-	}
+    this.id = state.id;
+    if (bootstrapObj) {
+      this.state = bootstrapObj._state;
+    }
+  }
 
 
-	util.inherits(CanonicalEntity, AbstractEntity);
+  util.inherits(CanonicalEntity, AbstractEntity);
 
-	CanonicalEntity.prototype._validationSchema = validator.createSchema();
+  CanonicalEntity.prototype._validationSchema = validator.createSchema();
 
-	CanonicalEntity.prototype.toRethinkObject = function(props) {
+  CanonicalEntity.prototype.toRethinkObject = function (props) {
 
-		var now = new Date();
+    var now = new Date();
 
-		return _.extend(entityUtils._toRethinkObjectRecursive(props || this._props, true), {
-			id: this.id, //set by client based on uuidv5
-			_type: this._type,
-			_state: _.defaults({
-				modified: now //set modified to now
-			}, this.state, {
-				created: now //set created to now if not already set
-			})
-		});
-	};
+    return _.extend(entityUtils._toRethinkObjectRecursive(props || this._props, true), {
+      id: this.id, //set by client based on uuidv5
+      _type: this._type,
+      _state: _.defaults({
+        modified: now //set modified to now
+      }, this.state, {
+        created: now //set created to now if not already set
+      })
+    });
+  };
 
-	CanonicalEntity.prototype.toERDObject = function(refMap) {
+  CanonicalEntity.prototype.toERDObject = function (refMap) {
 
-		var self = this;
+    var self = this;
 
-		return Promise.resolve()
-			.then(function toERDObjectPromise() {
+    return Promise.resolve()
+      .then(function toERDObjectPromise() {
 
-				var props = _.cloneDeep(self._props);
+        var props = _.cloneDeep(self._props);
 
-				//Given (possible multiple) this._type, get the typechain.
-				var typechain = CanonicalEntity.super_.getTypechain(self._type); //may contain duplicate types, see method
+        //Given (possible multiple) this._type, get the typechain.
+        var typechain = CanonicalEntity.super_.getTypechain(self._type); //may contain duplicate types, see method
 
-				//Get the root, which will tell in which index to store, as well as the subtypes: 
-				//i.e. the typechain sitting below the root.
-				var rootAndSubtypes = CanonicalEntity.super_.getRootAndSubtypes(typechain);
+        //Get the root, which will tell in which index to store, as well as the subtypes: 
+        //i.e. the typechain sitting below the root.
+        var rootAndSubtypes = CanonicalEntity.super_.getRootAndSubtypes(typechain);
 
-				var root = rootAndSubtypes.root;
+        var root = rootAndSubtypes.root;
 
-				//subtypes-property is the union of: 
-				//- official subtypes 
-				//- other subtypes which were free to be manually assigned. They *must* adhere to Controlled Vocabulary through
-				//  - subtypes *might* also be populated from the 'tag'-property
-				props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
+        //subtypes-property is the union of: 
+        //- official subtypes 
+        //- other subtypes which were free to be manually assigned. They *must* adhere to Controlled Vocabulary through
+        //  - subtypes *might* also be populated from the 'tag'-property
+        props.subtypes = _.union(rootAndSubtypes.subtypes, props.subtypes);
 
-				//we want root to be indexed to ES as well.
-				props.root = root;
+        //we want root to be indexed to ES as well.
+        props.root = root;
 
-				//we need id to be avail on root
-				props.id = self.id;
+        //we need id to be avail on root
+        props.id = self.id;
 
-				//populate values from other fields.
-				_populate(props, root, false);
+        //populate values from other fields.
+        _populate(props, root, false);
 
-				//do the mapping and stuff.
-				return toERDRecursive(props, typechain, refMap)
-					.then(function toERDObjectAfterRecursive(dto) {
+        //do the mapping and stuff.
+        return toERDRecursive(props, typechain, refMap)
+          .then(function toERDObjectAfterRecursive(dto) {
 
-						//post populate
-						_populate(dto, root, true);
+            //post populate
+            _populate(dto, root, true);
 
-						//optional post reduce values
-						//This is especially useful when wanting to bring a multi-valued value to 
-						//a concatted single-valued value in ERD.
-						_postReduce(dto, root);
+            //optional post reduce values
+            //This is especially useful when wanting to bring a multi-valued value to 
+            //a concatted single-valued value in ERD.
+            _postReduce(dto, root);
 
-						_.extend(dto, {
-							id: self.id,
-							_root: root,
-						});
+            _.extend(dto, {
+              id: self.id,
+              _root: root,
+            });
 
-						return dto;
+            return dto;
 
-					});
-			});
-	};
+          });
+      });
+  };
 
-	function _populate(props, root, isPostPopulate) {
+  function _populate(props, root, isPostPopulate) {
 
-		_.each(entityUtils.calcPropertyOrderToPopulate(root), function populateLoop(propName) {
-			var prop = erdMappingConfig.properties[propName] || erdMappingConfig.propertiesCalculated[propName];
+    _.each(entityUtils.calcPropertyOrderToPopulate(root), function populateLoop(propName) {
+      var prop = erdMappingConfig.properties[propName] || erdMappingConfig.propertiesCalculated[propName];
 
-			if (!prop) return;
+      if (!prop) return;
 
-			var populateObj = prop[!isPostPopulate ? "populate" : "postPopulate"];
+      var populateObj = prop[!isPostPopulate ? "populate" : "postPopulate"];
 
-			if (!populateObj) return;
+      if (!populateObj) return;
 
-			//the fieldnames of which the contents should be populated into the current propName
-			var fields = _.isArray(populateObj.fields) ? populateObj.fields : [populateObj.fields];
+      //the fieldnames of which the contents should be populated into the current propName
+      var fields = _.isArray(populateObj.fields) ? populateObj.fields : [populateObj.fields];
 
-			//populate.stategy with default fallback function
-			var fn = populateObj.strategy || function populateDefaultFN(val) {
-				return _.isArray(val) ? val : [val];
-			};
+      //populate.stategy with default fallback function
+      var fn = populateObj.strategy || function populateDefaultFN(val) {
+        return _.isArray(val) ? val : [val];
+      };
 
-			if (!prop.isMulti) {
+      if (!prop.isMulti) {
 
-				///////////////////////////////////////////////
-				//process populate for a single-valued field //
-				///////////////////////////////////////////////
+        ///////////////////////////////////////////////
+        //process populate for a single-valued field //
+        ///////////////////////////////////////////////
 
-				_.each(fields, function populateSingleValued(field) {
+        _.each(fields, function populateSingleValued(field) {
 
-					if (props[propName] !== undefined) return; //only continue if value not set already
+          if (props[propName] !== undefined) return; //only continue if value not set already
 
-					//fetch content of field
-					var fieldContents = props[field];
+          //fetch content of field
+          var fieldContents = props[field];
 
-					//provide `props` as second arg as well in case we want to noop from entire context
-					var val = fn(fieldContents, props);
-					val = _.isArray(val) ? val : [val];
+          //provide `props` as second arg as well in case we want to noop from entire context
+          var val = fn(fieldContents, props);
+          val = _.isArray(val) ? val : [val];
 
-					//fetch first item if it exists and set 
-					if (val.length && val[0] !== undefined) {
-						props[propName] = val[0];
-					}
+          //fetch first item if it exists and set 
+          if (val.length && val[0] !== undefined) {
+            props[propName] = val[0];
+          }
 
-				});
+        });
 
-			} else {
+      } else {
 
-				//////////////////////////////////////////////
-				//process populate for a multi-valued field //
-				//////////////////////////////////////////////
+        //////////////////////////////////////////////
+        //process populate for a multi-valued field //
+        //////////////////////////////////////////////
 
-				//iterate all fieldnames, fetch the contents, pipe through the strategy function, and save
-				props[propName] = _.uniq(_.reduce(fields, function populateReducer(arr, field) {
-					var fieldContents = props[field];
+        //iterate all fieldnames, fetch the contents, pipe through the strategy function, and save
+        props[propName] = _.uniq(_.reduce(fields, function populateReducer(arr, field) {
+          var fieldContents = props[field];
 
-					var val = fn(fieldContents, props);
-					val = _.isArray(val) ? val : [val];
+          var val = fn(fieldContents, props);
+          val = _.isArray(val) ? val : [val];
 
-					return fieldContents ? arr.concat(val) : arr;
-				}, props[propName] || []));
+          return fieldContents ? arr.concat(val) : arr;
+        }, props[propName] || []));
 
-			}
-		});
+      }
+    });
 
-	}
+  }
 
-	//optional reduce which is executed AFTER Post-populate.
-	function _postReduce(props, root) {
-		_.each(entityUtils.calcPropertyOrderToPopulate(root), function populateLoop(propName) {
-			var prop = erdMappingConfig.properties[propName] || erdMappingConfig.propertiesCalculated[propName];
+  //optional reduce which is executed AFTER Post-populate.
+  function _postReduce(props, root) {
+    _.each(entityUtils.calcPropertyOrderToPopulate(root), function populateLoop(propName) {
+      var prop = erdMappingConfig.properties[propName] || erdMappingConfig.propertiesCalculated[propName];
 
-			if (!prop) return;
+      if (!prop) return;
 
-			if (!prop.postReduce) return;
+      if (!prop.postReduce) return;
 
-			var val = props[propName];
-			val = _.isArray(val) ? val : [val];
+      var val = props[propName];
+      val = _.isArray(val) ? val : [val];
 
-			props[propName] = prop.postReduce(val, props);
+      props[propName] = prop.postReduce(val, props);
 
-		});
-	}
+    });
+  }
 
 
-	function toERDRecursive(properties, typechain, resolvedRefMap) {
+  function toERDRecursive(properties, typechain, resolvedRefMap) {
 
 
-		if (!typechain) {
-			throw new Error("toERDRecursive expects arg 'typechain'");
-		}
+    if (!typechain) {
+      throw new Error("toERDRecursive expects arg 'typechain'");
+    }
 
-		typechain = _.isArray(typechain) ? typechain : [typechain];
+    typechain = _.isArray(typechain) ? typechain : [typechain];
 
-		return Promise.resolve()
-			.then(function toERDRecursiveFetchRefsIfNeeded() {
+    return Promise.resolve()
+      .then(function toERDRecursiveFetchRefsIfNeeded() {
 
-				if (!resolvedRefMap) {
-					return fetchRefs(properties);
-				} else {
-					return resolvedRefMap;
-				}
-			})
-			.then(function toERDRecursiveWork(resolvedRefMap) {
+        if (!resolvedRefMap) {
+          return fetchRefs(properties);
+        } else {
+          return resolvedRefMap;
+        }
+      })
+      .then(function toERDRecursiveWork(resolvedRefMap) {
 
-				var expandMapToInclude = {};
+        var expandMapToInclude = {};
 
-				var dto = {};
+        var dto = {};
 
-				var promises = _.map(properties, function toERDRecursivePerProperty(v, k) {
+        var promises = _.map(properties, function toERDRecursivePerProperty(v, k) {
 
-					if (excludePropertyKeys.indexOf(k) !== -1) return;
+          if (excludePropertyKeys.indexOf(k) !== -1) return;
 
-					var argObj = {
-						isTotalValueMultiValued: _.isArray(v),
-						k: k,
-						expandMapToInclude: expandMapToInclude,
-						typechain: typechain,
-						resolvedRefMap: resolvedRefMap
-					};
+          var argObj = {
+            isTotalValueMultiValued: _.isArray(v),
+            k: k,
+            expandMapToInclude: expandMapToInclude,
+            typechain: typechain,
+            resolvedRefMap: resolvedRefMap
+          };
 
-					return Promise.resolve()
-						.then(function toERDRecursivePerPropertyRecurse() {
+          return Promise.resolve()
+            .then(function toERDRecursivePerPropertyRecurse() {
 
-							if (_.isArray(v)) {
+              if (_.isArray(v)) {
 
-								return Promise.all(_.map(v, function toERDRecursivePerPropertyRecurseForArray(singleVal) {
-										return toERDRecursiveSingleItem(singleVal, argObj);
-									}))
-									.then(function toERDRecursivePerPropertyRecurseForArrayThen(arrOfPossibleArr) {
+                return Promise.all(_.map(v, function toERDRecursivePerPropertyRecurseForArray(singleVal) {
+                    return toERDRecursiveSingleItem(singleVal, argObj);
+                  }))
+                  .then(function toERDRecursivePerPropertyRecurseForArrayThen(arrOfPossibleArr) {
 
-										arrOfPossibleArr = _.compact(arrOfPossibleArr);
+                    arrOfPossibleArr = _.compact(arrOfPossibleArr);
 
-										return _.reduce(arrOfPossibleArr, function toERDRecursivePerPropertyRecurseForArrayReduce(out, possibleArr) {
-											return out.concat(_.isArray(possibleArr) ? possibleArr : [possibleArr]);
-										}, []);
-									});
+                    return _.reduce(arrOfPossibleArr, function toERDRecursivePerPropertyRecurseForArrayReduce(out, possibleArr) {
+                      return out.concat(_.isArray(possibleArr) ? possibleArr : [possibleArr]);
+                    }, []);
+                  });
 
-							} else {
-								//apply single transform to single item. Result may be undefined as well as array. 
-								//Remember isMulti= false, doesn't dictate that a transform can't make an array. 
-								//For instance geoPoint is tranformed to array [long, lat] 
-								return toERDRecursiveSingleItem(v, argObj);
-							}
-						})
-						.then(function toERDRecursivePerPropertyRecurseAfter(out) {
+              } else {
+                //apply single transform to single item. Result may be undefined as well as array. 
+                //Remember isMulti= false, doesn't dictate that a transform can't make an array. 
+                //For instance geoPoint is tranformed to array [long, lat] 
+                return toERDRecursiveSingleItem(v, argObj);
+              }
+            })
+            .then(function toERDRecursivePerPropertyRecurseAfter(out) {
 
-							if (_.isArray(out)) {
+              if (_.isArray(out)) {
 
-								//compact: some may be undefined. uniq: vocab lookup may produce dupes
-								out = _.uniq(_.compact(out));
+                //compact: some may be undefined. uniq: vocab lookup may produce dupes
+                out = _.uniq(_.compact(out));
 
-								//if the remaining size is zero, return undefined.
-								if (!_.size(out)) {
-									out = undefined;
-								}
-							}
+                //if the remaining size is zero, return undefined.
+                if (!_.size(out)) {
+                  out = undefined;
+                }
+              }
 
-							//add result to output object only if not undefined
-							if (out !== undefined) {
-								dto[k] = out;
-							}
-						});
-				});
+              //add result to output object only if not undefined
+              if (out !== undefined) {
+                dto[k] = out;
+              }
+            });
+        });
 
-				return Promise.all(promises)
-					.then(function toERDRecursiveExtendDTO() {
-						return _.extend(dto, expandMapToInclude);
-					});
-			});
+        return Promise.all(promises)
+          .then(function toERDRecursiveExtendDTO() {
+            return _.extend(dto, expandMapToInclude);
+          });
+      });
 
-	}
+  }
 
-	function toERDRecursiveSingleItem(v, argObj) {
+  function toERDRecursiveSingleItem(v, argObj) {
 
-		var isTotalValueMultiValued = argObj.isTotalValueMultiValued;
-		var k = argObj.k;
-		var expandMapToInclude = argObj.expandMapToInclude;
-		var typechain = argObj.typechain;
-		var resolvedRefMap = argObj.resolvedRefMap;
+    var isTotalValueMultiValued = argObj.isTotalValueMultiValued;
+    var k = argObj.k;
+    var expandMapToInclude = argObj.expandMapToInclude;
+    var typechain = argObj.typechain;
+    var resolvedRefMap = argObj.resolvedRefMap;
 
-		var erdMappingObj = erdMappingConfig.properties[k] || erdMappingConfig.propertiesCalculated[k];
+    var erdMappingObj = erdMappingConfig.properties[k] || erdMappingConfig.propertiesCalculated[k];
 
-		return Promise.resolve()
-			.then(function toERDRecursiveSingleItemCalcV() {
+    return Promise.resolve()
+      .then(function toERDRecursiveSingleItemCalcV() {
 
-				if (!v._type) return v;
+        if (!v._type) return v;
 
-				//Translate only original values coming from DB. 
-				//This means no Elasticsearch transformed values.
-				var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
+        //Translate only original values coming from DB. 
+        //This means no Elasticsearch transformed values.
+        var propType = generatedSchemas.types[v._type] || generatedSchemas.datatypes[v._type];
 
-				if (propType.isValueObject) {
-					//recurse non-datatypes
-					//We've already resolved references for all valueObjects.
-					return toERDRecursive(v, typechain, resolvedRefMap);
-				} else if (v._ref) {
-					return undefined; //skip all non-resolved refs. 
-				} else {
-					return v._value; //simplify all datatypes and object-references to their value
-				}
-			})
-			.then(function erdExpandSingleItem(v) {
+        if (propType.isValueObject) {
+          //recurse non-datatypes
+          //We've already resolved references for all valueObjects.
+          return toERDRecursive(v, typechain, resolvedRefMap);
+        } else if (v._ref) {
+          return undefined; //skip all non-resolved refs. 
+        } else {
+          return v._value; //simplify all datatypes and object-references to their value
+        }
+      })
+      .then(function erdExpandSingleItem(v) {
 
-				if (v === undefined) return undefined;
+        if (v === undefined) return undefined;
 
-				return Promise.resolve()
-					.then(function() {
+        return Promise.resolve()
+          .then(function () {
 
 
-						//If mapping contains a `expand` directive, create a new, possibly multivalued, field named: <prop>#expanded. 
-						//E.g.: location#expanded
-						if (erdMappingObj && erdMappingObj.expand) {
+            //If mapping contains a `expand` directive, create a new, possibly multivalued, field named: <prop>#expanded. 
+            //E.g.: location#expanded
+            if (erdMappingObj && erdMappingObj.expand) {
 
-							var expandObj = erdMappingObj.expand;
+              var expandObj = erdMappingObj.expand;
 
-							//fetch the reference and only keep the `fields` defined.
-							var ref = resolvedRefMap[v];
+              //fetch the reference and only keep the `fields` defined.
+              var ref = resolvedRefMap[v];
 
-							if (!ref) {
-								throw new Error("resolved ref couldn't be resolved: " + v + " - " + k);
-							}
+              if (!ref) {
+                throw new Error("resolved ref couldn't be resolved: " + v + " - " + k);
+              }
 
-							var refId = ref.id;
+              var refId = ref.id;
 
-							return Promise.resolve()
-								.then(function calcRefObj() {
+              return Promise.resolve()
+                .then(function calcRefObj() {
 
-									if (refMapCalc[refId]) {
-										return refMapCalc[refId];
-									}
+                  if (refMapCalc[refId]) {
+                    return refMapCalc[refId];
+                  }
 
-									if (refsInProgress.indexOf(refId) === -1) {
+                  if (refsInProgress.indexOf(refId) === -1) {
 
-										refsInProgress.push(refId);
-										return _processObjExpanded(ref, expandObj, refId);
+                    refsInProgress.push(refId);
+                    return _processObjExpanded(ref, expandObj, refId);
 
-									} else {
+                  } else {
 
-										//ref in progress, let's wait for it. It's quicker that way
-										var start = new Date().getTime();
-										return Promise.resolve()
-											.then(function recheckIfRefInProgressIsDone() {
+                    //ref in progress, let's wait for it. It's quicker that way
+                    var start = new Date().getTime();
+                    return Promise.resolve()
+                      .then(function recheckIfRefInProgressIsDone() {
 
-												if (refMapCalc[refId]) {
-													//cool, we've resolved the objExpanded now
-													return refMapCalc[refId];
+                        if (refMapCalc[refId]) {
+                          //cool, we've resolved the objExpanded now
+                          return refMapCalc[refId];
 
-												} else {
+                        } else {
 
-													if (new Date().getTime() - start < 1000) {
-														//check in later if we've resolved.
-														return new Promise(function(resolve, reject) {
-															setTimeout(function() { //Promise.delay doesn't work? so do it like this
-																return resolve(recheckIfRefInProgressIsDone());
-															});
-														});
+                          if (new Date().getTime() - start < 1000) {
+                            //check in later if we've resolved.
+                            return new Promise(function (resolve, reject) {
+                              setTimeout(function () { //Promise.delay doesn't work? so do it like this
+                                return resolve(recheckIfRefInProgressIsDone());
+                              });
+                            });
 
-													} else {
-														//we've waited > 500 ms to resolve. Probably due to crash in other concurrent worker. 
-														//We can't let this get in the way, so we resolve ourselves.
-														return _processObjExpanded(ref, expandObj, refId);
-													}
-												}
-											});
+                          } else {
+                            //we've waited > 500 ms to resolve. Probably due to crash in other concurrent worker. 
+                            //We can't let this get in the way, so we resolve ourselves.
+                            return _processObjExpanded(ref, expandObj, refId);
+                          }
+                        }
+                      });
 
-									}
-								})
-								.then(function doCalculationsBasedOnObjExpanded(objExpanded) {
+                  }
+                })
+                .then(function doCalculationsBasedOnObjExpanded(objExpanded) {
 
-									if (!expandObj.flatten) {
+                  if (!expandObj.flatten) {
 
-										var key = k + "--expand";
-										expandMapToInclude[key] = isTotalValueMultiValued ?
-											(expandMapToInclude[key] || []).concat([objExpanded]) :
-											objExpanded;
+                    var key = k + "--expand";
+                    expandMapToInclude[key] = isTotalValueMultiValued ?
+                      (expandMapToInclude[key] || []).concat([objExpanded]) :
+                      objExpanded;
 
-									} else {
+                  } else {
 
-										//add individual fields to expandMapToInclude
-										_.each(objExpanded, function toERDRecursiveSingleItemExpandMap(v, fieldKey) {
-											var key = k + "--" + fieldKey;
+                    //add individual fields to expandMapToInclude
+                    _.each(objExpanded, function toERDRecursiveSingleItemExpandMap(v, fieldKey) {
+                      var key = k + "--" + fieldKey;
 
-											if (isTotalValueMultiValued) {
-												v = _.isArray(v) ? v : [v];
-												expandMapToInclude[key] = (expandMapToInclude[key] || []).concat(v);
-											} else {
-												//NOTE: v can still be an array here
-												expandMapToInclude[k + "--" + fieldKey] = v;
-											}
-										});
-									}
-								});
+                      if (isTotalValueMultiValued) {
+                        v = _.isArray(v) ? v : [v];
+                        expandMapToInclude[key] = (expandMapToInclude[key] || []).concat(v);
+                      } else {
+                        //NOTE: v can still be an array here
+                        expandMapToInclude[k + "--" + fieldKey] = v;
+                      }
+                    });
+                  }
+                });
 
-						}
-					})
-					.then(function() {
-						return v; // return v in all circumstances
-					});
-			})
-			.then(function transformOrRecurseOnValue(v) {
+            }
+          })
+          .then(function () {
+            return v; // return v in all circumstances
+          });
+      })
+      .then(function transformOrRecurseOnValue(v) {
 
-				if (v === undefined) return undefined;
+        if (v === undefined) return undefined;
 
-				if (!erdMappingObj) return v; //no mapping object so no transformers, vocab lookup, etc.
-				if (erdMappingObj.exclude) return undefined;
+        if (!erdMappingObj) return v; //no mapping object so no transformers, vocab lookup, etc.
+        if (erdMappingObj.exclude) return undefined;
 
-				if (!typechain) {
-					throw new Error("sanity check: 'typechain' not defined on applyTransformOrInspectNestedAttribs");
-				}
-				return Promise.resolve()
-					.then(function transformOrRecurseOnValueTransformOrRecurse() {
+        if (!typechain) {
+          throw new Error("sanity check: 'typechain' not defined on applyTransformOrInspectNestedAttribs");
+        }
+        return Promise.resolve()
+          .then(function transformOrRecurseOnValueTransformOrRecurse() {
 
-						if (erdMappingObj.transform) {
-							//we either do a transform, and then don't try to recurse anymore (since transform can alter at will, 
-							//which will make tranform on child-properties moot).. 
-							return _doESTransform(v, erdMappingObj.transform);
-						} else if (_.isObject(v)) {
-							// .. or no transform specified and we recurse properties
-							return toERDRecursive(v, typechain, resolvedRefMap);
-						} else {
-							return v;
-						}
-					})
-					.then(function transformOrRecurseOnValueVocabLookup(v) {
+            if (erdMappingObj.transform) {
+              //we either do a transform, and then don't try to recurse anymore (since transform can alter at will, 
+              //which will make tranform on child-properties moot).. 
+              return _doESTransform(v, erdMappingObj.transform);
+            } else if (_.isObject(v)) {
+              // .. or no transform specified and we recurse properties
+              return toERDRecursive(v, typechain, resolvedRefMap);
+            } else {
+              return v;
+            }
+          })
+          .then(function transformOrRecurseOnValueVocabLookup(v) {
 
-						return _doVocabLookup(v, _.extend({
-							transformer: erdMappingObj.transform
-						}, argObj));
+            return _doVocabLookup(v, _.extend({
+              transformer: erdMappingObj.transform
+            }, argObj));
 
-					});
-			});
-	}
+          });
+      });
+  }
 
 
-	function _processObjExpanded(ref, expandObj, refId) {
+  function _processObjExpanded(ref, expandObj, refId) {
 
-		ref = _.pick(ref, expandObj.fields.concat("_type"));
+    ref = _.pick(ref, expandObj.fields.concat("_type"));
 
-		//We get the first reftype. We can't do any better for ambiguous types: we can only expand
-		//properties when they occur on all types
-		var refTypechain = CanonicalEntity.super_.getTypechain(ref._type);
-		var refRoot = CanonicalEntity.super_.getRootAndSubtypes(refTypechain).root;
+    //We get the first reftype. We can't do any better for ambiguous types: we can only expand
+    //properties when they occur on all types
+    var refTypechain = CanonicalEntity.super_.getTypechain(ref._type);
+    var refRoot = CanonicalEntity.super_.getRootAndSubtypes(refTypechain).root;
 
-		if (!refTypechain.length) {
-			throw new Error("Sanity check: reftypeChain of length 0 for type: " + JSON.stringify(ref._type));
-		}
+    if (!refTypechain.length) {
+      throw new Error("Sanity check: reftypeChain of length 0 for type: " + JSON.stringify(ref._type));
+    }
 
-		//populate values on Ref
-		_populate(ref, refRoot);
+    //populate values on Ref
+    _populate(ref, refRoot);
 
-		return toERDRecursive(ref, refTypechain)
-			.then(function toERDRecursiveSingleItemWorkAfterToESRecursive(objExpanded) {
+    return toERDRecursive(ref, refTypechain)
+      .then(function toERDRecursiveSingleItemWorkAfterToESRecursive(objExpanded) {
 
-				//post populate on Ref
-				_populate(objExpanded, refRoot, true);
+        //post populate on Ref
+        _populate(objExpanded, refRoot, true);
 
-				//optional post reduce values
-				//This is especially useful when wanting to bring a multi-valued value to 
-				//a concatted single-valued value in ERD.
-				_postReduce(objExpanded, refRoot);
+        //optional post reduce values
+        //This is especially useful when wanting to bring a multi-valued value to 
+        //a concatted single-valued value in ERD.
+        _postReduce(objExpanded, refRoot);
 
-				//After populate we need to prune to wanted fields again.
-				objExpanded = _.pick(objExpanded, expandObj.fields);
+        //After populate we need to prune to wanted fields again.
+        objExpanded = _.pick(objExpanded, expandObj.fields);
 
-				//Now optionally we prune some more fields. 
-				//This allows for keeping a calculated field (say all_tags) which is based on 
-				//a field that we now want to prune
-				objExpanded = _.omit(objExpanded, expandObj.postPruneFields || []);
+        //Now optionally we prune some more fields. 
+        //This allows for keeping a calculated field (say all_tags) which is based on 
+        //a field that we now want to prune
+        objExpanded = _.omit(objExpanded, expandObj.postPruneFields || []);
 
-				if (_.isArray(objExpanded)) {
-					throw new Error("sanity check: expanded object after transform should never be array? ");
-				}
+        if (_.isArray(objExpanded)) {
+          throw new Error("sanity check: expanded object after transform should never be array? ");
+        }
 
-				if (expandObj.includeId) {
-					objExpanded.id = v;
-				}
+        if (expandObj.includeId) {
+          objExpanded.id = v;
+        }
 
-				return objExpanded;
-			})
-			.then(function cacheRef(objExpanded) {
-				refMapCalc[refId] = objExpanded; //cache
-				refsInProgress.splice(refsInProgress.indexOf(refId), 1); //can be removed
-				return objExpanded;
-			});
+        return objExpanded;
+      })
+      .then(function cacheRef(objExpanded) {
+        refMapCalc[refId] = objExpanded; //cache
+        refsInProgress.splice(refsInProgress.indexOf(refId), 1); //can be removed
+        return objExpanded;
+      });
 
-	}
+  }
 
 
-	//transform a value to it's ES-counterpart by either 
-	//- object-notation -> <k,v> map where values are functions with sig function(val)
-	//  missing keys are passed along untouched
-	//- function-notation -> one function with the value passed.
-	//- string-notation -> canned transformer such as float, lowercase. 
-	//
-	//Note: when transformer not defined we recurse the possibly nested object. 
-	//When transformer IS defined, we cannot do that anymore, since the transformer
-	//might (read: is likely to) have changed the 'property-schema' on which recursing relies.
-	function _doESTransform(v, transformers) {
+  //transform a value to it's ES-counterpart by either 
+  //- object-notation -> <k,v> map where values are functions with sig function(val)
+  //  missing keys are passed along untouched
+  //- function-notation -> one function with the value passed.
+  //- string-notation -> canned transformer such as float, lowercase. 
+  //
+  //Note: when transformer not defined we recurse the possibly nested object. 
+  //When transformer IS defined, we cannot do that anymore, since the transformer
+  //might (read: is likely to) have changed the 'property-schema' on which recursing relies.
+  function _doESTransform(v, transformers) {
 
-		transformers = _.isArray(transformers) ? transformers : [transformers];
+    transformers = _.isArray(transformers) ? transformers : [transformers];
 
-		return _.reduce(transformers, function _doESTransformReduce(out, transformer) {
+    return _.reduce(transformers, function _doESTransformReduce(out, transformer) {
 
-			if (_.isFunction(transformer)) {
-				return transformer(v);
-			}
+      if (_.isFunction(transformer)) {
+        return transformer(v);
+      }
 
-			if (_.isObject(transformer)) {
-				if (!_.isObject(v)) {
-					throw new Error("object-transformer selected but value not an object: " + v);
-				}
-				return _.reduce(v, function _doESTransformReducePerProperty(agg, value, k) {
-					var transK = transformer[k];
-					if (transK) {
-						if (_.isString(transK)) {
-							transK = domainUtils.transformers[transformer];
-							if (!fn) throw new Error("canned transformer not found: " + transK);
-						}
-						agg[k] = transK(value);
-					}
-					return agg;
-				}, {});
-			}
+      if (_.isObject(transformer)) {
+        if (!_.isObject(v)) {
+          throw new Error("object-transformer selected but value not an object: " + v);
+        }
+        return _.reduce(v, function _doESTransformReducePerProperty(agg, value, k) {
+          var transK = transformer[k];
+          if (transK) {
+            if (_.isString(transK)) {
+              transK = domainUtils.transformers[transformer];
+              if (!fn) throw new Error("canned transformer not found: " + transK);
+            }
+            agg[k] = transK(value);
+          }
+          return agg;
+        }, {});
+      }
 
-			if (_.isString(transformer)) {
-				var fn = domainUtils.transformers[transformer];
-				if (!fn) throw new Error("canned transformer not found: " + transformer);
-				return fn(v);
-			}
+      if (_.isString(transformer)) {
+        var fn = domainUtils.transformers[transformer];
+        if (!fn) throw new Error("canned transformer not found: " + transformer);
+        return fn(v);
+      }
 
-			throw new Error("transformer needs to be function or object:" + transformer);
+      throw new Error("transformer needs to be function or object:" + transformer);
 
-		}, v);
+    }, v);
 
-	}
+  }
 
 
-	function _doVocabLookup(v, argObj) {
-		var k = argObj.k,
-			typechain = argObj.typechain,
-			transformer = argObj.transformer;
+  function _doVocabLookup(v, argObj) {
+    var k = argObj.k,
+      typechain = argObj.typechain,
+      transformer = argObj.transformer;
 
-		// Vocabulary lookups. 
-		var erdMappingObj = erdMappingConfig.properties[k] || erdMappingConfig.propertiesCalculated[k]; //exists based on calling logic
-		if (erdMappingObj.enum) {
+    // Vocabulary lookups. 
+    var erdMappingObj = erdMappingConfig.properties[k] || erdMappingConfig.propertiesCalculated[k]; //exists based on calling logic
+    if (erdMappingObj.enum) {
 
-			//It's safe to make array, bc: enum -> prop is multivalued
-			//resulting array is later flatmapped into overall result
-			v = _.isArray(v) ? v : [v];
+      //It's safe to make array, bc: enum -> prop is multivalued
+      //resulting array is later flatmapped into overall result
+      v = _.isArray(v) ? v : [v];
 
-			//e.g.: ["Movie"]
-			var typesForThisEnum = _.intersection(_.keys(erdMappingObj.enum.sourceMappings), typechain);
+      //e.g.: ["Movie"]
+      var typesForThisEnum = _.intersection(_.keys(erdMappingObj.enum.sourceMappings), typechain);
 
-			v = _.reduce(v, function _doVocabLookupReduce(arr, val) {
+      v = _.reduce(v, function _doVocabLookupReduce(arr, val) {
 
-				//do a vocab lookup
-				val = _.reduce(typesForThisEnum, function _doVocabLookupReducePerSingleVal(arr, typeName) {
-					var valueMapForType = erdMappingObj.enum.sourceMappings[typeName];
-					return arr.concat(valueMapForType[val] || []);
-				}, []);
+        //do a vocab lookup
+        val = _.reduce(typesForThisEnum, function _doVocabLookupReducePerSingleVal(arr, typeName) {
+          var valueMapForType = erdMappingObj.enum.sourceMappings[typeName];
+          return arr.concat(valueMapForType[val] || []);
+        }, []);
 
-				//after vocab lookup, do a transform again because lookup may have resulted 
-				//in values not respecting transform
-				val = transformer ? _.map(val, _.partial(_doESTransform, _, transformer)) : val;
+        //after vocab lookup, do a transform again because lookup may have resulted 
+        //in values not respecting transform
+        val = transformer ? _.map(val, _.partial(_doESTransform, _, transformer)) : val;
 
-				return arr.concat(val);
-			}, []);
+        return arr.concat(val);
+      }, []);
 
-			v = _.uniq(_.compact(v));
+      v = _.uniq(_.compact(v));
 
-			if (erdMappingObj.enumStrictSingleValued) {
-				if (!v.length) {
-					return undefined;
-				}
+      if (erdMappingObj.enumStrictSingleValued) {
+        if (!v.length) {
+          return undefined;
+        }
 
-				return v[0];
-			}
-		}
-		return v;
-	}
+        return v[0];
+      }
+    }
+    return v;
+  }
 
-	function fetchRefs(propertiesOrEntities, isEntities) {
+  function fetchRefs(propertiesOrEntities, isEntities) {
 
-		var fieldsToFetch = _.uniq(erdMappingConfig.refExpandWithFields.concat(["id", "_type"]));
+    var fieldsToFetch = _.uniq(erdMappingConfig.refExpandWithFields.concat(["id", "_type"]));
 
-		var refs;
+    var refs;
 
-		if (!isEntities) {
-			var properties = propertiesOrEntities;
-			refs = _fetchResolvedRefsRecursive(properties);
-		} else {
-			var entities = propertiesOrEntities;
-			refs = _.reduce(entities, function fetchRefsReduce(arr, entity) {
-				return arr.concat(_fetchResolvedRefsRecursive(entity._props));
-			}, []);
-		}
+    if (!isEntities) {
+      var properties = propertiesOrEntities;
+      refs = _fetchResolvedRefsRecursive(properties);
+    } else {
+      var entities = propertiesOrEntities;
+      refs = _.reduce(entities, function fetchRefsReduce(arr, entity) {
+        return arr.concat(_fetchResolvedRefsRecursive(entity._props));
+      }, []);
+    }
 
-		if (!refs.length) {
-			return Promise.resolve({});
-		}
+    if (!refs.length) {
+      return Promise.resolve({});
+    }
 
-		//lot's of dupes potentially
-		refs = _.uniq(refs);
+    //lot's of dupes potentially
+    refs = _.uniq(refs);
 
-		return tableCanonicalEntity.getAll.apply(tableCanonicalEntity, refs).pluck(fieldsToFetch)
-			.then(function fetchRefsAfter(results) {
+    return tableCanonicalEntity.getAll.apply(tableCanonicalEntity, refs).pluck(fieldsToFetch)
+      .then(function fetchRefsAfter(results) {
 
-				//skip building aliases since that's not needed
-				var options = {
-					skipAlias: true
-				};
+        //skip building aliases since that's not needed
+        var options = {
+          skipAlias: true
+        };
 
-				return _.reduce(results, function fetchRefsAfterReduce(agg, result) {
+        return _.reduce(results, function fetchRefsAfterReduce(agg, result) {
 
-					var entity = new CanonicalEntity({
-						id: result.id,
-						type: result._type
-					}, result, options);
+          var entity = new CanonicalEntity({
+            id: result.id,
+            type: result._type
+          }, result, options);
 
-					var simpleDTO = entity.toSimple();
-					simpleDTO.id = result.id;
+          var simpleDTO = entity.toSimple();
+          simpleDTO.id = result.id;
 
-					agg[entity.id] = simpleDTO;
+          agg[entity.id] = simpleDTO;
 
-					return agg;
-				}, {});
-			});
-	}
+          return agg;
+        }, {});
+      });
+  }
 
-	CanonicalEntity.fetchRefs = fetchRefs;
+  CanonicalEntity.fetchRefs = fetchRefs;
 
 
-	function _fetchResolvedRefsRecursive(properties) {
+  function _fetchResolvedRefsRecursive(properties) {
 
-		var refs = _.reduce(properties, function _fetchResolvedRefsRecursivePerProp(arr, v, k) {
-			if (excludePropertyKeys.indexOf(k) !== -1) return arr;
+    var refs = _.reduce(properties, function _fetchResolvedRefsRecursivePerProp(arr, v, k) {
+      if (excludePropertyKeys.indexOf(k) !== -1) return arr;
 
-			function transformSingleItem(v) {
+      function transformSingleItem(v) {
 
-				var prop = generatedSchemas.properties[k];
-				if (!prop) {
-					//possible because we've already performed `populate` which can add calculated properties
-					return;
-				}
+        var prop = generatedSchemas.properties[k];
+        if (!prop) {
+          //possible because we've already performed `populate` which can add calculated properties
+          return;
+        }
 
-				//if first is range is datatype -> all in range are datatype as per #107
-				//If datatype -> return undefined
-				if (generatedSchemas.datatypes[prop.ranges[0]]) {
-					return;
-				}
+        //if first is range is datatype -> all in range are datatype as per #107
+        //If datatype -> return undefined
+        if (generatedSchemas.datatypes[prop.ranges[0]]) {
+          return;
+        }
 
-				var type = generatedSchemas.types[prop.ranges[0]];
+        var type = generatedSchemas.types[prop.ranges[0]];
 
-				if (!type) {
-					throw new Error("sanity check: type should exist for propName: " + k);
-				}
+        if (!type) {
+          throw new Error("sanity check: type should exist for propName: " + k);
+        }
 
-				if (type.isValueObject) {
-					return arr.concat(_fetchResolvedRefsRecursive(v));
-				}
+        if (type.isValueObject) {
+          return arr.concat(_fetchResolvedRefsRecursive(v));
+        }
 
-				if (v._value) {
-					arr.push(v._value);
-				} else if (_.isString(v)) {
-					//must be a reference as well since it's a string and no datatype
-					//it's not formatted as a _value anymore, since it was already simplified. 
-					//This happens on nested objects from 2nd degree onwards.
-					arr.push(v);
-				}
-			}
+        if (v._value) {
+          arr.push(v._value);
+        } else if (_.isString(v)) {
+          //must be a reference as well since it's a string and no datatype
+          //it's not formatted as a _value anymore, since it was already simplified. 
+          //This happens on nested objects from 2nd degree onwards.
+          arr.push(v);
+        }
+      }
 
-			_.each(_.isArray(v) ? v : [v], transformSingleItem);
+      _.each(_.isArray(v) ? v : [v], transformSingleItem);
 
-			return arr;
-		}, []);
+      return arr;
+    }, []);
 
 
-		return refs;
-	}
+    return refs;
+  }
 
 
 
-	return CanonicalEntity;
+  return CanonicalEntity;
 
 };
