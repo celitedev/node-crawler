@@ -26,6 +26,8 @@ var expandMap = {
   CreativeWork: []
 };
 
+//used for type-less query
+var fixedTypesInOrder = ["Event", "PlaceWithOpeninghours", "CreativeWork"];
 
 //used for answer and search
 function createDTOS(command) {
@@ -148,6 +150,42 @@ function conditionalEnrichWithCardViewmodel(command, json) {
   return results;
 }
 
+
+function createFilterQuery(command) {
+
+  if (!command.type) {
+    throw new Error("command.type shoud be defined");
+  }
+
+  //auto load expand-map
+  if (command.includeCardFormatting) {
+    var refs = command.meta.refs = command.meta.refs || {};
+    refs.expand = refs.expand || expandMap[command.type];
+  }
+
+  command.page = command.page || 0;
+
+  //default sort
+  command.sort = command.sort || {
+    type: "doc"
+  };
+
+  //sort is an array
+  command.sort = _.isArray(command.sort) ? command.sort : [command.sort];
+
+  command.filter = command.filter || command.filters; //filter and filters are both supported
+
+  //create filterQuery object
+  var filterQuery = FilterQuery(command);
+
+  //asserts
+  if (!~roots.indexOf(filterQuery.type)) {
+    throw new Error("filterQuery.type should be a known root: " + roots.join(","));
+  }
+
+  return filterQuery;
+}
+
 var middleware = {
   superSweetNLP: function superSweetNLP(req, res, next) {
     if (!req.type && req.body.question !== undefined) { //change question into filtercontext if filtercontext not already present
@@ -172,11 +210,11 @@ var middleware = {
         return fc;
       }, null);
 
-      //if type no found to a 'all-type' query
+      //if type no found to a 'all-type' query which is later on separated
       //Also make sure 'filter' object exists
       filterContext = _.defaults(filterContext || {}, {
-        type: "all",
-        filter: {}
+        filter: {},
+        type: "all"
       });
 
       //termFound was used for type-lookup. Remove that for lookup of name
@@ -188,83 +226,9 @@ var middleware = {
         filterContext.filter.name = lowerBodySplit.join(" ").trim();
       }
 
-      //Make a all types query. 
-      //This will exectute on a separate code path, since we need to query 
-      //multiple/all indices at the same time. 
-      if (filterContext.type === "all") {
-        var filterNames = _.keys(filterContext.filter);
-        if (filterNames.length !== 1 || !filterContext.filter.name) {
-          err = new Error("multi-type query only allowed with exactly 1 filter of type='name'");
-          err.status = 400;
-          return next(err);
-        }
-        filterContext.allTypesQuery = true;
-      }
-
       _.extend(req.body, filterContext, {
         wantUnique: false
       });
-    }
-    next();
-  },
-  createFilterQuery: function createFilterQuery(req, res, next) {
-
-    if (!req.body.type) {
-      throw new Error("req.body.type shoud be defined");
-    }
-
-    req.body.page = req.body.page || 0;
-
-    //default sort
-    req.body.sort = req.body.sort || {
-      type: "doc"
-    };
-
-    //sort is an array
-    req.body.sort = _.isArray(req.body.sort) ? req.body.sort : [req.body.sort];
-
-    req.body.filter = req.body.filter || req.body.filters; //filter and filters are both supported
-
-    //create filterQuery object
-    req.filterQuery = FilterQuery(req.body);
-
-    //asserts
-    if (!~roots.indexOf(req.filterQuery.type) && !req.filterQuery.allTypesQuery) {
-      throw new Error("filterQuery.type should be a known root: " + roots.join(","));
-    }
-
-    next();
-  },
-  addExpand: function addExpand(req, res, next) {
-
-    req.body.meta = req.body.meta || {};
-    req.includeCardFormatting = req.body.meta.includeCardFormatting || req.query.includeCardFormatting;
-
-    if (req.includeCardFormatting) {
-
-      var type = req.body.type;
-
-      if (!type) {
-        next(new Error("'type' not defined. Needed if 'includeCardFormatting' defined "));;
-      }
-
-      var refs = req.body.meta.refs = req.body.meta.refs || {};
-
-
-      //Create the expand map automatically as default
-      if (type === "all") {
-        //HACK : need to hack this as well. Relates to #206
-        refs.expand = refs.expand || _.uniq(_.reduce(expandMap, function (arr, v) {
-          return arr.concat(v);
-        }, []));
-
-      } else {
-        refs.expand = refs.expand || expandMap[type];
-      }
-
-      if (!refs.expand) {
-        next(new Error("'type' not found in auto-expand map. Used for 'includeCardFormatting=true'. For type: " + type));;
-      }
     }
     next();
   }
@@ -297,7 +261,7 @@ module.exports = function (command) {
   });
 
   //Single Item
-  app.get("/entities/:id", middleware.addExpand, function (req, res, next) {
+  app.get("/entities/:id", function (req, res, next) {
 
     Promise.resolve()
       .then(function () {
@@ -353,15 +317,21 @@ module.exports = function (command) {
 
 
   //used by Search page. 
-  app.post('/search', middleware.addExpand, middleware.createFilterQuery, function (req, res, next) {
+  app.post('/search', function (req, res, next) {
 
-    var filterQuery = req.filterQuery;
+    //always do includeCardFormatting for simplicity
+    var command = _.extend({}, req.body, {
+      includeCardFormatting: true
+    });
 
-    var command = {
-      //NOTE: here filterQuery and filterContext are the same
-      filterContext: filterQuery,
-      includeCardFormatting: req.includeCardFormatting
-    };
+    var filterQuery;
+    try {
+      filterQuery = createFilterQuery(command);
+    } catch (err) {
+      return next(err);
+    }
+
+    command.filterContext = filterQuery;
 
     return Promise.resolve()
       .then(function () {
@@ -381,10 +351,32 @@ module.exports = function (command) {
   });
 
   //used by Answer page. 
-  app.post('/question', middleware.superSweetNLP, middleware.addExpand, middleware.createFilterQuery, function (req, res, next) {
+  app.post('/question', middleware.superSweetNLP, function (req, res, next) {
 
-    //create related filter queries.
-    var filterQueries = createRelatedFilterQueries(req.filterQuery);
+    //always include cardFormatting
+    var command = _.extend({}, req.body, {
+      includeCardFormatting: true
+    });
+
+    //typeless query -> should be split multiple typed queries
+    var filterQueries;
+    try {
+
+      if (command.type === "all") {
+
+        //group filter queries by type
+        filterQueries = _.map(fixedTypesInOrder, function (type) {
+          return createFilterQuery(_.defaults({
+            type: type
+          }, command));
+        });
+      } else {
+        //temporary way of adding related filter queries
+        filterQueries = createRelatedFilterQueries(createFilterQuery(command));
+      }
+    } catch (err) {
+      return next(err);
+    }
 
     var promises = _.map(filterQueries, function (filterQuery) {
       return Promise.resolve()
@@ -394,7 +386,7 @@ module.exports = function (command) {
         })
         .then(createDTOS({
           filterContext: filterQuery,
-          includeCardFormatting: req.includeCardFormatting
+          includeCardFormatting: command.includeCardFormatting
         }))
         .then(function (combinedResult) {
           return combinedResult.results;
@@ -405,7 +397,7 @@ module.exports = function (command) {
       .then(function (jsons) {
 
         var outputJson = {
-          related: jsons
+          results: jsons
         };
 
         console.log("ANSWER response with attribs", _.keys(outputJson));
