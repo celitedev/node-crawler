@@ -404,11 +404,9 @@ module.exports = function (command) {
     return Promise.all(promises)
       .then(function (jsons) {
 
-        var firstFilterResult = jsons.shift();
-
-        var outputJson = _.extend(firstFilterResult, {
+        var outputJson = {
           related: jsons
-        });
+        };
 
         console.log("ANSWER response with attribs", _.keys(outputJson));
 
