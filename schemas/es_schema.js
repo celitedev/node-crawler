@@ -12,6 +12,18 @@ var _ = require("lodash");
 //on geo-mapping. This seems cleaner anyway.
 var mappings = require("./domain/utils").mappings;
 
+
+function facetLabelForType(type) {
+  //TODO:
+  //- creativeWork? 
+  return type.toLowerCase();
+}
+
+function capitalizeFirstLetter(string) {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+
 var singleton;
 module.exports = function (generatedSchemas) {
 
@@ -74,22 +86,45 @@ module.exports = function (generatedSchemas) {
       }
     },
 
+
+    //NOTE: IF NOT DEFINED THIS 
     properties: {
 
       genre: {
+        facet: {
+          type: "enum",
+          label: function (root, type) {
+            if (root === type) return "genre"; //if we query for movies -> return genre
+            return capitalizeFirstLetter(facetLabelForType(type)) + " genre"; //if we query for events -> return movie genre
+          },
+        },
         enum: vocabs.genre
       },
 
       subtypes: {
+        facet: {
+          type: "enum",
+          label: function (root, type) {
+            return "kind of " + facetLabelForType(type);
+          },
+        },
         enum: vocabs.subtypes
       },
 
       ratingValue: {
+        facet: {
+          label: "rating",
+          type: "range"
+        },
         mapping: "double",
         transform: "float"
       },
 
       ratingCount: {
+        facet: {
+          label: "nr of ratings",
+          type: "range"
+        },
         mapping: "long",
         transform: "float"
       },
@@ -99,11 +134,21 @@ module.exports = function (generatedSchemas) {
       },
 
       geo: {
+        // facet: {
+        //   type: "geo" //? not sure if we want facet for geo. And if we want, how? 
+        // },
         mapping: mappings.geo,
         transform: "geo"
       },
 
       name: {
+        facet: {
+          label: function (root, type) {
+            if (root === type) return "name"; //if we query for movies -> return name
+            return capitalizeFirstLetter(facetLabelForType(type)) + " name"; //if we query for events -> return movie name
+          },
+          type: "freeText"
+        },
         mapping: {
           type: "string",
           //uses 'standard analyzer'
@@ -130,7 +175,11 @@ module.exports = function (generatedSchemas) {
         }
       },
 
-      "startDate": {
+      startDate: {
+        facet: {
+          label: "start at",
+          type: "dateTime" //? display as calendar? 
+        },
         "type": "date",
         "format": "yyyy-MM-dd"
       },
@@ -224,9 +273,6 @@ module.exports = function (generatedSchemas) {
       },
     },
 
-    defaultPropertyRelations: {
-
-    }
   };
 
 
@@ -234,7 +280,7 @@ module.exports = function (generatedSchemas) {
   //First require -> do some processing. //
   /////////////////////////////////////////
 
-  var allProps = _.extend({}, obj.properties, obj.propertiesCalculated);
+  var allProps = obj.allProperties = _.defaults({}, obj.properties, obj.propertiesCalculated);
 
   ///
   ///Enum-config is normalized. 

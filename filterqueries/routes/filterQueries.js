@@ -57,15 +57,125 @@ function createDTOS(command) {
   };
 }
 
+function fakeFilters(combinedResult) {
 
+  return _.extend(combinedResult.results, {
+    schema: {
+      sort: [{
+        name: "userProximity",
+        label: "proximity to user",
+        isAcending: true, //ascending or decending,
+        help: "tooltip with more help" //optiona;
+      }, {
+        name: "rating",
+        label: "rating",
+        isAcending: true //ascending or decending,
+      }],
 
-function enrichWithSchema(command) {
+      filters: [{
+        name: "subtypes",
+        label: "type", //used for display
+        type: "enum",
+        values: [{
+          val: "Movietheater",
+          nr: combinedResult.results.totalResults
+        }, {
+          val: "Restaurant",
+          nr: 42
+        }, {
+          val: "Bar",
+          nr: 13
+        }]
+      }, {
+        name: "neighborhood",
+        label: "neighborhood",
+        help: "what neighborhood bla bla description", //used for tooltip
+        type: "enum",
+        values: [{
+          val: "Soho",
+          nr: 48
+        }, {
+          val: "Brooklyn",
+          nr: 38
+        }, {
+          val: "Astoria",
+          nr: 38
+        }, {
+          val: "Brooklyn",
+          nr: 38
+        }, {
+          val: "Astoria",
+          nr: 38
+        }, {
+          val: "Brooklyn",
+          nr: 38
+        }, {
+          val: "Astoria",
+          nr: 38
+        }]
+      }]
+    }
+  });
+}
+
+function enrichWithFilters(command, filterQueryUtils) {
   return function (combinedResult) {
 
-    //combinedResult.original contains the original results from query
-    //keys: hits, expand, meta.
+    var root = command.filterContext.getRoot();
 
-    return _.extend(combinedResult.results, {
+    if (root !== "CreativeWork") return fakeFilters(combinedResult);
+
+    //fetch all supported properties for root
+    var rootMap = filterQueryUtils.getRootMap(root);
+
+    //all properties that are indexed in ES and can thus be queried
+    var allProperties = filterQueryUtils.erdConfig.allProperties;
+
+    //get all the facetProperties supported by this root
+    var facetProperties = _.reduce(_.pick(allProperties, _.keys(rootMap)), function (agg, v, k) {
+      if (v.facet) {
+        agg[k] = v;
+      }
+      return agg;
+    }, {});
+
+    ////////////////////////////////////////
+    //TODO: FETCH BASED ON EXPAND AS WELL //
+    ////////////////////////////////////////
+
+    var supportedFilters = _.reduce(facetProperties, function (arr, v, k) {
+      var facetDTO = {
+        type: v.facet.type,
+        name: k, //TODO: this will be dot-notation for expand
+        label: k,
+        help: "we need to define help text" //TODO
+      };
+
+      //TODO: will change on dot-notated props. Then type is, say, location, while root is, say, event
+      var type = root;
+
+      if (v.facet.type === "enum") {
+        var label = v.facet.label;
+        if (label) {
+          facetDTO.label = _.isFunction(label) ? label(root, type) : label;
+        }
+        facetDTO.values = [{
+          val: "Brooklyn",
+          nr: 48
+        }, {
+          val: "Astoria",
+          nr: 48
+        }, {
+          val: "Soho",
+          nr: 48
+        }];
+
+        arr.push(facetDTO);
+      }
+      return arr;
+    }, []);
+
+    var result = _.extend(combinedResult.results, {
       schema: {
         sort: [{
           name: "userProximity",
@@ -77,59 +187,31 @@ function enrichWithSchema(command) {
           label: "rating",
           isAcending: true //ascending or decending,
         }],
-
-        filters: [{
-          name: "subtypes",
-          label: "type", //used for display
-          type: "enum",
-          values: [{
-            val: "Movietheater",
-            nr: combinedResult.results.totalResults
-          }, {
-            val: "Restaurant",
-            nr: 42
-          }, {
-            val: "Bar",
-            nr: 13
-          }]
-        }, {
-          name: "neighborhood",
-          label: "neighborhood",
-          help: "what neighborhood bla bla description", //used for tooltip
-          type: "enum",
-          values: [{
-            val: "Soho",
-            nr: 48
-          }, {
-            val: "Brooklyn",
-            nr: 38
-          }, {
-            val: "Astoria",
-            nr: 38
-          }, {
-            val: "Brooklyn",
-            nr: 38
-          }, {
-            val: "Astoria",
-            nr: 38
-          }, {
-            val: "Brooklyn",
-            nr: 38
-          }, {
-            val: "Astoria",
-            nr: 38
-          }]
-        }, {
-          name: "price",
-          label: "price range", //used for display
-          type: "range",
-          min: 10,
-          max: 5000,
-          prefix: '$',
-          postfix: ''
-        }]
+        filters: supportedFilters
       }
     });
+
+
+    return result;
+
+
+
+    //TODO PRESENTING FILTERS 
+    //1. fetch all available es-fields per root
+    //2. ... including expanded ones
+    //3. ... that are available for filtering? hmm, shouldn't this be all filters, since otherwise how to link NLP?
+    //4. intersect with all fields for which enums are set. 
+    //4. other filters that are deemed important such as ranges
+    //5. Create labels for all filters including expanded ones. 
+    //
+    //NO: NOT ALL FILTERS NEED TO BE SUPPORTED BY FACETS
+    //YES: ALL FILTERS NEED TO BE SUPPORTED BY *ACTIVE* FACETS
+    //
+    //TODO CREATING FILTERS: 
+    //1. FROM PATH
+    //filterQueryUtils.getPathForCompoundKey(root, "location.containedInPlace.name".split(".")));
+    //
+
   };
 }
 
@@ -339,7 +421,7 @@ module.exports = function (command) {
         return filterQuery.performQuery();
       })
       .then(createDTOS(command))
-      .then(enrichWithSchema(command))
+      .then(enrichWithFilters(command, filterQueryUtils))
       .then(function returnDTO(dto) {
         console.log("SEARCH response with attribs", _.keys(dto));
         res.json(dto);

@@ -65,7 +65,6 @@ module.exports = function (generatedSchemas, r) {
       return agg2;
     }, {}), calcPropNamesForRoot);
 
-
     //We allow for autoresolving properties. 
     //This means that we use a filterQuery on a Place and property, say, ratingValue, 
     //it should know to resolve it through Place.aggregateRating.ratingValue. 
@@ -89,6 +88,9 @@ module.exports = function (generatedSchemas, r) {
     return agg;
   }, {});
 
+  function getRootMap(rootName) {
+    return rootPropertyMap[rootName];
+  }
 
   //dot-separated paths for all entities. Per root
   var entityPathsPerRoot = _.reduce(rootPropertyMap, function (agg, propMap, rootName) {
@@ -504,7 +506,9 @@ module.exports = function (generatedSchemas, r) {
     getEntityPathsForRoot: getEntityPathsForRoot,
     calcPathSuffix: calcPathSuffix,
     getValuesForPaths: getValuesForPaths,
-    recurseReferencesToExpand: recurseReferencesToExpand
+    recurseReferencesToExpand: recurseReferencesToExpand,
+    getRootMap: getRootMap,
+    erdConfig: erdConfig
   };
 
 };
