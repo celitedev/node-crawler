@@ -25,7 +25,7 @@ module.exports = {
     //- false: never prune
     //- true: prune if url already processed
     //- batch: prune if url already processed for this batch
-    pruneEntity: true,
+    pruneEntity: "batch",
 
     //How to check entity is updated since last processed
     // - string (templated functions) 
@@ -52,7 +52,13 @@ module.exports = {
     //
     //A good setting may be: 
     //- EACH HOUR: Run pruneList = batch + pruntEntity = true 
-    //- EACH DAY: Run pruneList = batch + pruntEntity = batch 
+    //- EACH DAY: Run pruneList = batch + pruntEntity = batch   
+    //
+    ///////////////////////////////////////////////////////////////////
+    //NOTE: PRUNELIST IS KEPT IN REDIS. BE SURE TO CLEAN THIS UP IF WE CLEAN RETHINKDB. 
+    //OTHERWISE PRUNE=TRUE WILL PRUNE EVEN IF WE DON'T HAVE THE ENTITY IN DB ANYMORE.
+    //THIS IS ONLY AN ISSUE DURING DEV
+    //////////////////////////////////////////////////////////////////////
   },
   job: {
     //x concurrent kue jobs
@@ -136,7 +142,9 @@ module.exports = {
       //We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
       selector: ".search-results > li", //selector for results
 
-      //does detailPage pruning. For this to work: 
+      //Indicate that the schema visits a detail page. 
+      //This can be used later on by pruning strategies.
+      //
       //- _sourceUrl should exist and should equal detail page visisted
       //- 'detail page visited' is the page on which the detailObj is attached.
       detailPageAware: true,
