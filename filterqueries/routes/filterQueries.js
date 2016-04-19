@@ -23,11 +23,12 @@ var expandMap = {
     "workFeatured"
   ],
   PlaceWithOpeninghours: [],
-  CreativeWork: []
+  CreativeWork: [],
+  OrganizationAndPerson: []
 };
 
 //used for type-less query
-var fixedTypesInOrder = ["Event", "PlaceWithOpeninghours", "CreativeWork"];
+var fixedTypesInOrder = ["Event", "PlaceWithOpeninghours", "CreativeWork", "OrganizationAndPerson"];
 
 //used for answer and search
 function createDTOS(command) {

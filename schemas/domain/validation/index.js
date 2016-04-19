@@ -66,21 +66,27 @@ module.exports = function (generatedSchemas) {
 
       if (!isToplevel) {
 
-        //single type because not-toplevel
-        var typeName = value._type;
-        var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName]; //guaranteed
+        try {
 
-        //type may be a datatype only iff non-toplevel
-        if (type.isDataType) {
+          //single type because not-toplevel
+          var typeName = value._type;
+          var type = generatedSchemas.types[typeName] || generatedSchemas.datatypes[typeName]; //guaranteed
 
-          //STATE: type is a DATATYPE
+          //type may be a datatype only iff non-toplevel
+          if (type.isDataType) {
 
-          //field specific validator
-          return _generateDataTypeValidator({
-            fieldName: fieldName,
-            ranges: [typeName],
-            validate: fieldtype ? fieldtype.validate : undefined
-          });
+            //STATE: type is a DATATYPE
+
+            //field specific validator
+            return _generateDataTypeValidator({
+              fieldName: fieldName,
+              ranges: [typeName],
+              validate: fieldtype ? fieldtype.validate : undefined
+            });
+          }
+        } catch (e) {
+          console.log("ERR", e);
+          console.log(fieldName, fieldtype, rule, value);
         }
       }
 

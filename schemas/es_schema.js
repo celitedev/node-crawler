@@ -45,7 +45,10 @@ module.exports = function (generatedSchemas) {
       "address", "geo", "containedInPlace",
 
       //creative work
-      "aggregateRating", "genre"
+      "aggregateRating", "genre",
+
+      //organizationAndPerson
+      "tag"
     ],
 
     //general index mapping
@@ -100,6 +103,18 @@ module.exports = function (generatedSchemas) {
         },
         enum: vocabs.genre
       },
+
+      tag: {
+        facet: {
+          type: "enum",
+          label: function (root, type) {
+            if (root === type) return "tags"; //if we query for artist -> return tag
+            return capitalizeFirstLetter(facetLabelForType(type)) + " tags"; //if we query for events -> return 'person tags'
+          },
+        },
+        enum: vocabs.tag //TODO, need to provide this. For now it's undefined thus pass-all
+      },
+
 
       subtypes: {
         facet: {
@@ -218,6 +233,16 @@ module.exports = function (generatedSchemas) {
           fields: "subtypes",
         },
       },
+
+      raw_tag: {
+        roots: true, //true (all) or (array of) rootNames
+        isMulti: true,
+        mapping: mappings.enum,
+        populate: {
+          fields: "tag",
+        },
+      },
+
 
       raw_genre: {
         roots: "CreativeWork",

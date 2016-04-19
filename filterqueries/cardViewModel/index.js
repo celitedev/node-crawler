@@ -84,15 +84,28 @@ var simpleCardFormatters = {
     //set geo of event based on location if event doesn't have geo set yet
     var location = expand[raw.location];
     if (location) {
+
       raw.geo = raw.geo || location.geo;
+
+      json.formatted.identifiers2 = json.formatted.identifiers2 || location.name;
     }
 
     _.defaults(json.formatted, {
+      category: raw.root,
+      headsup1: json.formatted.headsup1 || (raw.startDate ? moment(raw.startDate).format('MMMM Do YYYY, h:mm:ss a') : "start time not known"),
       //default to name of event. Sometimes this is rather meaningless, so we might already set this in subtypes
       //which are processed earlier such as ScreeningEvent.
       identifiers1: raw.name
     });
+  },
 
+  organizationandperson: function (json, expand) {
+    var raw = json.raw,
+      formatted = json.formatted;
+
+    formatted.category = formatted.category || raw.tag[0]; //e.g.: performer
+    formatted.identifiers1 = raw.name;
+    formatted.databits2 = raw.tag; //array
   },
 
   thing: function (json, expand) {
@@ -102,7 +115,7 @@ var simpleCardFormatters = {
 
     //if category not yet defined, simply use the fist (most specific) type
     formatted.category = formatted.category || raw.types[0];
-    formatted.databits1 = formatted.databits1;
+
 
     //if imagePrimaryURL not set explicitly, set it to the first element in the image-array
     if (!raw.imagePrimaryUrl && raw.image && raw.image.length) {

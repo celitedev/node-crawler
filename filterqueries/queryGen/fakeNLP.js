@@ -1,6 +1,8 @@
 //simply the most fantastic NLP stuff evarrr..
 var subtypeToFilterQuery = {
 
+
+
   //top level types
   "creativework": {
     type: "CreativeWork"
@@ -11,6 +13,10 @@ var subtypeToFilterQuery = {
   "place": {
     type: "PlaceWithOpeninghours"
   },
+  "organizationandperson": {
+    type: "OrganizationAndPerson"
+  },
+
   "movie": {
     type: "CreativeWork",
     filter: {
@@ -51,6 +57,14 @@ var subtypeToFilterQuery = {
       subtypes: "movietheater"
     }
   },
+
+  //performer
+  "performer": {
+    type: "OrganizationAndPerson",
+    filter: {
+      tag: "performer"
+    }
+  },
 };
 
 /////////////
@@ -86,6 +100,15 @@ subtypeToFilterQuery["movie theaters"] = subtypeToFilterQuery.movietheater;
 subtypeToFilterQuery["movie theater"] = subtypeToFilterQuery.movietheater;
 subtypeToFilterQuery.theater = subtypeToFilterQuery.movietheater;
 subtypeToFilterQuery.theaters = subtypeToFilterQuery.movietheater;
+
+//person
+subtypeToFilterQuery.person = subtypeToFilterQuery.organizationandperson;
+subtypeToFilterQuery.persons = subtypeToFilterQuery.organizationandperson;
+
+//performer
+subtypeToFilterQuery.performers = subtypeToFilterQuery.performer;
+subtypeToFilterQuery.artist = subtypeToFilterQuery.performer;
+subtypeToFilterQuery.artists = subtypeToFilterQuery.performer;
 
 
 
