@@ -5,14 +5,14 @@ var _ = require("lodash");
 //type: events
 module.exports = {
   _meta: {
-    name: "Eventful Events",
-    description: "Distributed Crawler for Eventful.com Events"
+    name: "Eventful Artists",
+    description: "Distributed Crawler for Eventful.com Artists"
   },
   source: {
     name: "Eventful"
   },
   entity: {
-    type: "Event",
+    type: "OrganizationAndPerson",
   },
   scheduler: {
     runEveryXSeconds: 24 * 60 * 60 //each day
@@ -25,19 +25,7 @@ module.exports = {
     //- false: never prune
     //- true: prune if url already processed
     //- batch: prune if url already processed for this batch
-
     pruneEntity: "batch",
-
-    //
-    //Example of variable pruneEntity which re-processes 
-    //every entity once every x times.
-    //
-    // pruneEntity: function(batchId) {
-    // 	if (batchId % 7 === 0) {
-    // 		return "batch"; //every 7 batches let's do an entire rerun
-    // 	}
-    // 	return "true";
-    // },
 
     //How to check entity is updated since last processed
     // - string (templated functions) 
@@ -46,7 +34,6 @@ module.exports = {
     //template options: 
     //- hash: hash of detail contents
     //- headers: based on cache headers
-    //- db: check against saved SourceEntity
     dirtyCheckEntity: "hash",
 
 
@@ -65,7 +52,13 @@ module.exports = {
     //
     //A good setting may be: 
     //- EACH HOUR: Run pruneList = batch + pruntEntity = true 
-    //- EACH DAY: Run pruneList = batch + pruntEntity = batch 
+    //- EACH DAY: Run pruneList = batch + pruntEntity = batch   
+    //
+    ///////////////////////////////////////////////////////////////////
+    //NOTE: PRUNELIST IS KEPT IN REDIS. BE SURE TO CLEAN THIS UP IF WE CLEAN RETHINKDB. 
+    //OTHERWISE PRUNE=TRUE WILL PRUNE EVEN IF WE DON'T HAVE THE ENTITY IN DB ANYMORE.
+    //THIS IS ONLY AN ISSUE DURING DEV
+    //////////////////////////////////////////////////////////////////////
   },
   job: {
     //x concurrent kue jobs
@@ -79,11 +72,10 @@ module.exports = {
     concurrentJobs: 10,
     retries: 5,
 
-    // fail job if not complete in 100 seconds. This is used because a consumer/box can fail/crash
+    // fail job if not complete in 40 seconds. This is used because a consumer/box can fail/crash
     // In that case the job would get stuck indefinitely in 'active' state. 
     // With this solution, the job is placed back on the queue, and retried according to 'retries'-policy
-    // This should be WAY larger then driver.timeoutMS
-    ttl: 100 * 1000,
+    ttl: 40 * 1000,
   },
   driver: {
 
@@ -109,11 +101,12 @@ module.exports = {
       //may be a string an array or string or a function producing any of those
       seedUrls: function () {
         var urls = [];
-        for (var i = 1; i < 20; i++) { //array to kickstart the lot
-          urls.push("http://newyorkcity.eventful.com/events/categories?page_number=" + i);
+        for (var i = 1; i < 20; i++) {
+          urls.push("http://eventful.com/performers?page_number=" + i);
         }
         return urls;
       },
+
       nextUrlFN: function (el) {
         return el.find(".next > a").attr("href");
       },
@@ -149,65 +142,99 @@ module.exports = {
       //We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
       selector: ".search-results > li", //selector for results
 
-      //does detailPage pruning. For this to work: 
+      //Indicate that the schema visits a detail page. 
+      //This can be used later on by pruning strategies.
+      //
       //- _sourceUrl should exist and should equal detail page visisted
       //- 'detail page visited' is the page on which the detailObj is attached.
-      detailPageAware: true,
+      detailPageAware: false,
 
       schema: function (x, detailObj) { //schema for each individual result
-
         return {
           _sourceUrl: "a.tn-frame@href",
           _sourceId: "a.tn-frame@href",
-          _detail: x("a.tn-frame@href", {
-            name: "[itemprop=name] > span",
-            description: "[itemprop=description]",
-            location: x("[itemprop=location]", "> a@href"), //no array. This way we omit a fault google maps location
-            performer: x("[itemprop=performer]", ["> a@href"]),
-            startDate: "[itemprop=startDate]@content",
+          name: "h4 > a",
+          tag: "h4 + p", //p following h4. TODO: is this stable?
+          image: x("a > img", [{
+            _ref: {
+              contentUrl: "@src",
+              url: "@src",
+            }
+          }])
 
-            image: x(".image-viewer li", [{
-              _ref: { //notice: _ref here.
-                contentUrl: "a@href",
-                url: "a@href",
-                caption: "@title",
-              }
-            }]),
-
-            // subtypes: function ($, cb) {
-            //   //fetch subtypes from url
-            //   //i.e.: http://newyorkcity.eventful.com/events/categories/music -> music
-            //   //
-            //   //Tech: why on earch does a .map not work?? 
-            //   var st = [];
-            //   $("#event-price + p > a").each(function () {
-            //     var href = $(this).attr("href");
-            //     st.push(href.substring(href.lastIndexOf("/") + 1));
-            //   });
-
-            //   cb(null, st);
-            // }
-
-          }, undefined, detailObj)
+          // _detail: x("a.tn-frame@href", {
+          //   name: "[itemprop=name] > span",
+          //   image: x(".image-viewer li", [{
+          //     _ref: { //notice: _ref here.
+          //       contentUrl: "a@href",
+          //       url: "a@href",
+          //       caption: "@title",
+          //     }
+          //   }]),
+          //   // subtypes: .... TODO
+          // }, undefined, detailObj)
         };
       },
 
+      //mapping allow function(entire obj) || strings or array of those
+      //returning undefined removes them
       mapping: {
-        "_detail.description": function (desc, obj) {
-          if (desc === "There is no description for this event.") {
-            return undefined;
-          }
-          return desc;
+        // //Example of #115: "How to allow multi _types and subtypes in specific crawlers"
+        // _type: function (val) {
+        //   return ["LocalBusiness"]; //must be subs of entity.type (here: PlaceWithOpeninghours)
+        // },
+
+
+        //some url magic to get to a bigger image
+        image: function mapImage(val) {
+
+          if (!val) return val;
+          return _.map(val, function (imgObj) {
+            var url = imgObj._ref.contentUrl
+              .replace("block", "block400"); //when fetching from detail page
+
+            _.extend(imgObj._ref, {
+              contentUrl: url,
+              url: url
+            });
+
+            return imgObj;
+          });
         },
-        "_detail.location": function (location, obj) {
-          if (!location) return undefined;
-          return location.length ? location : undefined;
+
+        tag: function mapTag(tagDelimited) {
+
+          if (!tagDelimited) return tagDelimited;
+
+          var tags = _.map(tagDelimited.split("/"), function (tag) {
+            return tag.trim();
+          });
+
+          //explicitly add "performer" to tags
+          tags.unshift("performer");
+
+          return tags;
         },
-        "_detail.performer": function (performer, obj) {
-          if (!performer) return undefined;
-          return performer.length ? performer : undefined;
-        },
+
+        // "_detail.image": function mapNeighborhood(val) {
+
+        //   if (!val) return val;
+        //   var out = _.map(val, function (imgObj) {
+
+        //     var url = imgObj._ref.contentUrl
+        //       .replace("edpborder500", "block400"); //when fetching from detail page
+
+        //     _.extend(imgObj._ref, {
+        //       contentUrl: url,
+        //       url: url
+        //     });
+
+        //     return imgObj;
+        //   });
+        //   return val;
+        // },
       },
+
     }
   }
 };
