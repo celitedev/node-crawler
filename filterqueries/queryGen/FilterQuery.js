@@ -239,6 +239,13 @@ module.exports = function (command) {
 
       var splitSymbols = _.difference(compoundKey.split(/\.|--/), ["expand"]); //remove 'expand'
       var path = filterQueryUtils.getPathForCompoundKey(root, splitSymbols);
+      var typeOfQuery;
+
+      //HACK: We misuse this code-path to construct a prefix-query...
+      if (compoundKey === "name.raw") {
+        path = compoundKey;
+        typeOfQuery = "PrefixName";
+      }
 
       if (!path) {
         throw new Error("following filter key not allowed: " + compoundKey);
@@ -246,8 +253,7 @@ module.exports = function (command) {
 
       //TODO: #183 - if compoundkey is an entity or valueObject and `v` is an object, allow
       //deep filtering inside nested object (which is either type = nested (multival) || type=object (singleval))
-
-      var typeOfQuery = _.isObject(v) ? "Range" : "Text";
+      typeOfQuery = typeOfQuery || (_.isObject(v) ? "Range" : "Text");
 
       //special path for name: free-text
       if (compoundKey === "name") {
@@ -258,6 +264,13 @@ module.exports = function (command) {
       var propFilter;
 
       switch (typeOfQuery) {
+        case "PrefixName":
+          propFilter = {
+            prefix: {
+              "name.raw": v
+            }
+          };
+          break;
         case "FreeText":
           var isFuzzy = true;
           propFilter = filterQueryUtils.performTextQuery(v, path, isFuzzy);
