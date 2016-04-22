@@ -343,6 +343,93 @@ module.exports = function (command) {
     res.send('Use POST silly');
   });
 
+  //Exposes suggest endpoint. 
+  //By default returns results for each type
+  //
+  //body: 
+  // {
+  //  query: "some query"  
+  //}
+  //
+  //Optionally constrain to type to be returned: 
+  //
+  //{
+  //  query: "some query", 
+  //  type: "PlaceWithOpening"
+  //}
+  //
+  //
+  var rootsLowerCaseMap = _.reduce(roots, function(agg, root){
+    agg[root.toLowerCase()] = root;
+    return agg;
+  }, {}); 
+  rootsLowerCaseMap = _.omit(rootsLowerCaseMap, ["place", "mediaobject","comment","review","rating"]);
+
+  app.post('/suggest', function (req, res, next) {
+
+    var body = req.body; 
+    var err;
+    if(!body.query){
+      err = new Error("'query' body param required");
+      err.status = 400; 
+      return next(err);
+    }
+
+    var types = _.keys(rootsLowerCaseMap);
+    if(body.type){
+      var type = body.type.toLowerCase();
+      if(rootsLowerCaseMap[type]){
+        types = [type];
+      }else{
+        err = new Error("'type' body param should be one of existing types: " + types.join(","));
+        err.status = 400; 
+        return next(err);
+      }
+    }
+
+    //compound all indices together that we want to query
+    var indexString = _.map(types, function(type){
+      return "kwhen-"+type;
+    }).join(",");
+
+    //create suggest body. 
+    //This consists of a group per type
+    var esBody = _.reduce(types, function(agg, type){
+      var rootCorrectCase = rootsLowerCaseMap[type];
+      agg[rootCorrectCase] = {
+        completion: {
+          field: "suggest",
+          context: {
+            root: rootCorrectCase
+          }
+        }
+      };
+      return agg;
+    }, {
+      "text" : body.query
+    });
+
+    command.esClient.suggest({
+      index: indexString,
+      body:esBody
+    })
+    .then(function(esResult){
+      delete esResult._shards; 
+
+      res.json(_.reduce(esResult, function(agg, groupForType, typeName){
+        if(groupForType[0].options.length){
+          agg[typeName] = groupForType[0].options;
+        }
+        return agg;
+      }, {}));
+    })
+    .catch(function(err){
+      console.log(err);
+      next(err);
+    });
+  });
+
+
   //Single Item
   app.get("/entities/:id", function (req, res, next) {
 

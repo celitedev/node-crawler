@@ -22,7 +22,7 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
     },
 
 
-    //https://www.elastic.co/guide/en/elasticsearch/reference/current/suggester-context.html#suggester-context-geo
+    //https://www.elastic.co/guide/en/elasticsearch/reference/current/search-suggesters-completion.html
     suggestWithRoot: {
       "type": "completion",
       "analyzer": "simple",
