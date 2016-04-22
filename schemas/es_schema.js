@@ -170,7 +170,7 @@ module.exports = function (generatedSchemas) {
           //https://www.elastic.co/guide/en/elasticsearch/guide/current/analysis-intro.html
         },
         fields: {
-          "raw": mappings.notAnalyzed
+          "raw": mappings.enum //not tokenized. Lowercased
         }
       },
 

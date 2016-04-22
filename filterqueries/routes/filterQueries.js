@@ -359,74 +359,10 @@ module.exports = function (command) {
   //}
   //
   //
-  var rootsLowerCaseMap = _.reduce(fixedTypesInOrder, function(agg, root){
+  var rootsLowerCaseMap = _.reduce(fixedTypesInOrder, function (agg, root) {
     agg[root.toLowerCase()] = root;
     return agg;
-  }, {}); 
-
-  app.post('/suggest', function (req, res, next) {
-
-    var body = req.body; 
-    var err;
-    if(!body.query){
-      err = new Error("'query' body param required");
-      err.status = 400; 
-      return next(err);
-    }
-
-    var types = _.keys(rootsLowerCaseMap);
-    if(body.type){
-      var type = body.type.toLowerCase();
-      if(rootsLowerCaseMap[type]){
-        types = [type];
-      }else{
-        err = new Error("'type' body param should be one of existing types: " + types.join(","));
-        err.status = 400; 
-        return next(err);
-      }
-    }
-
-    //compound all indices together that we want to query
-    var indexString = _.map(types, function(type){
-      return "kwhen-"+type;
-    }).join(",");
-
-    //create suggest body. 
-    //This consists of a group per type
-    var esBody = _.reduce(types, function(agg, type){
-      var rootCorrectCase = rootsLowerCaseMap[type];
-      agg[rootCorrectCase] = {
-        completion: {
-          field: "suggest",
-          context: {
-            root: rootCorrectCase
-          }
-        }
-      };
-      return agg;
-    }, {
-      "text" : body.query
-    });
-
-    command.esClient.suggest({
-      index: indexString,
-      body:esBody
-    })
-    .then(function(esResult){
-      delete esResult._shards; 
-
-      res.json(_.reduce(esResult, function(agg, groupForType, typeName){
-        if(groupForType[0].options.length){
-          agg[typeName] = groupForType[0].options;
-        }
-        return agg;
-      }, {}));
-    })
-    .catch(function(err){
-      console.log(err);
-      next(err);
-    });
-  });
+  }, {});
 
 
   //Single Item
@@ -485,6 +421,163 @@ module.exports = function (command) {
   });
 
 
+  //quick search returning results on every kepress
+  //Used in
+  //- collection "add dialog"
+  app.post('/suggest', function (req, res, next) {
+
+    var body = req.body;
+    var err;
+    if (!body.query) {
+      err = new Error("'query' body param required");
+      err.status = 400;
+      return next(err);
+    }
+
+    var types = _.keys(rootsLowerCaseMap);
+    if (body.type) {
+      var type = body.type.toLowerCase();
+      if (rootsLowerCaseMap[type]) {
+        types = [type];
+      } else {
+        err = new Error("'type' body param should be one of existing types: " + types.join(","));
+        err.status = 400;
+        return next(err);
+      }
+    }
+
+    //compound all indices together that we want to query
+    var indexString = _.map(types, function (type) {
+      return "kwhen-" + type;
+    }).join(",");
+
+    //create suggest body. 
+    //This consists of a group per type
+    var esBody = _.reduce(types, function (agg, type) {
+      var rootCorrectCase = rootsLowerCaseMap[type];
+      agg[rootCorrectCase] = {
+        completion: {
+          field: "suggest",
+          context: {
+            root: rootCorrectCase
+          }
+        }
+      };
+      return agg;
+    }, {
+      "text": body.query
+    });
+
+    command.esClient.suggest({
+        index: indexString,
+        body: esBody
+      })
+      .then(function (esResult) {
+        delete esResult._shards;
+
+        res.json(_.reduce(esResult, function (agg, groupForType, typeName) {
+          if (groupForType[0].options.length) {
+            agg[typeName] = groupForType[0].options;
+          }
+          return agg;
+        }, {}));
+      })
+      .catch(function (err) {
+        console.log(err);
+        next(err);
+      });
+  });
+
+
+  //Search returns results on suggestion Enter
+  //Used in
+  //- collection "add dialog"
+  //
+  //Frontend needs to do a query per type.
+  app.post('/suggestCards', function (req, res, next) {
+
+    var body = req.body;
+    var err;
+
+    if (!body.types) {
+      err = new Error("'types' body param required");
+      err.status = 400;
+      return next(err);
+    }
+
+    //pagination
+    var page = body.page || 0;
+
+    //create promises
+    var promiseMap;
+    try {
+      promiseMap = _.reduce(_.isArray(body.types) ? body.types : [body.types], function (agg, type) {
+        var typeCorrectCase = rootsLowerCaseMap[type.toLowerCase()];
+
+        if (!typeCorrectCase) {
+          err = new Error("'type' body param should be one of existing types: " + _.keys(rootsLowerCaseMap).join(","));
+          err.status = 400;
+          throw err;
+        }
+
+        //if type no found to a 'all-type' query which is later on separated
+        //Also make sure 'filter' object exists
+        var command = _.extend({
+          wantUnique: false,
+          type: typeCorrectCase,
+          includeCardFormatting: true,
+          page: page,
+          sort: {
+            type: "score"
+          },
+          meta: {
+            includeCardFormatting: true
+          }
+        });
+
+        //addq uery-param. Not
+        if (body.query) {
+          command.filter = {};
+          //name.raw has enum-mapping: 1 token, lowercased. 
+          //This allows to do prefix
+          command.filter["name.raw"] = body.query.toLowerCase().trim();
+        }
+
+        var filterQuery = createFilterQuery(command);
+        command.filterContext = filterQuery;
+
+        var singleReqPromise = Promise.resolve()
+          .then(function () {
+            //perform query
+            return filterQuery.performQuery();
+          })
+          .then(function (json) {
+            return {
+              totalResults: json.meta.elasticsearch.hits.total,
+              filterContext: command.filterContext,
+              results: conditionalEnrichWithCardViewmodel(command, json),
+            };
+          })
+          .catch(function (err) {
+            err.filterQuery = filterQuery;
+            return err; //error passed as result
+          });
+
+        agg[typeCorrectCase] = singleReqPromise;
+        return agg;
+      }, {});
+
+      return Promise.props(promiseMap)
+        .then(function (json) {
+          return res.json(json);
+        });
+
+    } catch (error) {
+      next(error); //error sync -> 500
+    }
+
+  });
+
   //used by Search page. 
   app.post('/search', function (req, res, next) {
 
@@ -496,11 +589,10 @@ module.exports = function (command) {
     var filterQuery;
     try {
       filterQuery = createFilterQuery(command);
+      command.filterContext = filterQuery;
     } catch (err) {
       return next(err);
     }
-
-    command.filterContext = filterQuery;
 
     return Promise.resolve()
       .then(function () {
