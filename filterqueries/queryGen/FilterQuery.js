@@ -5,6 +5,7 @@ var Promise = require("bluebird");
 var domainConfig = require("../../schemas/domain/_definitions/config");
 var roots = domainConfig.domain.roots;
 
+var DEFAULT_PAGESIZE = 10;
 module.exports = function (command) {
 
   var r = command.r,
@@ -39,8 +40,9 @@ module.exports = function (command) {
 
     page: t.maybe(t.Number),
 
-    meta: t.maybe(t.Object)
+    meta: t.maybe(t.Object),
 
+    pageSize: t.maybe(t.Number),
   }, 'FilterQuery');
 
 
@@ -211,8 +213,10 @@ module.exports = function (command) {
   };
 
   FilterQuery.prototype.getPage = function () {
+    var size = this.pageSize || DEFAULT_PAGESIZE;
     return {
-      from: 10 * (this.page || 0)
+      from: size * (this.page || 0),
+      size: size
     };
   };
 
