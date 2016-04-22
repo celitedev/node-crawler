@@ -499,10 +499,16 @@ module.exports = function (command) {
     var body = req.body;
     var err;
 
-    if (!body.types) {
-      err = new Error("'types' body param required");
-      err.status = 400;
-      return next(err);
+    var types = _.keys(rootsLowerCaseMap);
+    if (body.type) {
+      var type = body.type.toLowerCase();
+      if (rootsLowerCaseMap[type]) {
+        types = [type];
+      } else {
+        err = new Error("'type' body param should be one of existing types: " + types.join(","));
+        err.status = 400;
+        return next(err);
+      }
     }
 
     //pagination
@@ -511,7 +517,7 @@ module.exports = function (command) {
     //create promises
     var promiseMap;
     try {
-      promiseMap = _.reduce(_.isArray(body.types) ? body.types : [body.types], function (agg, type) {
+      promiseMap = _.reduce(types, function (agg, type) {
         var typeCorrectCase = rootsLowerCaseMap[type.toLowerCase()];
 
         if (!typeCorrectCase) {
@@ -527,6 +533,7 @@ module.exports = function (command) {
           type: typeCorrectCase,
           includeCardFormatting: true,
           page: page,
+          pageSize: body.type ? 10 : 5, //5 per page. Since we show multiple types, 
           sort: {
             type: "score"
           },
