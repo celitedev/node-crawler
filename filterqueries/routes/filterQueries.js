@@ -359,11 +359,10 @@ module.exports = function (command) {
   //}
   //
   //
-  var rootsLowerCaseMap = _.reduce(roots, function(agg, root){
+  var rootsLowerCaseMap = _.reduce(fixedTypesInOrder, function(agg, root){
     agg[root.toLowerCase()] = root;
     return agg;
   }, {}); 
-  rootsLowerCaseMap = _.omit(rootsLowerCaseMap, ["place", "mediaobject","comment","review","rating"]);
 
   app.post('/suggest', function (req, res, next) {
 
