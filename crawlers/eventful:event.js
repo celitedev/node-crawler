@@ -174,19 +174,24 @@ module.exports = {
               }
             }]),
 
-            // subtypes: function ($, cb) {
-            //   //fetch subtypes from url
-            //   //i.e.: http://newyorkcity.eventful.com/events/categories/music -> music
-            //   //
-            //   //Tech: why on earch does a .map not work?? 
-            //   var st = [];
-            //   $("#event-price + p > a").each(function () {
-            //     var href = $(this).attr("href");
-            //     st.push(href.substring(href.lastIndexOf("/") + 1));
-            //   });
+            //JUST TO SHOW OF. NORMALLY WE'D DO A SIMPLE EXTRACT + A MAPPING AFTERWARDS
+            // tag: ["#event-price + p > a@href"]
+            tag: function ($, cb) {
+              //fetch subtypes from url
+              //i.e.: http://newyorkcity.eventful.com/events/categories/music -> music
+              //
+              //Tech: why on earch does a .map not work?? 
+              var st = [];
+              $("#event-price + p > a").each(function () {
+                var href = $(this).attr("href");
+                st.push(href.substring(href.lastIndexOf("/") + 1));
+              });
 
-            //   cb(null, st);
-            // }
+              //NOTE: BUG #222: be sure to remove empty arrays. For some reason this trips code
+              cb(null, st.length ? st : undefined);
+            },
+
+
 
           }, undefined, detailObj)
         };
