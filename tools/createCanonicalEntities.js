@@ -39,10 +39,16 @@ var data = _.cloneDeep({
 var start = new Date().getTime();
 
 
+var doProcessAll = argv.processAll;
+
 var fetchQuery = function () {
-  return tableSourceEntity.getAll(true, {
-    index: 'modifiedMatch'
-  }).limit(data.state.batch).run();
+  if (doProcessAll) {
+    return tableSourceEntity.limit(data.state.batch).run();
+  } else {
+    return tableSourceEntity.getAll(true, {
+      index: 'modifiedMatch'
+    }).limit(data.state.batch).run();
+  }
 };
 
 Promise.resolve()
@@ -83,29 +89,38 @@ Promise.resolve()
                 if (k.indexOf(".") !== -1) {
                   throw new Error("Create Canonical: below code doesn't work yet for  lookup for path with '.' yet: " + k);
                 }
+
+                //key is, say, location
                 _.each(_.isArray(v) ? v : [v], function (ref) {
                   if (ref.isOutdated) {
                     return;
                   }
 
+                  //ref is, say 
+                  //{
+                  // "_refNormId":  "1893a57a-0208-470b-9fff-c0e75b39a036" ,
+                  // "_sourceId": http://concerts.eventful.com/Snoop-Dogg, »
+                  // "_sourceUrl": http://concerts.eventful.com/Snoop-Dogg, »
+                  // }
+
                   var sourceRefId = sourceEntity._refToSourceRefIdMap[ref._refNormId];
                   var origValues = dto[k]; //should exist...
 
+                  //overwrite reference with found value
                   if (sourceRefId && origValues) {
                     var origVal;
                     if (_.isArray(origValues)) {
 
                       for (var i = 0; i < origValues.length; i++) {
                         origVal = origValues[i];
-                        if (ref._sourceId === origVal._ref._sourceId) {
+                        if (origVal._ref && ref._sourceId === origVal._ref._sourceId) {
                           origValues[i] = sourceRefId;
                         }
                       }
 
                     } else {
                       origVal = origValues;
-                      //NOTE: we assume _ref-object exists. We would have failed earlier if it doesn't
-                      if (ref._sourceId === origVal._ref._sourceId) {
+                      if (origVal._ref && ref._sourceId === origVal._ref._sourceId) {
                         dto[k] = sourceRefId;
                       }
                     }
