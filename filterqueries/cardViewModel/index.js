@@ -34,7 +34,7 @@ var simpleCardFormatters = {
         }
       }()),
       headsup2: _.compact([raw.contentRating].concat(raw.genre)), //if omitted space will be truncated in frontend.
-      // databits2: _.compact([movie.contentRating].concat(movie.genre)), //if omitted space will be truncated in frontend.
+      databits2: _.compact([movie.contentRating].concat(movie.genre)), //if omitted space will be truncated in frontend.
       // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
     });
 
@@ -105,7 +105,6 @@ var simpleCardFormatters = {
 
     formatted.category = formatted.category || raw.tag[0]; //e.g.: performer
     formatted.identifiers1 = raw.name;
-    formatted.databits2 = raw.tag; //array
   },
 
   thing: function (json, expand) {
@@ -116,6 +115,7 @@ var simpleCardFormatters = {
     //if category not yet defined, simply use the fist (most specific) type
     formatted.category = formatted.category || raw.types[0];
 
+    formatted.databits2 = (formatted.databits2 || []).concat(raw.tag);
 
     //if imagePrimaryURL not set explicitly, set it to the first element in the image-array
     if (!raw.imagePrimaryUrl && raw.image && raw.image.length) {
