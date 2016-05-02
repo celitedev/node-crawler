@@ -377,16 +377,7 @@ module.exports = {
   val: {
     isCustom: true,
     isMulti: true,
-    ranges: ["Text", "Object"],
-    ambiguitySolvedBy: {
-      type: "implicitDataType",
-      //results in 
-      //- p.ambiguitySolvedBy.storage = "sharedField" -> store values in same field, regardless of datatype
-      //- p.ambiguitySolvedBy.sharedParentDataType = DataType -> 
-      //which means Any Datatype, so not useful for mapping in ERD at all. 
-      //We don't need this for `fact` since it's split in more fine-grained stuff
-      //on ERD generation (See #134)
-    },
+    ranges: ["Text"]
   },
 
   //////////////////////////////////
