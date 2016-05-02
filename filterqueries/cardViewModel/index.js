@@ -34,7 +34,7 @@ var simpleCardFormatters = {
         }
       }()),
       headsup2: _.compact([raw.contentRating].concat(raw.genre)), //if omitted space will be truncated in frontend.
-      databits2: _.compact([movie.contentRating].concat(movie.genre)), //if omitted space will be truncated in frontend.
+      databits2: _.compact([json.contentRating].concat(json.genre)), //if omitted space will be truncated in frontend.
       // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
     });
 
