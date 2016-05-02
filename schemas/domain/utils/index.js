@@ -21,6 +21,17 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
       "doc_values": true
     },
 
+    fact: {
+      type: "nested",
+      properties: {
+        name: {
+          type: "string"
+        },
+        val: {
+          type: "string"
+        }
+      }
+    },
 
     //https://www.elastic.co/guide/en/elasticsearch/reference/current/search-suggesters-completion.html
     suggestWithRoot: {
