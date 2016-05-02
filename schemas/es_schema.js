@@ -126,6 +126,7 @@ module.exports = function (generatedSchemas) {
         enum: vocabs.subtypes
       },
 
+
       ratingValue: {
         facet: {
           label: "rating",
@@ -146,6 +147,10 @@ module.exports = function (generatedSchemas) {
 
       aggregateRating: {
         mapping: "object"
+      },
+
+      fact: {
+        mapping: mappings.fact,
       },
 
       geo: {
