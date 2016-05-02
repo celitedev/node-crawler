@@ -1,0 +1,207 @@
+var _ = require("lodash");
+
+//crawlSchema for: 
+//source: Eventful
+//type: events
+module.exports = {
+  _meta: {
+    name: "NYC restaurants",
+    description: "Distributed Crawler for NYC.com Restaurants"
+  },
+  source: {
+    name: "NYC"
+  },
+  entity: {
+    type: "PlaceWithOpeninghours",
+  },
+  scheduler: {
+    runEveryXSeconds: 24 * 60 * 60 //each day
+  },
+  //General logic/behavior for this crawler 
+  semantics: {
+
+    //prune ENTITY URL if already processed 
+    //options: 
+    //- false: never prune
+    //- true: prune if url already processed
+    //- batch: prune if url already processed for this batch
+    pruneEntity: "batch",
+
+  },
+  job: {
+    concurrentJobs: 1, //10 master pages * nrof detail pages per master page
+    retries: 5,
+    ttl: 40 * 1000,
+  },
+  driver: {
+
+    //timeout on individual request. 
+    //Result: fail job and put back in queue as oer config.job.retries
+    timeoutMS: 40000,
+
+    //local proxy, e.g.: TOR
+    proxy: "socks://localhost:5566",
+
+    //Default Headers for all requests
+    headers: {
+      "Accept-Encoding": 'gzip, deflate'
+    }
+  },
+  schema: {
+    version: "0.1", //version of this schema
+    type: "masterDetail", //signifies overall type of scroll. For now: only 'masterDetail'
+    requiresJS: false, //If true, use PhantomJS
+    seed: {
+      disable: false, //for testing. Disabled nextUrl() call
+
+      //may be a string an array or string or a function producing any of those
+      seedUrls: function () {
+        var urls = [];
+        for (var i = 0; i < 1; i++) {
+          urls.push("http://www.nyc.com/search/find.aspx?secid=6&pagefrom=" + (i * 20 + 1));
+        }
+        return urls;
+      },
+
+      nextUrlFN: function (el) {
+        return el.find(".searchnav > a:last-child").attr("href");
+      },
+
+      stop: [{
+        name: "zeroResults", //zeroResults
+      }]
+    },
+    results: {
+      selector: ".recordlist > li", //selector for results
+      detailPageAware: true,
+
+      schema: function (x, detailObj) { //schema for each individual result
+        return {
+          _sourceUrl: "> a@href",
+          _sourceId: "> a@href",
+          image: "img.thumb@src",
+          _detail: x("> a@href", {
+            name: "h1",
+            _descFull: ".editorial-and-map .ellipsis-full",
+            _descFallback: ".editorial-and-map > p",
+            geo: {
+              latitude: "[property='place:location:latitude']@content",
+              longitude: "[property='place:location:longitude']@content",
+            },
+            address: {
+              streetAddress: '[property="restaurant:contact_info:street_address"]@content',
+              postalCode: '[property="restaurant:contact_info:postal_code"]@content',
+              addressLocality: '[property="restaurant:contact_info:locality"]@content',
+              addressRegion: '[property="restaurant:contact_info:region"]@content',
+              addressCountry: '[property="restaurant:contact_info:country_name"]@content',
+              neighborhood: "#pnlNeighborhood h3",
+              telephone: ".rating address" //needs post mapping
+            },
+
+            sameAs: ".rating address > a@href", //own website
+
+            //TODO: we're mapping an editorialRating to aggregateRating. 
+            //Clearly this isn't 100% correct
+            aggregateRating: [".category > .starlite"], //needs post mapping
+
+
+            // subtypes: .... TODO
+          }, undefined, detailObj)
+        };
+      },
+
+      //mapping allow function(entire obj) || strings or array of those
+      //returning undefined removes them
+      mapping: {
+        _type: function (val) {
+          return ["LocalBusiness", "Restaurant"];
+        },
+        description: function (val, obj) {
+          return obj._detail._descFull || obj._detail._descFallback;
+        },
+        image: function (imgUrl) {
+          if (!imgUrl) {
+            return undefined;
+          }
+
+          //placeholder
+          if (~imgUrl.indexOf("icon_restaurants")) {
+            return undefined;
+          }
+
+          //from thumb to large file
+          imgUrl = imgUrl.replace("thumb", "front");
+
+          return {
+            _ref: { //notice: _ref here.
+              contentUrl: imgUrl,
+              url: imgUrl,
+            }
+          };
+
+        },
+        "_detail.geo": function (val) {
+          if (!val) return undefined;
+          if (!val.latitude || !val.longitude) return undefined;
+          return {
+            latitude: parseFloat(val.latitude),
+            longitude: parseFloat(val.longitude)
+          };
+        },
+        "_detail.sameAs": function (val) {
+          //lowercase url so it passes isUrl check
+          if (!val) return val;
+          var url = val.toLowerCase();
+          if (url.lastIndexOf(".") === url.length - 1) { //formatting error: url sometimes ends in '.'
+            url = url.substring(0, url.length - 1);
+          }
+          return url;
+        },
+        "_detail.address.neighborhood": function mapNeighborhood(val, obj) {
+
+          //East Village Description -> East Village
+          if (!val) return val;
+          var needle = "Description";
+          var index = val.indexOf(needle);
+          if (index === -1) return val;
+          return val.substring(0, index).trim();
+        },
+
+        "_detail.address.telephone": function mapTel(val) {
+          //lots of text. Need to only extract tel
+          if (!val) return undefined;
+
+          //Regex: http://stackoverflow.com/questions/16699007/regular-expression-to-match-standard-10-digit-phone-number
+          var telArr = val.match(/(\+\d{1,2}\s)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g);
+          if (!telArr) return undefined;
+          return telArr[0];
+        },
+        "_detail.aggregateRating": function mapRating(val) {
+          if (!val) {
+            return val;
+          }
+          //rating = the number or .starlite tags
+          return {
+            ratingValue: "" + val.length //needs to be string
+          };
+        }
+
+      },
+
+      pruner: function (result) {
+        if (!result._detail.address.streetAddress) {
+          //markets might not have streetAddress. 
+          //We skip these.
+          return undefined;
+        }
+
+        if (~result._detail.name.indexOf("CLOSED")) {
+          //NYC.com way of denoting restaurant is closed. Let's skip these.
+          return undefined;
+        }
+
+        return result;
+      }
+    }
+  }
+};
