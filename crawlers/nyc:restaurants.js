@@ -80,6 +80,7 @@ module.exports = {
           _sourceUrl: "> a@href",
           _sourceId: "> a@href",
           image: "img.thumb@src",
+          _factReservationOpentable: ".btngroups .reservation@href",
           _detail: x("> a@href", {
             name: "h1",
             _descFull: ".editorial-and-map .ellipsis-full",
@@ -186,6 +187,32 @@ module.exports = {
           };
         }
 
+      },
+
+      reducer: function (obj) {
+
+        //Create 'fact'-attribute by combining all the separate facts we've collected
+        var factArr = obj.fact = obj.fact || [];
+
+
+        //a link to opentable reservation
+        if (obj._factReservationOpentable) {
+          //http://www.opentable.com/single.aspx?rid=105373&ref=148
+          //remove &ref, which probably is NYC affiliate id
+          var urlOpenTable = obj._factReservationOpentable;
+          urlOpenTable = urlOpenTable.substring(urlOpenTable, urlOpenTable.lastIndexOf("&"));
+          factArr.push({
+            name: "urlOpenTable",
+            val: urlOpenTable
+          });
+        }
+
+
+
+        if (!obj.fact.length) {
+          delete obj.fact;
+        }
+        return obj;
       },
 
       pruner: function (result) {
