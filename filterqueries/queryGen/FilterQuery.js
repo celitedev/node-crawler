@@ -222,15 +222,22 @@ module.exports = function (command) {
 
   FilterQuery.prototype.getFilter = function () {
 
-    if (!this.filter) {
-      return {};
-    }
 
     var query = {
       query: {
         bool: {}
+      },
+      "filter": {
+        "exists": {
+          "field": "image"
+        }
       }
     };
+
+    if (!this.filter) {
+      return query;
+    }
+
 
     //For now we only support AND
     //TODO: Should support arbitary nested AND / OR, 
