@@ -376,6 +376,8 @@ function processJob(job, done) {
 
           //results crawling
           results: x(crawlSchema.results.selector, [crawlResultSchema])
+        }, {
+          name: crawlerName
         })(function (err, obj) {
           if (err) {
             return reject(err);
