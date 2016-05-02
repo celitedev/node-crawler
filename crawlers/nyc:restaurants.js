@@ -160,7 +160,8 @@ module.exports = {
           }
 
           //from thumb to large file
-          imgUrl = imgUrl.replace("thumb", "front");
+          //NOPE since not all thumbs have a larger variant.. Hmm
+          // imgUrl = imgUrl.replace("thumb", "front");
 
           return {
             _ref: { //notice: _ref here.
