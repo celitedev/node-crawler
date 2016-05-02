@@ -556,6 +556,8 @@ function processJob(job, done) {
         return new Promise(function (resolve, reject) {
           obj.commit(function (err) {
             if (err) {
+              err.sourceId = obj.sourceId;
+              err.sourceUrl = obj.sourceUrl;
               return reject(err); //actual error in code (non-validation)
             }
             resolve(obj);
