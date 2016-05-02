@@ -18,16 +18,11 @@ var utils = module.exports = {
   //Used by consumer.
   //
   //redis type: sorted set
-  addedUrlsSortedSet: function (jobData) {
-
-    var firstType = _.isArray(jobData.type) ? jobData.type[0] : jobData.type;
-
-    var arr = [
-      "kwhen--urlsAdded",
-      jobData.source,
-      firstType,
-    ];
-    return arr.join("--");
+  addedUrlsSortedSet: function (crawlerName) {
+    if (!crawlerName) {
+      throw new Error("crawlerName not set in addedUrlsSortedSet");
+    }
+    return "kwhen--urlsAdded--" + crawlerName.toLowerCase();
   },
 
   //the last batchid per crawler
@@ -35,38 +30,22 @@ var utils = module.exports = {
   //Used by consumer and producer
   //
   //redis type: hash
-  lastBatchIdHash: function (jobData) {
-    var firstType = _.isArray(jobData.type) ? jobData.type[0] : jobData.type;
-
-    var arr = [
-      jobData.source,
-      firstType
-    ];
-    return ["kwhen--lastid", arr.join("--")];
+  lastBatchIdHash: function (crawlerName) {
+    return ["kwhen--lastid", crawlerName.toLowerCase()];
   },
 
   //used by producer to see if we're not too fast with producing.
   //
   // redis type: hash 
-  lastBatchIdEpoch: function (jobData) {
-    var firstType = _.isArray(jobData.type) ? jobData.type[0] : jobData.type;
-
-    var arr = [
-      jobData.source,
-      firstType
-    ];
-    return ["kwhen--lastidEpoch", arr.join("--")];
+  lastBatchIdEpoch: function (crawlerName) {
+    return ["kwhen--lastidEpoch", crawlerName.toLowerCase()];
   },
 
 
 
   //NOTE: config is from commandline. Here type is never an array
-  fetchCrawlConfig: function (config) {
-    config.source = config.source.toLowerCase();
-    config.type = config.type.toLowerCase();
-
-    var crawlerName = utils.calculated.getCrawlerName(config.source, config.type);
-
+  fetchCrawlConfig: function (crawlerName) {
+    crawlerName = crawlerName.toLowerCase();
     try {
       var crawlerSchemaPath = path.resolve(__dirname + "/crawlers/" + crawlerName);
       crawlConfig = require(crawlerSchemaPath);
@@ -83,21 +62,26 @@ var utils = module.exports = {
       // throw new Error("crawler not found: " + config.crawler);
     }
 
+    crawlConfig.name = crawlerName;
+
     return crawlConfig;
   },
 
   addCrawlJob: function (queue, batchId, crawlConfig, url, cb) {
-
+    if (!crawlConfig.name) {
+      throw new Error("Sanity check: crawlConfig.name is undefined!");
+    }
     var crawlerQueueName = utils.calculated.getCrawlerQueueName(crawlConfig);
 
     return queue.create(crawlerQueueName, {
+        name: crawlConfig.name,
         batchId: batchId,
         jobId: uuid.v4(), //id of this specific mini batch
         source: crawlConfig.source.name,
         type: crawlConfig.entity.type,
         url: url,
         created: new Date().toISOString(),
-        title: utils.calculated.getSeedUrlTitle(crawlConfig.source.name, crawlConfig.entity.type, url)
+        title: crawlConfig.name + "--" + url
       })
       .ttl(crawlConfig.job.ttl)
       //fail means retry: return to queue to be picked up later. Allows us to mimic 'at-least-once'-semantics
@@ -108,35 +92,9 @@ var utils = module.exports = {
       .save(cb || noop);
   },
   calculated: {
-    getSeedUrlTitle: function (source, type, url) {
-      return source + ":" + type + "--" + url;
-    },
-
-    /**
-     * Get name of crawler which is '<source>:<type>'
-     *
-     * Input either: 
-     * - source + type
-     * - seedUrlJob
-     * 
-     * @param  {[type]} source [description]
-     * @param  {[type]} type   [description]
-     * @return {[type]}        [description]
-     */
-    getCrawlerName: function (source, type) {
-      var name;
-      if (_.isObject(source)) {
-        name = source.source + ":" + (_.isArray(source.type) ? source.type.join("-") : source.type);
-      } else {
-        name = source + ":" + (_.isArray(type) ? type.join("-") : type);
-      }
-      return name.toLowerCase();
-    },
-
 
     getCrawlerQueueName: function (crawlConfig) {
-      var crawlerName = utils.calculated.getCrawlerName(crawlConfig.source.name, crawlConfig.entity.type);
-      return "crawl-" + crawlerName;
+      return "crawl-" + crawlConfig.name;
     }
   }
 };

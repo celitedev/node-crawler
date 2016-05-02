@@ -89,9 +89,9 @@ var functionLib = {
 console.log("Remembered to install proper DNS caching on the box such as nscd?".green);
 
 var resourcesPerCrawlerType = {};
-
-if (argv.source && argv.type) {
-  var specificCrawler = utils.calculated.getCrawlerName(argv.source, argv.type);
+var specificCrawler;
+if (argv.name) {
+  specificCrawler = argv.name.toLowerCase();
   console.log(("consuming jobs for specific crawler: " + specificCrawler).yellow);
 } else {
   console.log(("consuming jobs for all crawlers").yellow);
@@ -104,7 +104,11 @@ fs.readdirSync(normalizedPath).forEach(function (file) {
   var stat = fs.statSync(path.join(normalizedPath, file));
   if (stat.isFile()) {
     if ((specificCrawler && file === specificCrawler + ".js") || !specificCrawler) {
-      startCrawlerQueue(require("./crawlers/" + file));
+
+      var crawlConfig = require("./crawlers/" + file);
+      crawlConfig.name = file.substring(0, file.lastIndexOf(".")).toLowerCase(); //set name
+
+      startCrawlerQueue(crawlConfig);
     } else {
       console.log(("skipping jobs for crawler: " + file.substring(0, file.lastIndexOf("."))).yellow);
     }
@@ -117,8 +121,9 @@ fs.readdirSync(normalizedPath).forEach(function (file) {
 ///////////////////////////////
 function startCrawlerQueue(crawlConfig) {
 
-  var crawlerName = utils.calculated.getCrawlerName(crawlConfig.source.name, crawlConfig.entity.type);
+  var crawlerName = crawlConfig.name;
 
+  console.log("CRAWLER", crawlerName);
   var x = Xray();
 
   //install own driver which does: 
@@ -199,7 +204,12 @@ function processJob(job, done) {
     throw new Error("'type' not defined on job: " + JSON.stringify(job));
   }
 
-  var crawlerName = utils.calculated.getCrawlerName(data);
+  var crawlerName = data.name;
+
+  if (!crawlerName) {
+    throw new Error('Sanity check: data.name not defined!');
+  }
+
   var crawlerResource = resourcesPerCrawlerType[crawlerName];
   if (crawlerResource === undefined) {
     throw new Error("crawler not found: " + crawlerName);
@@ -238,7 +248,7 @@ function processJob(job, done) {
     .then(function getLatestBatchId() {
       //get latest batchId from redis
 
-      var lastbatchIdObj = utils.lastBatchIdHash(data);
+      var lastbatchIdObj = utils.lastBatchIdHash(crawlerName);
 
       return new Promise(function (resolve, reject) {
 
@@ -328,7 +338,7 @@ function processJob(job, done) {
             }
 
 
-            var sortedSetname = utils.addedUrlsSortedSet(data);
+            var sortedSetname = utils.addedUrlsSortedSet(crawlerName);
 
             //get the last time (batchId) nextUrl was added to queue
             redisClient.zscore(sortedSetname, nextUrl, function (err, score) {
@@ -591,7 +601,7 @@ function processJob(job, done) {
               if (obj.detailPageAware) {
                 return new Promise(function (resolve, reject) {
 
-                  var sortedSetname = utils.addedUrlsSortedSet(data);
+                  var sortedSetname = utils.addedUrlsSortedSet(crawlerName);
 
                   redisClient.zadd(sortedSetname, data.batchId, obj.sourceUrl, function (err, score) {
                     if (err) {

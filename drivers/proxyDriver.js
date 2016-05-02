@@ -42,7 +42,7 @@ function driver(driverOpts) {
 
       var redisClient = opts.redisClient;
       var utils = opts.utils;
-      var sortedSetname = utils.addedUrlsSortedSet(opts);
+      var sortedSetname = utils.addedUrlsSortedSet(opts.name);
 
       //get the last time (batchId) nextUrl was added to queue
       redisClient.zscore(sortedSetname, ctx.url, function (err, score) {
