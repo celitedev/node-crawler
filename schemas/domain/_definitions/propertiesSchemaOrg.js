@@ -142,6 +142,11 @@ module.exports = {
   opens: {},
   validFrom: {},
   validThrough: {},
+  hoursPayload: { //e.g.: dinner
+    isCustom: true,
+    ranges: ["Text"],
+    isMulti: true
+  },
 
   //////////////////////////////////////
   //https://schema.org/GeoCoordinates //

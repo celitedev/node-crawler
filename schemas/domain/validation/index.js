@@ -260,7 +260,7 @@ module.exports = function (generatedSchemas) {
         validateObj.type = "string";
         break;
       case "Time":
-        throw new Error("TODO: _generateDataTypeValidator.Time not validated yet");
+        // throw new Error("TODO: _generateDataTypeValidator.Time not validated yet");
         validateObj.type = "string";
         break;
       case "URL":

@@ -3,6 +3,13 @@ var _ = require("lodash");
 var typesGlobal = [];
 
 
+var openinghoursStats = {
+  has: 0,
+  success: 0,
+  failParse: 0,
+  failOrder: 0
+};
+
 function getFactsObject(htmlFragment) {
 
   //later extra 0 and 2. 1 is used for matching div which might have class attached but we don't need
@@ -279,35 +286,180 @@ module.exports = {
           });
         }
 
-        // OPENINGHOURS Daily: 10:00am-10:30pm
-        // OPENINGHOURS BREAKFAST<br>Monday &#x2013; Friday<br>7:30 am &#x2013; 11:30 am<br>Saturday &amp; Sunday<br>8:00 am &#x2013; 10:00 am<br><br><b>LUNCH</b><br>Monday &#x2013; Friday<br>12: 00 pm &#x2013; 3:00 pm<br><br>APR&#xC8;S-MIDI<br>3:00 pm &#x2013; 5:30 pm daily<br><br><b>DINNER</b><br>Sunday &#x2013; Wednesday<br>5:30 pm &#x2013; 11:00 pm<br>Thursday &#x2013; Saturday<br>5:30 pm &#x2013; 12:00 am<br><br>WEEKEND <b>BRUNCH</b><br>Saturday &amp; Sunday<br>10:00 am &#x2013; 3:00 pm
-        // OPENINGHOURS Daily: 5:30pm-2:00am
-        // OPENINGHOURS <b>LUNCH</b><br>Mon-Fri: 11:30am-3:00pm<br>Sat-Sun 11:30am-4:00pm<br><br><b>DINNER</b><br>Mon-Thu: 5:00pm-11:00pm<br>Fri-Sat: 5:00pm-12:00am<br>Sun: 5:00pm-10:00pm
-        // OPENINGHOURS Daily: 11:00am-11:30pm
-        // OPENINGHOURS <b>LUNCH</b><br>Mon-Fri: 11:00am-4:00pm<br><br><b>DINNER</b><br>Sun-Thu: 4:00pm-11:00pm<br>Fri-Sat: 4:00pm-12:00am
-        // OPENINGHOURS BREAKFAST<br>Daily: 6:30am-10:30am<br><br><b>LUNCH</b><br>Mon-Fri: 11:30am-2:00pm<br><br><b>BRUNCH</b><br>Sat-Sun: 11:30am-2:00pm<br><br><i>Afternoon Tea</i><br>Daily: 2:00pm-5:00pm
-        // OPENINGHOURS Tue-Thu: 12:00pm-11:00pm<br>Friday: 12:00pm-12:00am<br>Saturday: 5:00pm-12:00am<br>Sunday: 5:00pm-11:00pm<br><br><b>BRUNCH</b><br>Sat-Sun: 11:00am-4:00pm
-        // OPENINGHOURS Mon-Thu: 5:00pm-11:30pm<br>Fri-Sun: 5:00pm-12:00am
-        // OPENINGHOURS <b>LUNCH</b><br>Daily: 11:30am-3:30pm<br><br><b>DINNER</b><br>Sun-Thu: 6:00pm-12:00am<br>Fri-Sat 5:00pm-1:00am<br><br><i>Bar</i><br>Mon-Thu: 6:00pm-2:00am<br>Fri-Sat: 6:00pm-3:00am<br>Sunday: 3:00pm-12:00am
-        // OPENINGHOURS <b>DINNER</b><br>Mon-Sat: 5:30pm-11:00pm
-        // OPENINGHOURS Mon-Thu: 5:00pm-12:00am<br>Fri-Sat: 5:00pm-1:00am<br>Sunday: 5:00pm-11:00pm
-        // OPENINGHOURS Mon-Fri: 7:00am-7:00pm<br>Sat-Sun: 8:00am-7:00pm
-        // OPENINGHOURS <b>LUNCH</b><br><br>Mon-Fri<br>11:30am- 2:30pm<br>Reservations are required for the public at least 24 hours in advance.
-        // OPENINGHOURS Tue-Fri: 8:00am-7:00pm<br>Saturday: 9:00am-7:00pm<br>Sunday: 10:00am-6:00pm
-        // OPENINGHOURS Mon-Fri: 7:00am-8:00pm<br>Sat-Sun: 8:00am-8:00pm
-        // OPENINGHOURS Daily: 11:00am-12:00am
-        // OPENINGHOURS BREAKFAST<br>Mon-Fri: 8:00am-12:00pm<br><br><b>LUNCH</b><br>Mon-Fri: 12:00pm-3:00pm<br><br><b>DINNER</b><br>Mon-Tue: 5:30pm-11:00pm <br>Wed-Sat: 5:30pm-12:00am<br>Sun: 5:30pm-10:00pm<br><br><b>BRUNCH</b><br>Sat-Sun: 9am-4pm<br><br><i>Brasserie</i><br>Mon-Fri: 3pm-5:30pm<br>Sat-Sun: 4pm-5:30pm
-        // OPENINGHOURS BREAKFAST<br>Daily: 7:00am-10:00am<br><br><b>LUNCH</b><br>Mon-Sat 12:00pm-2:30pm<br><br><b>DINNER</b><br>Tue-Sat 6:00pm-10:00pm<br><br><b>BRUNCH</b><br>Sun: 11:30am-2:30pm
-        // OPENINGHOURS <b>LUNCH</b><br>Mon-Fri: 12:00pm-3:30pm<br><br><b>DINNER</b><br>Mon-Sun: 5:30pm-2:00am<br><br><b>BRUNCH</b><br>Sat-Sun: 11:00am-5:00pm
-        // OPENINGHOURS Mon-Sat noon-8pm<br>Sun noon-6pm
-        // OPENINGHOURS <b>LUNCH</b><br>Tue-Fri: 12:00pm-3:00pm<br><br><b>DINNER</b><br>Mon-Thu: 5:30pm-11:00pm<br>Fri-Sat: 5:30pm-12:00am<br>Sunday: 5:30pm-10:30pm
-        // OPENINGHOURS Daily from 11:00 am to 7:00 pm
-        // OPENINGHOURS <b>LUNCH</b><br>Sat-Sun: 12:00pm-3:30pm<br><br><b>DINNER</b><br>Mon-Sat: 6:00pm-11:00pm<br>Sunday: 5:30pm-10:00pm<br><br><b>BRUNCH</b><br>Sat-Sun; 11:00am-3:00pm
+        if (factsRaw["This Week&apos;s Hours"]) {
+
+          var mealTypes = {
+            dinner: "dinner",
+            brunch: "brunch",
+            lunch: "lunch",
+            breakfast: "breakfast",
+            "bar &amp; lounge": "bar / lounge",
+            "bar": "bar / lounge",
+            "lounge": "bar / lounge",
+            "late": "late",
+            "late menu": "late",
+          };
 
 
-        // if (factsRaw["This Week&apos;s Hours"]) {
-        //   console.log("OPENINGHOURS", factsRaw["This Week&apos;s Hours"]);
-        // }
+          var dayMapping = {
+            mon: 0,
+            tue: 1,
+            wed: 2,
+            thu: 3,
+            fri: 4,
+            sat: 5,
+            sun: 6,
+            dai: [0, 1, 2, 3, 4, 5, 6] //daily
+          };
+
+          //lowercase -> trim -> remove spaces next to '-'
+          var openRaw = factsRaw["This Week&apos;s Hours"]
+            .toLowerCase()
+            .trim()
+            .replace(/( )+to( )+/g, '-') //change word 'to' -> '-'
+            .replace(/( )+from( )+/g, '#') //change word 'from' -> '#'
+            .replace(/( )*-( )*/g, '-')
+            .replace(/&(.){2,7};/g, "#") //remove special characters. Assume these are separators
+            .replace(/<[^>]*>/g, "#") //change all tags  -> #
+            .replace(/:( )+/g, "#") //change colon plus at least 1 space -> #
+            .replace(/:#/g, "#")
+            .replace(/am( )+/g, "am#") //am (pm) followed by space injects a separator.
+            .replace(/pm( )+/g, "pm#")
+            .replace(/( )*am( )*/g, "am") //remove space around am
+            .replace(/( )*pm( )*/g, "pm")
+            .replace(/( )*#( )*/g, "#")
+            .replace(/\#+/g, '#') //change multiple ## -> #
+            .replace(/^#/g, '') //remove first #
+            .replace(/#$/g, ''); //... and last
+
+          var openingArr = openRaw.split("#");
+
+
+          var openingDayParser = {
+            //find day range
+            //PRE: check if dayIndexStart exists
+            findDayRange: function (el) {
+              var dayIndexStart = dayMapping[el.substring(0, 3)]; //Exists as checked upstream
+              var dayRange;
+              if (~el.indexOf("-")) { //e.g.: mon-sun
+                var dayIndexStop = dayMapping[el.substring(4, 7)];
+                if (_.isArray(dayIndexStart)) {
+                  throw new Error("found date-range '-' but dateStart is already a day-array");
+                }
+                if (dayIndexStop === undefined) {
+                  throw new Error("dayRange end not found");
+                }
+                if (_.isArray(dayIndexStop)) {
+                  throw new Error("found date-range '-' but dayIndexStop is already a day-array");
+                }
+
+                //create dayRange using [begin, end]
+                if (dayIndexStart > dayIndexStop) {
+                  dayIndexStop += 7; //mod
+                }
+
+                dayRange = [];
+                for (var i = dayIndexStart; i <= dayIndexStop; i++) {
+                  dayRange.push(i % 7);
+                }
+              } else { //e.g: 'monday' or 'daily'
+                dayRange = _.isArray(dayIndexStart) ? dayIndexStart : [dayIndexStart];
+              }
+              return dayRange;
+            }
+          };
+
+
+          //We probably have pairs of day (or day-ranges) + a time-range
+          function processOpeninghours(arr) {
+
+            if (!arr.length) return [];
+
+            var el = arr.shift();
+
+            var thisTerm;
+
+            if (mealTypes[el] !== undefined) { //find mealtype
+              thisTerm = "mealType";
+            } else if (dayMapping[el.substring(0, 3)] !== undefined) { //fine dayrange
+              thisTerm = "dayrange";
+            } else if (~el.indexOf("am-") || ~el.indexOf("pm-")) { //find timerange
+              thisTerm = "timerange";
+            } else {
+              var err = new Error("no parser found: " + el);
+              err.status = "NO_PARSER";
+              throw err;
+            }
+
+            //continue processing
+            return [thisTerm].concat(processOpeninghours(arr));
+          }
+
+          //Generally we split into 2 distinct groups: 
+          //1. indication of mealtype
+          //2. NO indication of mealtype
+
+          try {
+            openinghoursStats.has++;
+            var result = processOpeninghours(_.clone(openingArr));
+
+            var lastTerm;
+            var errMsg;
+            _.each(result, function (term) {
+
+              if (!lastTerm) { //init
+                lastTerm = term;
+                return;
+              }
+
+              if (lastTerm === "mealType" && term === "mealType") {
+                errMsg = errMsg || "mealType cannot directly follow mealtype: " + openingArr;
+              } else if (lastTerm === "timerange" && term === "timerange") {
+                errMsg = errMsg || "timerange cannot directly follow timerange: " + openingArr;
+              } else if (lastTerm === "mealType" && term === "timerange") {
+                errMsg = errMsg || "timerange cannot directly follow mealType: " + openingArr;
+              }
+              lastTerm = term;
+            });
+
+            if (errMsg) {
+              var error = new Error(errMsg);
+              error.status = "ERROR_IN_ORDER";
+              throw error;
+            }
+
+            openinghoursStats.success++;
+
+          } catch (err) {
+            switch (err.status) {
+              case "ERROR_IN_ORDER":
+                // console.log(err.message);
+                openinghoursStats.failOrder++;
+                break;
+              case "NO_PARSER":
+                // console.log(err.message);
+                openinghoursStats.failParse++;
+                break;
+              default:
+                throw err; //uncaught
+            }
+          }
+        }
+
+        // console.log(openinghoursStats);
+
+
+
+
+        //NOTE: opens
+        // obj.openingHoursSpecification = [{
+        //   opens: "8AM", //NOTE: of dataType=time which is not validated (assumes time)
+        //   closes: "10PM",
+        //   dayOfWeek: "MON",
+        //   // validFrom: {},
+        //   // validThrough: {},
+        //   hoursPayload: "dinner"
+        // }];
 
 
         ///////////////////////
