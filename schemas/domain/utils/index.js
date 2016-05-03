@@ -33,6 +33,33 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
       }
     },
 
+    //Based on:
+    //http://stackoverflow.com/questions/25823419/find-open-shops-through-timetable-with-elasticsearch-tire
+    //Which in turn is based on my approach from Solr back in the day: 
+    //http://lucene.472066.n3.nabble.com/Modeling-openinghours-using-multipoints-td4025336.html
+    //
+    //Idea as follows: 
+    //open/close are represented as integers with 5 minute increments. 
+    //As such Mon 00:00 - Sun 11:55PM is decoded as integers
+    //
+    //[0, 2016] i.e.: 12 (increments per hour, Because 5 * 12 = 60) * 24 * 7 = 2016
+    //Querying if 
+    // "open_hours": {
+    //   "type": "nested",
+    //   "properties": {
+    //     "meal": {
+    //       type: "string" //breakfast, lunch, dinner. Multivalued.
+    //     },
+    //     "open": {
+    //       "type": "integer"
+    //     },
+    //     "close": {
+    //       "type": "integer"
+    //     }
+    //   }
+    // },
+
+
     //https://www.elastic.co/guide/en/elasticsearch/reference/current/search-suggesters-completion.html
     suggestWithRoot: {
       "type": "completion",
