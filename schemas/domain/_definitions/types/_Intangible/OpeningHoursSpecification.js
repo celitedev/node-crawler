@@ -1,7 +1,7 @@
 module.exports = {
   properties: {
-    closes: false,
     dayOfWeek: false,
+    closes: false,
     opens: false,
     validFrom: false,
     validThrough: false,
