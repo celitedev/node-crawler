@@ -139,6 +139,11 @@ module.exports = {
   ////////////////////////////////////////////////
   closes: {},
   dayOfWeek: {},
+  dayOfWeekNumber: { //instead of that weird dayOfWeek enumeration
+    isCustom: true,
+    ranges: ["Number"],
+    isMulti: true
+  },
   opens: {},
   validFrom: {},
   validThrough: {},

@@ -305,20 +305,15 @@ function processOpeninghoursTotal(openRaw) {
     });
 
 
-    //Now parse out dayRange to separate day objects
+    //Now create correct format
     if (_.size(openinghoursMap)) {
       return _.reduce(openinghoursMap, function (arr, obj) {
-
-        var dayObjs = _.map(obj.dayRange, function (dayIndex) {
-          return {
-            hoursPayload: obj.type,
-            dayOfWeek: dayIndex,
-            opens: obj.timeRange[0],
-            closes: obj.timeRange[1]
-          };
-        });
-
-        return arr.concat(dayObjs);
+        return arr.concat([{
+          hoursPayload: obj.type,
+          dayOfWeekNumber: obj.dayRange,
+          opens: obj.timeRange[0],
+          closes: obj.timeRange[1]
+        }]);
       }, []);
     }
 
