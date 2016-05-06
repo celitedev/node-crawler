@@ -1,6 +1,8 @@
 var t = require("tcomb");
 var _ = require("lodash");
 var Promise = require("bluebird");
+var moment = require("moment");
+require("moment-timezone");
 
 var domainConfig = require("../../schemas/domain/_definitions/config");
 var roots = domainConfig.domain.roots;
@@ -160,11 +162,75 @@ module.exports = function (command) {
   };
 
 
+  var OPENINGHOURS_RESOLUTION = 5;
+
   FilterQuery.prototype.getTemporal = function () {
 
     if (!this.temporal) {
       return {};
     }
+
+    //PRE: temporal defined;
+
+    if (this.getRoot() === "PlaceWithOpeninghours") {
+
+      //check on openinghours
+      if (!this.temporal.open) {
+        throw new Error("temporal defined on PlaceWithOpeninghours must contain 'open' attrib");
+      }
+
+      var date;
+      if (this.temporal.open === "now") {
+        date = moment();
+      }
+      date = date.tz('America/New_York');
+
+
+      var days = date.isoWeekday() - 1; //returns[1, 7] -> map to [0,6]
+      var hours = date.hours();
+      var minutes = date.minutes();
+
+      var dateAsInt = ((24 * days + hours) * 60 / OPENINGHOURS_RESOLUTION) + Math.round(minutes / OPENINGHOURS_RESOLUTION);
+      var openingQuery = {
+        "query": {
+          "bool": {
+            "must": [{
+              "nested": {
+                "path": "openingHoursSpecification",
+                "query": {
+                  "bool": {
+                    "must": [{
+                      "filtered": {
+                        "filter": {
+                          "range": {
+                            "openingHoursSpecification.opens": {
+                              "lte": dateAsInt
+                            }
+                          }
+                        }
+                      }
+                    }, {
+                      "filtered": {
+                        "filter": {
+                          "range": {
+                            "openingHoursSpecification.closes": {
+                              "gte": dateAsInt
+                            }
+                          }
+                        }
+                      }
+                    }]
+                  }
+                }
+              }
+            }]
+          }
+        }
+      };
+
+      return openingQuery;
+    }
+
 
     //TODO: all the checking on values, properties given root and all that.
     //NOTE startDate hardcoded
