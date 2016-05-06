@@ -115,6 +115,48 @@ module.exports = function (generatedSchemas) {
         enum: vocabs.tag //TODO, need to provide this. For now it's undefined thus pass-all
       },
 
+      openingHoursSpecification: {
+        mapping: mappings.openingHoursSpecification,
+        transform: function transformOpeninghoursToES(openingHours) {
+
+          //sometimes we have empty openinghours?
+          //probably because null value on SourceEntities -> empty {} on entities
+          //Null normally isn't set, but may be done by hand in RethinkDB
+          if (!openingHours.hoursPayload) return [];
+
+          var TIME_RESOLUTION = 5; //5 minutes
+          function getIntFromTime(sTime) {
+            //interval = 5minutes
+            var splitHM = sTime.split(":");
+            var hours = parseInt(splitHM[0]) * 60 / TIME_RESOLUTION; //hour = 60 minutes, interval = 5 minutes -> each hour is 12 intervals
+            var minutes = Math.round(parseInt(splitHM[1]) / TIME_RESOLUTION);
+            return hours + minutes;
+          }
+
+          return _.map(openingHours.dayOfWeekNumber, function (day) {
+
+
+            var dayIntervals = day * 24 * (60 / TIME_RESOLUTION);
+
+            var open = getIntFromTime(openingHours.opens) + dayIntervals;
+            var close = getIntFromTime(openingHours.closes) + dayIntervals;
+
+            //moving past midnight...
+            if (open > close) {
+              close += 24 * (60 / TIME_RESOLUTION); //add a day
+            }
+
+
+            return {
+              hoursPayload: openingHours.hoursPayload,
+              opens: open,
+              closes: close
+            };
+          });
+
+        }
+      },
+
 
       subtypes: {
         facet: {

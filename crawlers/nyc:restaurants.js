@@ -126,10 +126,18 @@ function processOpeninghours(arr) {
     var startHour,
       endHour;
 
-    try {
-      startHour = moment(splitHours[0], 'HH:mm').format('HH:mm');
-      endHour = moment(splitHours[1], 'HH:mm').format('HH:mm');
-    } catch (error) {
+    //specific catch
+    if (splitHours[0] === "midnight" || splitHours[0] === "12:00am") {
+      splitHours[0] = "00:00am";
+    }
+    if (splitHours[1] === "midnight" || splitHours[1] === "12:00am") {
+      splitHours[1] = "00:00am";
+    }
+
+    startHour = moment(splitHours[0], 'HH:mm').format('HH:mm');
+    endHour = moment(splitHours[1], 'HH:mm').format('HH:mm');
+
+    if (!~startHour.indexOf(":") || !~endHour.indexOf(":")) {
       err = new Error("startHour or endHour could not be parsed: " + el);
       err.status = "hourCouldNotBeParseError";
       throw err;

@@ -5,6 +5,12 @@ var UUID = require("pure-uuid");
 
 var excludePropertyKeys = domainUtils.excludePropertyKeys;
 
+//instead of _.compact
+function removeUndefined(col) {
+  return _.reject(col, function (val) {
+    return _.isUndefined(val);
+  });
+}
 
 module.exports = function (generatedSchemas, AbstractEntity, r) {
 
@@ -238,7 +244,7 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
                   }))
                   .then(function toERDRecursivePerPropertyRecurseForArrayThen(arrOfPossibleArr) {
 
-                    arrOfPossibleArr = _.compact(arrOfPossibleArr);
+                    arrOfPossibleArr = removeUndefined(arrOfPossibleArr);
 
                     return _.reduce(arrOfPossibleArr, function toERDRecursivePerPropertyRecurseForArrayReduce(out, possibleArr) {
                       return out.concat(_.isArray(possibleArr) ? possibleArr : [possibleArr]);
@@ -257,7 +263,8 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
               if (_.isArray(out)) {
 
                 //compact: some may be undefined. uniq: vocab lookup may produce dupes
-                out = _.uniq(_.compact(out));
+                out = _.uniq(removeUndefined(out));
+
 
                 //if the remaining size is zero, return undefined.
                 if (!_.size(out)) {
@@ -571,12 +578,16 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
 
         //after vocab lookup, do a transform again because lookup may have resulted 
         //in values not respecting transform
-        val = transformer ? _.map(val, _.partial(_doESTransform, _, transformer)) : val;
+        val = transformer ? _.reduce(val, function (arr, indivVal) {
+          var out = _doESTransform(indivVal, transformer);
+          out = _.isArray(out) ? out : [out];
+          return arr.concat(out); //
+        }, []) : val;
 
         return arr.concat(val);
       }, []);
 
-      v = _.uniq(_.compact(v));
+      v = _.uniq(removeUndefined(v));
 
       if (erdMappingObj.enumStrictSingleValued) {
         if (!v.length) {
