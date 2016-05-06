@@ -245,7 +245,7 @@ Promise.resolve()
                       var errors = _.filter(results.items, function (result) {
                         return result.index.status >= 300;
                       });
-                      console.log("ERRORS IN ES BULK INSERT************************");
+                      console.log("ERRORS IN ES BULK INSERT: REST OF BULK IS PERSISTED ************************");
                       console.log(JSON.stringify(errors, null, 2));
                     }
                   });

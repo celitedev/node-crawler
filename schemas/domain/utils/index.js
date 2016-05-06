@@ -44,20 +44,20 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
     //
     //[0, 2016] i.e.: 12 (increments per hour, Because 5 * 12 = 60) * 24 * 7 = 2016
     //Querying if 
-    // "open_hours": {
-    //   "type": "nested",
-    //   "properties": {
-    //     "meal": {
-    //       type: "string" //breakfast, lunch, dinner. Multivalued.
-    //     },
-    //     "open": {
-    //       "type": "integer"
-    //     },
-    //     "close": {
-    //       "type": "integer"
-    //     }
-    //   }
-    // },
+    "openingHoursSpecification": {
+      "type": "nested",
+      "properties": {
+        "hoursPayload": {
+          type: "string" //breakfast, lunch, dinner. Multivalued.
+        },
+        "opens": {
+          "type": "integer"
+        },
+        "closes": {
+          "type": "integer"
+        },
+      }
+    },
 
 
     //https://www.elastic.co/guide/en/elasticsearch/reference/current/search-suggesters-completion.html
