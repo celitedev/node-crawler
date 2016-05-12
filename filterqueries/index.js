@@ -1,5 +1,7 @@
 var elasticsearch = require('elasticsearch');
 
+
+
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
   checkSoundness: true,
   config: require("../schemas/domain/_definitions/config"),

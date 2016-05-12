@@ -9,6 +9,11 @@ var roots = domainConfig.domain.roots;
 var cardViewModel = require("../cardViewModel");
 var FilterQuery;
 
+var appRoot = require('app-root-path');
+
+var pos = require('pos');
+var chunker = require('pos-chunker');
+
 var subtypeToFilterQuery = require("../queryGen/fakeNLP").subtypeToFilterQuery;
 
 function createRelatedFilterQueries(filterQuery) {
@@ -269,8 +274,257 @@ function createFilterQuery(command) {
   return filterQuery;
 }
 
+var tagger = new pos.Tagger();
+
 var middleware = {
   superSweetNLP: function superSweetNLP(req, res, next) {
+    if (req.body.isNew && !req.type && req.body.question !== undefined) {
+
+      var question = req.body.question.toLowerCase();
+
+      var words = new pos.Lexer().lex(question);
+      var taggedWords = tagger.tag(words);
+
+      var tags = "";
+      _.each(taggedWords, function (val) {
+        var word = val[0];
+        var tag = val[1];
+        tags += " " + word + "/" + tag;
+      });
+      tags = tags.trim();
+
+
+      var ruleMap = {
+
+        NUMBER_CHUNK: {
+          ruleType: 'tokens',
+          pattern: '[{ word:/one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen/}]',
+          result: "CD"
+        },
+
+        NUMBER_CHUNK1: {
+          ruleType: 'tokens',
+          pattern: '[{ tag:CD}]',
+          result: "CD"
+        },
+
+        //january -> MONTH
+        MONTH: {
+          ruleType: 'tokens',
+          pattern: '[{ word:/january|february|march|april|may|june|july|august|september|october|november|december/ }]',
+          result: "MONTH"
+        },
+
+        //weekdays
+        //sundays -> weekday
+        WEEKDAY: {
+          ruleType: 'tokens',
+          pattern: '[{ word:/monday|tuesday|wednesday|thursday|friday|saturday|sunday(s)*/}]',
+          result: "WEEKDAY"
+        },
+
+        //e.g.: afternoon
+        TIMEOFDAY: {
+          ruleType: "tokens",
+          pattern: "[{word:/morning|afternoon|evening|night|midnight|midday/}]",
+          result: "TIMEOFDAY"
+        },
+
+        TIMESPAN: {
+          ruleType: 'tokens',
+          pattern: '[{word:/day(s)*|week(s)*|month(s)*|year(s)*/}]',
+          result: "TIMESPAN"
+        },
+
+
+        //E.g. next month
+        RELATIVE_DATE1: {
+          ruleType: 'tokens',
+          pattern: "[{ word:/this|next/}] [{chunk:TIMESPAN}]",
+          result: "RELATIVE_DATE"
+        },
+
+        //E.g.: 3 weeks
+        RELATIVE_DATE2: {
+          ruleType: 'tokens',
+          pattern: "[{chunk:CD}] [{chunk:TIMESPAN}]",
+          result: "RELATIVE_DATE"
+        },
+
+
+        //month + day -> DATE
+        //january 12 -> DATE
+        DATE_FROM_MONTH: {
+          ruleType: "tokens",
+          pattern: "[{chunk:MONTH}] [{word:\\d{1,2}; chunk:CD}]",
+          result: "DATE"
+        },
+
+        //Simple terms that directly indicate a date.
+        //e.g.: yesterday -> DATE
+        //now (as in 3 weeks from now) 
+        DATE_FROM_DAY_DIRECTLY: {
+          ruleType: 'tokens',
+          pattern: '[{ word:/yesterday|today|tomorrow|now/}]',
+          result: "DATE"
+        },
+
+        //date from weekday
+        //this sunday -> DATE
+        //next saturday -> DATE
+        DATE_FROM_WEEKDAY: {
+          ruleType: "tokens",
+          pattern: "[{word:this|next}] [{chunk:WEEKDAY}]",
+          result: "DATE"
+        },
+
+        //Used to compose compound dates
+        //(DATE | WEEKDAY) in RELATIVE_DATE -> DATE
+        //e.g: tomorrow in 3 weeks
+        DATE_FROM_RELATIVEDATE1: {
+          ruleType: "tokens",
+          pattern: "[{chunk:/DATE|WEEKDAY/}] [{word:in}] [{chunk:RELATIVE_DATE}]",
+          result: "DATE"
+        },
+
+        //RELATIVE_DATE from (DATE | WEEKDAY) -> DATE
+        //e.g. 3 weeks from tomorrow
+        //16 days after tomorrow
+        DATE_FROM_RELATIVEDATE2: {
+          ruleType: "tokens",
+          pattern: "[{chunk:RELATIVE_DATE}] [{word:/from|before|after/}] [{chunk:/DATE|WEEKDAY/}]",
+          result: "DATE"
+        },
+
+        //friday afternoon
+        DATE_FROM_TIMEOFDAY: {
+          ruleType: "tokens",
+          pattern: "[{chunk:/DATE|WEEKDAY/}] [{chunk:TIMEOFDAY}]",
+          result: "DATE"
+        },
+
+        //(the) afternoon of DATE
+        DATE_FROM_TIMEOFDAY1: {
+          ruleType: "tokens",
+          pattern: "[{tag:DT}]* [{chunk:TIMEOFDAY}] [{word:/of/}]* [{chunk:/DATE|WEEKDAY/}] ",
+          result: "DATE"
+        },
+
+
+        //catchall for weekdays if not matched using more complex stuff
+        WEEKDAY_TO_DATE: {
+          ruleType: "tokens",
+          pattern: "[{chunk:WEEKDAY}]",
+          result: "DATE"
+        },
+
+
+
+        ///////////////////////
+
+        //noun phrase plural
+
+
+        //e.g: the large black cat
+        //KWHEN: often denoting: 
+        // - Proper Noun (e.g.: name of bar)
+        // - (sub)type + adjectives (e.g.: best italian restaurants)
+        //   - all Delightfully cheap restaurants
+        NP: {
+          ruleType: 'tokens',
+
+          //determiner + 
+          //Adverb | Adverb, comparitive | Adverb, superlative
+          //adjective | Adjective, comparative | Adjective, superlative
+          //singular/plural (proper) noun
+          pattern: '[ { tag:/DT|RB(R|S)*|JJ(R|S)*|NN.*?/ } ]+',
+          result: 'NP'
+        },
+
+        // //NOTE: just as an example: if we add this, we need to allow for this chunk to match in NP as well..
+        // ALL: {
+        //   ruleType: 'tokens',
+        //   pattern: '[{ word:/all/; tag:DT }]',
+        //   result: "ALL"
+        // },
+
+        // //.. we could use this rule to do that.
+        // ALL_NP: {
+        //   ruleType: 'tokens',
+        //   pattern: '[ { chunk:ALL } ] [ { chunk:NP } ]',
+        //   result: 'NP'
+        // },
+
+
+        //prepositional phrase is a noun phrase preceded by a preposition
+        //e.g.: 'in the house' and 'by the cold pool' 
+        //KWHEN: often denoting where / when
+        PP: {
+          ruleType: 'tokens',
+          pattern: '[ { tag:IN } ] [ { chunk:NP } ]',
+          result: 'PP'
+        },
+
+        // //verb phrase:  verb followed by one or more noun or prepositional phrases
+        // //e.g.: 'washed the dog in the bath'
+        // //KWHEN: ??
+        // VP: {
+        //   ruleType: 'tokens',
+        //   pattern: '[ { tag:/VB.*?/ } ] [ { chunk:/NP|PP/ } ]+',
+        //   result: 'VP'
+        // },
+
+        // //e.g.: The doctor saw the patient at the surgery.
+        // CLAUSE: {
+        //   ruleType: 'tokens',
+        //   pattern: '[ { chunk:NP } ] [ { chunk:VP } ]',
+        //   result: 'CLAUSE'
+        // },
+
+
+        //we may have tagged some numbers that were part of NP. 
+        //We re-add these numbers to NP here, unless they are part of another bigger (temporal) structure
+        NP_WITH_NR: {
+          ruleType: "tokens",
+          pattern: '[ { chunk:NP }]* [ { chunk:CD } ] [ { chunk:NP }]*',
+          result: 'NP'
+        }
+      };
+
+      var rules = [
+        ruleMap.NUMBER_CHUNK,
+        ruleMap.NUMBER_CHUNK1,
+        ruleMap.MONTH,
+        ruleMap.WEEKDAY,
+        ruleMap.TIMEOFDAY,
+        ruleMap.TIMESPAN,
+        ruleMap.RELATIVE_DATE1,
+        ruleMap.RELATIVE_DATE2,
+        ruleMap.DATE_FROM_MONTH,
+        ruleMap.DATE_FROM_DAY_DIRECTLY,
+        ruleMap.DATE_FROM_WEEKDAY,
+        ruleMap.DATE_FROM_RELATIVEDATE1,
+        ruleMap.DATE_FROM_RELATIVEDATE2,
+        ruleMap.DATE_FROM_TIMEOFDAY,
+        ruleMap.DATE_FROM_TIMEOFDAY1,
+        ruleMap.WEEKDAY_TO_DATE,
+
+        ruleMap.NP,
+        ruleMap.NP_WITH_NR,
+        ruleMap.PP,
+        ruleMap.VP
+      ];
+
+      var chunks = chunker.chunk(tags, rules);
+
+      res.json({
+        tags: tags,
+        chunks: chunks
+      });
+
+      return;
+      // return next();
+    }
     if (!req.type && req.body.question !== undefined) { //change question into filtercontext if filtercontext not already present
 
       var lowerBodySplit = _.compact(req.body.question.toLowerCase().split(" ")); //remove empty
