@@ -345,9 +345,10 @@ var middleware = {
         },
 
         //E.g. next month / coming month
+        //"the day" (later to be constructed in 'the day after tomorrow for instance')
         RELATIVE_DATE2: {
           ruleType: 'tokens',
-          pattern: "[{ word:/this|next|coming/}] [{chunk:/TIMESPAN|RELATIVE_DATE/}]",
+          pattern: "[{ word:/the|this|next|coming|last|prior|previous/}] [{chunk:/TIMESPAN|RELATIVE_DATE/}]",
           result: "RELATIVE_DATE"
         },
 
@@ -374,7 +375,7 @@ var middleware = {
         //next saturday -> DATE
         DATE_FROM_WEEKDAY: {
           ruleType: "tokens",
-          pattern: "[{word:/this|next|coming/}] [{chunk:WEEKDAY}]",
+          pattern: "[{word:/this|next|coming|last|prior|previous/}] [{chunk:WEEKDAY}]",
           result: "DATE"
         },
 
@@ -417,6 +418,14 @@ var middleware = {
           pattern: "[{chunk:WEEKDAY}]",
           result: "DATE"
         },
+
+        //this + date -> date
+        THIS_DATE: {
+          ruleType: "tokens",
+          pattern: "[{word:/this/}] [{chunk:DATE}]",
+          result: "DATE"
+        },
+
 
 
 
@@ -508,6 +517,7 @@ var middleware = {
         ruleMap.DATE_FROM_TIMEOFDAY,
         ruleMap.DATE_FROM_TIMEOFDAY1,
         ruleMap.WEEKDAY_TO_DATE,
+        ruleMap.THIS_DATE,
 
         ruleMap.NP,
         ruleMap.NP_WITH_NR,
