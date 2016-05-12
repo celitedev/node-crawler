@@ -294,7 +294,7 @@ var middleware = {
       tags = tags.trim();
 
 
-      var ruleMap = {
+      var ruleMapDate = {
 
         NUMBER_CHUNK: {
           ruleType: 'tokens',
@@ -348,7 +348,7 @@ var middleware = {
         //"the day" (later to be constructed in 'the day after tomorrow for instance')
         RELATIVE_DATE2: {
           ruleType: 'tokens',
-          pattern: "[{ word:/the|this|next|coming|last|prior|previous/}] [{chunk:/TIMESPAN|RELATIVE_DATE/}]",
+          pattern: "[{ word:/the|this|next|coming|following|last|prior|previous/}] [{chunk:/TIMESPAN|RELATIVE_DATE/}]",
           result: "RELATIVE_DATE"
         },
 
@@ -375,7 +375,7 @@ var middleware = {
         //next saturday -> DATE
         DATE_FROM_WEEKDAY: {
           ruleType: "tokens",
-          pattern: "[{word:/this|next|coming|last|prior|previous/}] [{chunk:WEEKDAY}]",
+          pattern: "[{word:/this|next|coming|following|last|prior|previous/}] [{chunk:WEEKDAY}]",
           result: "DATE"
         },
 
@@ -393,7 +393,21 @@ var middleware = {
         //16 days after tomorrow
         DATE_FROM_RELATIVEDATE2: {
           ruleType: "tokens",
-          pattern: "[{chunk:RELATIVE_DATE}] [{word:/from|before|after/}] [{chunk:/DATE|WEEKDAY/}]",
+          pattern: "[{chunk:RELATIVE_DATE}] [{word:/from|before|after|since/}] [{chunk:/DATE|WEEKDAY/}]",
+          result: "DATE"
+        },
+
+        //3 weeks ago
+        DATE_FROM_RELATIVEDATE3: {
+          ruleType: "tokens",
+          pattern: "[{chunk:RELATIVE_DATE}] [{word:/ago/}]",
+          result: "DATE"
+        },
+
+        //in 3 weeks
+        DATE_FROM_RELATIVEDATE4: {
+          ruleType: "tokens",
+          pattern: "[{word:/in/}] [{chunk:RELATIVE_DATE}]",
           result: "DATE"
         },
 
@@ -411,6 +425,13 @@ var middleware = {
           result: "DATE"
         },
 
+        //last night, etc
+        DATE_FROM_TIMEOFDAY2: {
+          ruleType: "tokens",
+          pattern: "[{word:/the|this|last|next|coming|following|last|prior|previous/}] [{chunk:TIMEOFDAY}]",
+          result: "DATE"
+        },
+
 
         //catchall for weekdays if not matched using more complex stuff
         WEEKDAY_TO_DATE: {
@@ -425,10 +446,10 @@ var middleware = {
           pattern: "[{word:/this/}] [{chunk:DATE}]",
           result: "DATE"
         },
+      };
 
 
-
-
+      var ruleMapNP = {
         ///////////////////////
 
         //noun phrase plural
@@ -500,32 +521,66 @@ var middleware = {
         }
       };
 
-      var rules = [
-        ruleMap.NUMBER_CHUNK,
-        ruleMap.NUMBER_CHUNK1,
-        ruleMap.MONTH,
-        ruleMap.WEEKDAY,
-        ruleMap.TIMEOFDAY,
-        ruleMap.TIMESPAN,
-        ruleMap.RELATIVE_DATE1,
-        ruleMap.RELATIVE_DATE2,
-        ruleMap.DATE_FROM_MONTH,
-        ruleMap.DATE_FROM_DAY_DIRECTLY,
-        ruleMap.DATE_FROM_WEEKDAY,
-        ruleMap.DATE_FROM_RELATIVEDATE1,
-        ruleMap.DATE_FROM_RELATIVEDATE2,
-        ruleMap.DATE_FROM_TIMEOFDAY,
-        ruleMap.DATE_FROM_TIMEOFDAY1,
-        ruleMap.WEEKDAY_TO_DATE,
-        ruleMap.THIS_DATE,
+      var ruleMapDuration = {
+        //When we don't match relativeDate to a DATE then it should be matched to a DURATION
+        //e.g.: coming 3 weeks
+        RELATIVE_DATE_TO_DURATION: {
+          ruleType: "tokens",
+          pattern: "[{chunk:RELATIVE_DATE}]",
+          result: "DURATION"
+        },
+        THE_DURATION: {
+          ruleType: "tokens",
+          pattern: "[{word:/the/}] [{chunk:DATE_SPAN}]",
+          result: "DURATION"
+        },
+        WEEKEND: {
+          ruleType: "tokens",
+          pattern: "[{word:/this|next|coming|following|last|prior|previous/}]* [{word:/weekend/}]",
+          result: "DURATION"
+        },
+      };
 
-        ruleMap.NP,
-        ruleMap.NP_WITH_NR,
-        ruleMap.PP,
-        ruleMap.VP
-      ];
 
-      var chunks = chunker.chunk(tags, rules);
+      //apply date-rules
+      var chunks = chunker.chunk(tags, [
+        ruleMapDate.NUMBER_CHUNK,
+        ruleMapDate.NUMBER_CHUNK1,
+        ruleMapDate.MONTH,
+        ruleMapDate.WEEKDAY,
+        ruleMapDate.TIMEOFDAY,
+        ruleMapDate.TIMESPAN,
+        ruleMapDate.RELATIVE_DATE1,
+        ruleMapDate.RELATIVE_DATE2,
+        ruleMapDate.DATE_FROM_MONTH,
+        ruleMapDate.DATE_FROM_DAY_DIRECTLY,
+        ruleMapDate.DATE_FROM_WEEKDAY,
+        ruleMapDate.DATE_FROM_RELATIVEDATE1,
+        ruleMapDate.DATE_FROM_RELATIVEDATE2,
+        ruleMapDate.DATE_FROM_RELATIVEDATE3,
+        ruleMapDate.DATE_FROM_RELATIVEDATE4,
+        ruleMapDate.DATE_FROM_TIMEOFDAY,
+        ruleMapDate.DATE_FROM_TIMEOFDAY1,
+        ruleMapDate.DATE_FROM_TIMEOFDAY2,
+        ruleMapDate.WEEKDAY_TO_DATE,
+        ruleMapDate.THIS_DATE,
+      ]);
+
+      //apply datespan rules
+      chunks = chunker.chunk(chunks, [
+        ruleMapDuration.RELATIVE_DATE_TO_DURATION,
+        ruleMapDuration.THE_DURATION,
+        ruleMapDuration.WEEKEND,
+      ]);
+
+      //apply NP rules
+      chunks = chunker.chunk(chunks, [
+        ruleMapNP.NP,
+        ruleMapNP.NP_WITH_NR,
+        ruleMapNP.PP,
+        ruleMapNP.VP
+      ]);
+
 
       res.json({
         tags: tags,
