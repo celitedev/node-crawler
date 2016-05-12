@@ -337,17 +337,17 @@ var middleware = {
         },
 
 
-        //E.g. next month
+        //E.g.: 3 weeks
         RELATIVE_DATE1: {
           ruleType: 'tokens',
-          pattern: "[{ word:/this|next/}] [{chunk:TIMESPAN}]",
+          pattern: "[{chunk:CD}] [{chunk:TIMESPAN}]",
           result: "RELATIVE_DATE"
         },
 
-        //E.g.: 3 weeks
+        //E.g. next month / coming month
         RELATIVE_DATE2: {
           ruleType: 'tokens',
-          pattern: "[{chunk:CD}] [{chunk:TIMESPAN}]",
+          pattern: "[{ word:/this|next|coming/}] [{chunk:/TIMESPAN|RELATIVE_DATE/}]",
           result: "RELATIVE_DATE"
         },
 
@@ -374,7 +374,7 @@ var middleware = {
         //next saturday -> DATE
         DATE_FROM_WEEKDAY: {
           ruleType: "tokens",
-          pattern: "[{word:this|next}] [{chunk:WEEKDAY}]",
+          pattern: "[{word:/this|next|coming/}] [{chunk:WEEKDAY}]",
           result: "DATE"
         },
 
