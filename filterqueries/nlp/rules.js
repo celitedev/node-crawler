@@ -350,6 +350,10 @@ var hasErrors = false;
 var showStats = false;
 
 
+/////////////////////////////////////////////
+//SEE: http://www.chompchomp.com/terms.htm //
+/////////////////////////////////////////////
+
 //TODO: 
 //- add date / time
 //- add spatial (wrapper around PP?)
