@@ -13,7 +13,7 @@ var roots = domainConfig.domain.roots;
 
 //Setup CoreNLP
 var NLP = require('stanford-corenlp');
-var config = {
+var nlpConfig = {
   "nlpPath": "./corenlp",
   "version": "3.5.2",
   'annotators': [
@@ -30,7 +30,7 @@ var config = {
   // 	'depparse.extradependencie': 'MAXIMAL'
   // }
 };
-var coreNLP = new NLP.StanfordNLP(config);
+var coreNLP = new NLP.StanfordNLP(nlpConfig);
 
 
 module.exports = function (command) {
