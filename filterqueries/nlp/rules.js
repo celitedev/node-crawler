@@ -1,5 +1,21 @@
 var _ = require("lodash");
+var pos = require('pos');
+var chunker = require('pos-chunker');
+var tagger = new pos.Tagger();
 
+//Sometimes the simple pos-tagger makes a mistake.
+//We correct the most occuring errors here.
+var wordOverwriteMap = {
+  open: "VB" //the word open should always be a VB (verb). Incorrectly identified as JJ (adverb)
+};
+
+var tagOverwriteMap = {
+  "NNS": "NN" //problems with plural nouns
+};
+
+
+/////////////////////////////////////////
+////////////////////////////////////////
 var ruleMapGeneral = {
   NUMBER_CHUNK: {
     ruleType: 'tokens',
@@ -52,9 +68,16 @@ var ruleMapDate = {
     result: "RELATIVE_DATE"
   },
 
+  //a month
+  RELATIVE_DATE2: {
+    ruleType: 'tokens',
+    pattern: "[{term:a}] [{chunk:TIMESPAN}]",
+    result: "RELATIVE_DATE"
+  },
+
   //E.g. next month / coming month
   //"the day" (later to be constructed in 'the day after tomorrow for instance')
-  RELATIVE_DATE2: {
+  RELATIVE_DATE3: {
     ruleType: 'tokens',
     pattern: "[{ word:/the|this|next|coming|following|last|prior|previous/}] [{chunk:/TIMESPAN|RELATIVE_DATE/}]",
     result: "RELATIVE_DATE"
@@ -78,12 +101,19 @@ var ruleMapDate = {
     result: "DATE"
   },
 
+  //timeOfDay indicators that are specitic enough to count as dates
+  DATE_FROM_TIMEOFDAY_DIRECTLY: {
+    ruleType: 'tokens',
+    pattern: '[{ word:/tonight/}]',
+    result: "DATE"
+  },
+
   //date from weekday
-  //this sunday -> DATE
+  //this lovely sunday -> DATE
   //next saturday -> DATE
   DATE_FROM_WEEKDAY: {
     ruleType: "tokens",
-    pattern: "[{word:/this|next|coming|following|last|prior|previous/}] [{chunk:WEEKDAY}]",
+    pattern: "[{word:/this|next|coming|following|last|prior|previous/}] [{tag:/RB(R|S)*|JJ(R|S)*/}]* [{chunk:WEEKDAY}]",
     result: "DATE"
   },
 
@@ -136,7 +166,7 @@ var ruleMapDate = {
   //last night, etc
   DATE_FROM_TIMEOFDAY2: {
     ruleType: "tokens",
-    pattern: "[{word:/the|this|last|next|coming|following|last|prior|previous/}] [{chunk:TIMEOFDAY}]",
+    pattern: "[{word:/the|this|last|next|coming|following|last|prior|previous/}] [{tag:/RB(R|S)*|JJ(R|S)*/}]* [{chunk:TIMEOFDAY}]",
     result: "DATE"
   },
 
@@ -154,8 +184,19 @@ var ruleMapDate = {
     pattern: "[{word:/this/}] [{chunk:DATE}]",
     result: "DATE"
   },
-};
 
+  //Combine multiple dates
+  //
+  //Date(
+  //  Date(this monday)
+  //  Date(3 weeks ago) 
+  //)
+  DATE_COMPOUND: {
+    ruleType: "tokens",
+    pattern: "[{chunk:DATE}]{2,}", //combine 2 or more dates
+    result: "DATE"
+  }
+};
 
 var ruleMapDuration = {
   //When we don't match relativeDate to a DATE then it should be matched to a DURATION
@@ -170,28 +211,13 @@ var ruleMapDuration = {
     pattern: "[{word:/the/}] [{chunk:DATE_SPAN}]",
     result: "DURATION"
   },
+  //this lovely weekend
   WEEKEND: {
     ruleType: "tokens",
-    pattern: "[{word:/this|next|coming|following|last|prior|previous/}]* [{word:/weekend/}]",
+    pattern: "[{word:/this|next|coming|following|last|prior|previous/}]* [{tag:/RB(R|S)*|JJ(R|S)*/}]* [{word:/weekend/}]",
     result: "DURATION"
   },
 };
-
-
-var pos = require('pos');
-var chunker = require('pos-chunker');
-var tagger = new pos.Tagger();
-
-//Sometimes the simple pos-tagger makes a mistake.
-//We correct the most occuring errors here.
-var wordOverwriteMap = {
-  open: "VB" //the word open should always be a VB (verb). Incorrectly identified as JJ (adverb)
-};
-
-var tagOverwriteMap = {
-  "NNS": "NN" //problems with plural nouns
-};
-
 
 var ruleMapNP = {
   //e.g: the large black cat
@@ -223,10 +249,12 @@ var ruleMapNP = {
 
   //prepositional phrase is a noun phrase preceded by a preposition
   //e.g.: 'in the house' and 'by the cold pool' 
+  //
+  //THESE ACT AS CONTRAINTS!
   //KWHEN: often denoting where / when
   PP: {
     ruleType: 'tokens',
-    pattern: '[{tag:IN}] [{chunk:/NP|CLAUSE/}]',
+    pattern: '[{tag:IN}] [{chunk:/NP|DATE|DURATION/}]',
     result: 'PP'
   },
 
@@ -237,12 +265,28 @@ var ruleMapNP = {
     result: 'PP'
   },
 
+  // //Some dates are propositional phrases although no proposition (on, in) found. 
+  // //Examples: tonight, this saturday. 
+  // //For our purposes we match all dates as propositional phrases
+  //
+  //PROBLEM: this matches 
+  PP_DATE: {
+    ruleType: 'tokens',
+    pattern: '[{chunk:/DATE|DURATION/}]',
+    result: 'PP'
+  },
+
   // verb phrase:  verb followed by one or more noun or prepositional phrases
   //e.g.: 'washed the dog in the bath'
+  //
+  //Also matches DATE | DURATION: "let's go this weekend"
+  //here 'this weekend' isn't matched as a PP because it doesn't have a preposition (on, at, etc.)
+  //but still counts as a preposition. 
+  //
   //KWHEN: play in the garden?
   VP: {
     ruleType: 'tokens',
-    pattern: '[ { tag:/VB.*?/ } ] [ { chunk:/NP|PP/ } ]+',
+    pattern: '[ { tag:/VB.*?/ } ] [ { chunk:/NP|PP|DATE|DURATION/ } ]+',
     result: 'VP'
   },
 
@@ -274,6 +318,9 @@ var ruleMapNP = {
   //   result: 'NP'
   // }
 };
+
+/////////////////////////////////////////
+////////////////////////////////////////
 
 var NLPRules = module.exports = _.extend({}, ruleMapGeneral, ruleMapDate, ruleMapNP, ruleMapDuration);
 
@@ -309,8 +356,10 @@ NLPRules.getChunks = function (tags) {
     NLPRules.TIMESPAN,
     NLPRules.RELATIVE_DATE1,
     NLPRules.RELATIVE_DATE2,
+    NLPRules.RELATIVE_DATE3,
     NLPRules.DATE_FROM_MONTH,
     NLPRules.DATE_FROM_DAY_DIRECTLY,
+    NLPRules.DATE_FROM_TIMEOFDAY_DIRECTLY,
     NLPRules.DATE_FROM_WEEKDAY,
     NLPRules.DATE_FROM_RELATIVEDATE1,
     NLPRules.DATE_FROM_RELATIVEDATE2,
@@ -321,6 +370,7 @@ NLPRules.getChunks = function (tags) {
     NLPRules.DATE_FROM_TIMEOFDAY2,
     NLPRules.WEEKDAY_TO_DATE,
     NLPRules.THIS_DATE,
+    NLPRules.DATE_COMPOUND
   ]);
 
   //apply datespan rules
@@ -336,9 +386,11 @@ NLPRules.getChunks = function (tags) {
     NLPRules.NP_POSSESSIVE,
     NLPRules.PP,
     NLPRules.PP_TAG,
+    NLPRules.PP_DATE,
     NLPRules.VP,
     NLPRules.CLAUSE
   ]);
+
 
   return chunks;
 };
@@ -353,6 +405,27 @@ var showStats = false;
 /////////////////////////////////////////////
 //SEE: http://www.chompchomp.com/terms.htm //
 /////////////////////////////////////////////
+
+var testDates = [{
+  question: "tonight",
+  chunks: "[PP [DATE [NP tonight/RB]]]"
+}, {
+  question: "this morning",
+  chunks: "[PP [DATE [NP this/DT] [TIMEOFDAY morning/VBG]]]"
+}, {
+  //awful
+  question: "this saturday",
+  chunks: "[PP [DATE [DATE [NP this/DT] [DATE [WEEKDAY [NP saturday/NN]]]]]]"
+}, {
+  question: "this lovely weekend ",
+  chunks: "[PP [DURATION [NP this/DT lovely/RB weekend/NN]]]"
+}, {
+
+  //E2E
+  question: "this monday 3 weeks ago",
+  chunks: "[PP [DATE [DATE [DATE [NP this/DT] [DATE [WEEKDAY [NP monday/NN]]]]] [DATE [DURATION [RELATIVE_DATE [CD 3/CD] [TIMESPAN [NP weeks/NN]]]] [NP ago/RB]]]]"
+}];
+
 
 //TODO: 
 //- add date / time
@@ -373,8 +446,15 @@ var testPrepositionalPhrases = [{
   "chunks": "[PP at/IN [NP my/PRP$ [NP favorite/JJ restaurant/NN]]]"
 }];
 
+// var testVerbPhrases = [{
+//   question: 
+// }]
 
 //TODO: test VB (Verb Phrase)
+
+////////////
+///Overview of some sentences that we must match in the end
+// WHAT IS THE NAME OF THAT NICE ITALIAN PLACE NEAR CENTRAL STATION
 
 
 //TODO: MORE END TO END EXAMPLES
@@ -384,9 +464,13 @@ var testE2E = [{
 }, {
   question: "what restaurants are located near the sutton hotel",
   chunks: "what/WP [NP restaurants/NN] [VP are/VBP located/VBN [PP near/IN [NP the/DT sutton/NN hotel/NN]]]"
+}, {
+  question: "coldplay performs the coming months in the madison square garden",
+  chunks: "[NP coldplay/NN] [VP performs/VBZ [PP [DURATION [RELATIVE_DATE [NP the/DT] [RELATIVE_DATE coming/VBG [TIMESPAN [NP months/NN]]]]]] [PP in/IN [NP the/DT madison/NN square/NN garden/NN]]]"
 }];
 
 var testQuestions = []
+  .concat(testDates)
   .concat(testPrepositionalPhrases)
   .concat(testE2E);
 
