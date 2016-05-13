@@ -13,13 +13,31 @@ var tagOverwriteMap = {
   "NNS": "NN" //problems with plural nouns
 };
 
+//be, do, have and modal verbs 
+var modalForms = [
+  "am", "are", "is", //be
+  "do", "does", "don", //do. Don (from don't)
+  "have", "has", //have
+  "can", "could", "may", "might", "must", "shall", "should", "will", "would" //modals
+];
+
+var teens = ["twenty", "thirty", "fourty", "fifty", "sixty", "seventy", "eighty", 'ninety'];
+var toTen = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+var toTwenty = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+
+var toHundred = [].concat(toTen).concat(toTwenty);
+_.each(teens, function (pre) {
+  _.each(toTen, function (suf) {
+    toHundred.push(pre + suf);
+  });
+});
 
 /////////////////////////////////////////
 ////////////////////////////////////////
 var ruleMapGeneral = {
   NUMBER_CHUNK: {
     ruleType: 'tokens',
-    pattern: '[{ word:/one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen/}]',
+    pattern: '[{ word:/' + toHundred.join("|") + '/}]',
     result: "CD"
   },
 
@@ -28,6 +46,16 @@ var ruleMapGeneral = {
     pattern: '[{ tag:CD}]',
     result: "CD"
   },
+
+  //WRB + verb, e.g.: 
+  //When does
+  //who is
+  QUESTION1: {
+    ruleType: 'tokens',
+    pattern: '[{ tag:WRB}]',
+    result: "QUESTION"
+  },
+
 };
 
 var ruleMapDate = {
@@ -145,21 +173,21 @@ var ruleMapDate = {
   //in 3 weeks
   DATE_FROM_RELATIVEDATE4: {
     ruleType: "tokens",
-    pattern: "[{word:/in/}] [{chunk:RELATIVE_DATE}]",
+    pattern: "[{tag:IN}] [{chunk:RELATIVE_DATE}]",
     result: "DATE"
   },
 
   //friday afternoon
   DATE_FROM_TIMEOFDAY: {
     ruleType: "tokens",
-    pattern: "[{chunk:/DATE|WEEKDAY/}] [{chunk:TIMEOFDAY}]",
+    pattern: "[{chunk:/DATE|WEEKDAY/}] [{tag:IN}]* [{chunk:TIMEOFDAY}]",
     result: "DATE"
   },
 
   //(the) afternoon of DATE
   DATE_FROM_TIMEOFDAY1: {
     ruleType: "tokens",
-    pattern: "[{tag:DT}]* [{chunk:TIMEOFDAY}] [{word:/of/}]* [{chunk:/DATE|WEEKDAY/}] ",
+    pattern: "[{tag:DT}]* [{chunk:TIMEOFDAY}] [{tag:IN}]* [{chunk:/DATE|WEEKDAY/}] ",
     result: "DATE"
   },
 
@@ -228,13 +256,8 @@ var ruleMapNP = {
   NP: {
     ruleType: 'tokens',
 
-    //determiner + 
-    //Adverb | Adverb, comparitive | Adverb, superlative
-    //adjective | Adjective, comparative | Adjective, superlative
-    //singular/plural (proper) noun
+    //NOTE: liberal ordening to match proper nouns like restaurant names
     pattern: '[ { tag:/DT|RB(R|S)*|JJ(R|S)*|NN.*?/ } ]+',
-    // pattern: '[ { tag:/DT|JJ|NN.*?/ } ]+',
-    // pattern: '[{tag:DT}]* [{tag:/RB(R|S)*/}]* [{tag:/NN.*?/}]',
     result: 'NP'
   },
 
@@ -286,7 +309,7 @@ var ruleMapNP = {
   //KWHEN: play in the garden?
   VP: {
     ruleType: 'tokens',
-    pattern: '[ { tag:/VB.*?/ } ] [ { chunk:/NP|PP|DATE|DURATION/ } ]+',
+    pattern: '[ { tag:/VB.*?/ } ] [ { chunk:/NP|PP/ } ]+',
     result: 'VP'
   },
 
@@ -330,13 +353,27 @@ NLPRules.getTags = function (question) {
   var words = new pos.Lexer().lex(question);
   var taggedWords = tagger.tag(words);
 
+  //modalForms
+
   var tags = "";
-  _.each(taggedWords, function (val) {
-    var word = val[0];
-    var tag = wordOverwriteMap[word] || tagOverwriteMap[val[1]] || val[1];
-    tags += " " + word + "/" + tag;
-  });
-  tags = tags.trim();
+  if (taggedWords.length) {
+    var firstWord = taggedWords[0];
+
+    //If first word of sentence start with modal, this is an indication of a question. 
+    //Therefore, add a question symbol before it
+    if (~modalForms.indexOf(firstWord[0])) {
+      taggedWords.unshift([
+        "www", "WRB" //www is just a made up symbol: implicit what-who-where
+      ]);
+    }
+
+    _.each(taggedWords, function (val) {
+      var word = val[0];
+      var tag = wordOverwriteMap[word] || tagOverwriteMap[val[1]] || val[1];
+      tags += " " + word + "/" + tag;
+    });
+    tags = tags.trim();
+  }
 
   return tags;
 };
@@ -346,6 +383,7 @@ NLPRules.getChunks = function (tags) {
   var chunks = chunker.chunk(tags, [
     NLPRules.NUMBER_CHUNK,
     NLPRules.NUMBER_CHUNK1,
+    NLPRules.QUESTION1
   ]);
 
   //apply date-rules
@@ -407,24 +445,36 @@ var showStats = false;
 /////////////////////////////////////////////
 
 var testDates = [{
-  question: "tonight",
-  chunks: "[PP [DATE [NP tonight/RB]]]"
-}, {
-  question: "this morning",
-  chunks: "[PP [DATE [NP this/DT] [TIMEOFDAY morning/VBG]]]"
-}, {
-  //awful
-  question: "this saturday",
-  chunks: "[PP [DATE [DATE [NP this/DT] [DATE [WEEKDAY [NP saturday/NN]]]]]]"
-}, {
-  question: "this lovely weekend ",
-  chunks: "[PP [DURATION [NP this/DT lovely/RB weekend/NN]]]"
-}, {
+    question: "tonight",
+    chunks: "[PP [DATE [NP tonight/RB]]]"
+  }, {
+    question: "this morning",
+    chunks: "[PP [DATE [NP this/DT] [TIMEOFDAY morning/VBG]]]"
+  }, {
+    //awful
+    question: "this saturday",
+    chunks: "[PP [DATE [DATE [NP this/DT] [DATE [WEEKDAY [NP saturday/NN]]]]]]"
+  }, {
+    question: "this lovely weekend ",
+    chunks: "[PP [DURATION [NP this/DT lovely/RB weekend/NN]]]"
+  },
 
   //E2E
-  question: "this monday 3 weeks ago",
-  chunks: "[PP [DATE [DATE [DATE [NP this/DT] [DATE [WEEKDAY [NP monday/NN]]]]] [DATE [DURATION [RELATIVE_DATE [CD 3/CD] [TIMESPAN [NP weeks/NN]]]] [NP ago/RB]]]]"
-}];
+  {
+    question: "Where does The Avengers play near me this afternoon",
+    chunks: "[QUESTION where/WRB] [VP does/VBZ [NP the/DT avengers/NN]] [VP play/VB [PP near/IN me/PRP] [PP [DATE [NP this/DT] [TIMEOFDAY [NP afternoon/NN]]]]]"
+  }, {
+    question: "does miley cyrus play in the garden",
+    chunks: "[QUESTION www/WRB] [VP does/VBZ [NP miley/NN cyrus/NN]] [VP play/VB [PP in/IN [NP the/DT garden/NN]]]"
+  }, {
+    question: "where does miley cyrus play in the garden",
+    chunks: "[QUESTION where/WRB] [VP does/VBZ [NP miley/NN cyrus/NN]] [VP play/VB [PP in/IN [NP the/DT garden/NN]]]"
+  }, {
+
+    question: "this monday 3 weeks ago",
+    chunks: "[PP [DATE [DATE [DATE [NP this/DT] [DATE [WEEKDAY [NP monday/NN]]]]] [DATE [DURATION [RELATIVE_DATE [CD 3/CD] [TIMESPAN [NP weeks/NN]]]] [NP ago/RB]]]]"
+  }
+];
 
 
 //TODO: 
