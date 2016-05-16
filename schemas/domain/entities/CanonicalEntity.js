@@ -567,6 +567,8 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
       //e.g.: ["Movie"]
       var typesForThisEnum = _.intersection(_.keys(erdMappingObj.enum.sourceMappings), typechain);
 
+      var origv = _.clone(v);
+
       v = _.reduce(v, function _doVocabLookupReduce(arr, val) {
 
         //do a vocab lookup
@@ -587,6 +589,12 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
         return arr.concat(val);
       }, []);
 
+      //move in the originals
+      if (erdMappingObj.enumKeepOriginal) {
+        v = v.concat(origv);
+      }
+
+      //clean up
       v = _.uniq(removeUndefined(v));
 
       if (erdMappingObj.enumStrictSingleValued) {
