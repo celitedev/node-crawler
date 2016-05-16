@@ -78,9 +78,53 @@ var ruleMapDate = {
   //e.g.: afternoon
   TIMEOFDAY: {
     ruleType: "tokens",
-    pattern: "[{word:/morning|afternoon|evening|night|midnight|midday/}]",
+    pattern: "[{word:/morning|afternoon|evening|night|midnight|midday|noon/}]",
     result: "TIMEOFDAY"
   },
+
+  TIMEOFDAY1: {
+    ruleType: "tokens",
+    pattern: "[{chunk:CD}]{0,1} [{word:/minutes?|hours?/}] [{word:/ago/}]{0,1}",
+    result: "TIMEOFDAY"
+  },
+
+  //10 to five
+  TIMEOFDAY2: {
+    ruleType: "tokens",
+    pattern: "[{chunk:CD}] [{word:/to|after|before|past?/}] [{chunk:CD}]",
+    result: "TIMEOFDAY"
+  },
+
+  //quarter past five
+  TIMEOFDAY3: {
+    ruleType: "tokens",
+    pattern: "[{word:/quarter|half/}] [{word:/to|after|before|past?/}] [{chunk:CD}]",
+    result: "TIMEOFDAY"
+  },
+
+  //3 o'clock
+  //3 o clock
+  TIMEOFDAY4: {
+    ruleType: "tokens",
+    pattern: "[{chunk:CD}] [{word:o}] [{word:'}]* [{word:clock}]",
+    result: "TIMEOFDAY"
+  },
+
+  //at 5. (words 'at' needs to be here, otherwise not clear enough it indicates time)
+  TIMEOFDAY5: {
+    ruleType: "tokens",
+    pattern: "[{word:at}] [{chunk:CD}]",
+    result: "TIMEOFDAY"
+  },
+
+  //combinator
+  TIMEOFDAY6: {
+    ruleType: "tokens",
+    pattern: "[{tag:IN}] [{chunk:TIMEOFDAY}]",
+    result: "TIMEOFDAY"
+  },
+
+
 
   TIMESPAN: {
     ruleType: 'tokens',
@@ -92,14 +136,14 @@ var ruleMapDate = {
   //E.g.: 3 weeks
   RELATIVE_DATE1: {
     ruleType: 'tokens',
-    pattern: "[{chunk:CD}] [{chunk:TIMESPAN}]",
+    pattern: "[{chunk:CD}] [{chunk:/TIMESPAN/}]",
     result: "RELATIVE_DATE"
   },
 
   //a month
   RELATIVE_DATE2: {
     ruleType: 'tokens',
-    pattern: "[{term:a}] [{chunk:TIMESPAN}]",
+    pattern: "[{term:an?}] [{chunk:TIMESPAN}]",
     result: "RELATIVE_DATE"
   },
 
@@ -391,6 +435,12 @@ NLPRules.getChunks = function (tags) {
     NLPRules.MONTH,
     NLPRules.WEEKDAY,
     NLPRules.TIMEOFDAY,
+    NLPRules.TIMEOFDAY1,
+    NLPRules.TIMEOFDAY2,
+    NLPRules.TIMEOFDAY3,
+    NLPRules.TIMEOFDAY4,
+    NLPRules.TIMEOFDAY5,
+    NLPRules.TIMEOFDAY6,
     NLPRules.TIMESPAN,
     NLPRules.RELATIVE_DATE1,
     NLPRules.RELATIVE_DATE2,
