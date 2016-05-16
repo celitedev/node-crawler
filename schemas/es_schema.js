@@ -269,47 +269,67 @@ module.exports = function (generatedSchemas) {
       },
 
 
-      ////////////////////////////////////////
-      //Raw fields: use for vaocab creation //
-      ////////////////////////////////////////
-      raw_subtypes: {
-        roots: true, //true (all) or (array of) rootNames
+      // ////////////////////////////////////////
+      // //Raw fields: use for vaocab creation by looking at what is avail //
+      // ////////////////////////////////////////
+      // raw_subtypes: {
+      //   roots: true, //true (all) or (array of) rootNames
+      //   isMulti: true,
+      //   mapping: mappings.enum,
+      //   populate: {
+      //     fields: "subtypes",
+      //   },
+      // },
+      // raw_tag: {
+      //   roots: true, //true (all) or (array of) rootNames
+      //   isMulti: true,
+      //   mapping: mappings.enum,
+      //   populate: {
+      //     fields: "tag",
+      //   },
+      // },
+      // raw_genre: {
+      //   roots: "CreativeWork",
+      //   isMulti: true,
+      //   mapping: mappings.enum,
+      //   populate: {
+      //     fields: "genre"
+      //   },
+      // },
+
+      tagsFromFact: {
+        roots: true,
         isMulti: true,
         mapping: mappings.enum,
         populate: {
-          fields: "subtypes",
-        },
+          fields: ["fact"],
+          strategy: function (factArr) {
+
+            //skip these facts for now
+            var factsToSkip = [
+              "urlOpenTable",
+              "priceRange"
+            ];
+
+            //each fact can have multiple values. 
+            //Simply combine them all in one big array
+            return _.reduce(factArr, function (arr, fact) {
+              if (~factsToSkip.indexOf(fact.name._value)) {
+                return arr;
+              }
+              return arr.concat(_.pluck(fact.val, "_value"));
+            }, []);
+          }
+        }
       },
 
-      raw_tag: {
-        roots: true, //true (all) or (array of) rootNames
-        isMulti: true,
-        mapping: mappings.enum,
-        populate: {
-          fields: "tag",
-        },
-      },
 
-
-      raw_genre: {
-        roots: "CreativeWork",
-        isMulti: true,
-        mapping: mappings.enum,
-        populate: {
-          fields: "genre"
-        },
-      },
-
-      //We don't use a suggester to lookup tags, since the result is deduped. 
-      //i.e.: only 1 result for genre:action is given
-      //Instead we probably create a separate index that let's you search for 
-      //tags / vocabulary terms.
       all_tags: {
         roots: true,
         isMulti: true,
         mapping: mappings.enum,
         postPopulate: { //populate *after* vocab lookup + transform
-          fields: ["genre", "subtypes"]
+          fields: ["root", "subtypes", "genre", "tagsFromFact"]
         },
       },
 

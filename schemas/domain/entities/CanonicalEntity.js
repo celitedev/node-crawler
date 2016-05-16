@@ -193,7 +193,6 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
       val = _.isArray(val) ? val : [val];
 
       props[propName] = prop.postReduce(val, props);
-
     });
   }
 
@@ -575,6 +574,7 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
           var valueMapForType = erdMappingObj.enum.sourceMappings[typeName];
           return arr.concat(valueMapForType[val] || []);
         }, []);
+
 
         //after vocab lookup, do a transform again because lookup may have resulted 
         //in values not respecting transform
