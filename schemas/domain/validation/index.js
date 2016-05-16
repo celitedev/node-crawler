@@ -1,7 +1,7 @@
 var _ = require("lodash");
 var validator = require("validator");
 // var Rule = require("async-validate").Rule;
-var hogan = require("hogan");
+var hogan = require("hogan.js");
 var Schema = require('async-validate');
 var domainUtils = require("../utils");
 var moment = require('moment');

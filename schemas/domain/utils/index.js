@@ -72,6 +72,13 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
           "path": "root" //defined as calculated field
         }
       }
+    },
+
+    suggestWithRootAll: {
+      "type": "completion",
+      "analyzer": "simple",
+      "search_analyzer": "simple",
+      "payloads": true
     }
   },
 
