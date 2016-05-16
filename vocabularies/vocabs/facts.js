@@ -9,12 +9,11 @@ module.exports = function (generatedSchemas) {
 
       //NYC
       PlaceWithOpeninghours: {
-        "restaurant": "restaurant"
+        "chinese": "chinese"
       }
     },
-    //all values (independent of type) including their aliases and parents 
     vocabulary: {
-      "restaurant": ["restaurant", "eatery", "diner"]
+      "chinese": ["chinese", "eastern"]
     }
   };
 
