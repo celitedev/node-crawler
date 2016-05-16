@@ -157,7 +157,6 @@ module.exports = function (generatedSchemas) {
         }
       },
 
-
       subtypes: {
         facet: {
           type: "enum",

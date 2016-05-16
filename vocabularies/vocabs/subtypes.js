@@ -7,15 +7,14 @@ module.exports = function (generatedSchemas) {
     type: "static",
     sourceMappings: {
 
-      //mappings from sourceEntity-values -> controlled values
-      //It's logical to model these per Type since this is how crawlers are written
+      //NYC
       PlaceWithOpeninghours: {
-        //TBD
+        "restaurant": "restaurant"
       }
     },
     //all values (independent of type) including their aliases and parents 
     vocabulary: {
-      //TBD
+      "restaurant": ["restaurant", "eatery"]
     }
   };
 
@@ -24,10 +23,10 @@ module.exports = function (generatedSchemas) {
   exports.sourceMappings.Thing = exports.sourceMappings.Thing || {};
 
   _.each(_.keys(generatedSchemas.types), function (type) {
-    exports.sourceMappings.Thing[type] = type;
-    exports.vocabulary[type] = type;
+    type = type.toLowerCase();
+    exports.sourceMappings.Thing[type] = type; //this goes for everything
+    exports.vocabulary[type] = _.uniq((exports.vocabulary[type] || []).concat([type]));
   });
-
 
   return exports;
 };
