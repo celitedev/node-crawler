@@ -343,6 +343,27 @@ module.exports = function (generatedSchemas) {
           };
         }
       },
+
+      //search without need for context, so we can search all types in 1 go.
+      suggestAll: {
+        roots: true, //true (all) or (array of) rootNames
+        isMulti: false,
+        mapping: mappings.suggestWithRootAll,
+        populate: {
+          fields: "name",
+        },
+        postReduce: function (val, props) {
+          return {
+            input: val,
+            payload: {
+              id: props.id,
+              root: props.root,
+              subtypes: props.subtypes
+            }
+          };
+        }
+      },
+
     },
 
   };
