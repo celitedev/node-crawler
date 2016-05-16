@@ -300,6 +300,8 @@ module.exports = function (generatedSchemas) {
         roots: true,
         isMulti: true,
         mapping: mappings.enum,
+        enum: vocabs.facts,
+        enumKeepOriginal: true, //this allows for aliasing instead of strict vocabulary
         populate: {
           fields: ["fact"],
           strategy: function (factArr) {
@@ -316,7 +318,9 @@ module.exports = function (generatedSchemas) {
               if (~factsToSkip.indexOf(fact.name._value)) {
                 return arr;
               }
-              return arr.concat(_.pluck(fact.val, "_value"));
+              return arr.concat(_.map(_.pluck(fact.val, "_value"), function (v) {
+                return v.toLowerCase();
+              }));
             }, []);
           }
         }
@@ -328,7 +332,13 @@ module.exports = function (generatedSchemas) {
         isMulti: true,
         mapping: mappings.enum,
         postPopulate: { //populate *after* vocab lookup + transform
-          fields: ["root", "subtypes", "genre", "tagsFromFact"]
+          fields: ["root", "subtypes", "genre", "tagsFromFact"],
+          strategy: function (val) {
+            if (val === undefined) return [];
+            return _.map(_.isArray(val) ? val : [val], function (v) {
+              return v.toLowerCase();
+            });
+          }
         },
       },
 
