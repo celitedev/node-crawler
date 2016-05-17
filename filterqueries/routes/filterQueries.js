@@ -438,6 +438,16 @@ var middleware = {
         //when do the arctic monkeys perform
         questionType = "Q_PASSIVE_IMPLICIT";
 
+      } else if (chunks.abstractText.match(/^(chunk:NP( chunk:VP)+)$/)) {
+        //all bands who|that|which play tonight (that have high ratings)
+        //all bands playing tonight
+
+        questionType = "IMPERATIVE";
+
+        //TODO: show me all bands playing tonight. -> chunk:NP chunk:NP chunk:VP
+        //IS THIS SOMETHING WE CAN IMEPLEMENT GENERALLY?
+        //PROBLEM HERE IS THAT IT'S DIFFICULT (IMPOSSIBLE FOR THE GENERAL CASE?) TO DECIDE WHAT THE 'OPERATING NOUN' IS.
+        //THEREFORE PROBABLY BETTER TO MAKE SPECIAL CASES SUCH AS 'SHOW ME'
       }
 
       res.json({
