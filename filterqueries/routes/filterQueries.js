@@ -329,7 +329,7 @@ var chunkUtils = {
 
         if (part) { //don't add spaces
 
-          if (!startPartAt) { //we're at start. Possibly the chunk type
+          if (!startPartAt && !~part.indexOf("/")) { //we're at start. Possibly the chunk type
             currentChunk.chunkType = part;
           } else {
             var wordTag = part.split("/");
@@ -360,14 +360,24 @@ var chunkUtils = {
     currentChunk.path = curPath;
 
     currentChunk.abstract = _.reduce(currentChunk.parts, function (sOut, part) {
-      if (part.type === "chunk") {
+      if (part.type === "chunk" || part.type === "top") {
         return sOut.concat(["chunk:" + part.chunkType]);
       } else {
         return sOut.concat(part.abstract);
       }
     }, []);
+
+    currentChunk.abstractText = currentChunk.abstract.join(" ").trim();
+
     return currentChunk;
   },
+};
+
+chunkOrders = {
+
+  question: [
+    /chunk:QUESTION( chunk:VP)+/
+  ]
 };
 
 var middleware = {
@@ -389,16 +399,55 @@ var middleware = {
       ];
       var chunks = chunkUtils.getParts(currentChunk, sChunk);
 
-      var nps = chunkUtils.filter(chunks.parts, {
-        chunkType: "VP"
-      });
-      console.log("VP", nps);
+      var questionType = "UNKNOWN";
+
+
+      if (chunks.abstractText.match(/^(tag:WDT chunk:NP chunk:VP)( chunk:PP)*$/)) {
+        //which restaurants are open tonight
+        //which artist plays tonight in madison square garden
+        //which jazz bands play tonight at my favorite club
+        //which fine italian restaurants allow for reservations tomorrow night near grand central station
+        questionType = "Q_ACTIVE_EXPLICIT";
+
+      } else if (chunks.abstractText.match(/^(tag:WDT chunk:NP tag:VBP tag:VB)$/)) {
+
+        //which restaurants are open
+        questionType = "Q_ACTIVE_IMPLICIT";
+
+      } else if (chunks.abstractText.match(/^(chunk:QUESTION chunk:VP chunk:VP)( chunk:PP)*$/)) {
+
+        //when does the crazy goose open tonight in bla
+        //do the avengers play tomorrow in the AMC at 6 pm
+        questionType = "Q_PASSIVE_EXPLICIT";
+
+      } else if (chunks.abstractText.match(/^(chunk:QUESTION chunk:VP tag:VB)$/)) {
+
+        //when does the crazy goose open
+        //do the avengers play (where | when is also implicit here)
+        questionType = "Q_PASSIVE_IMPLICIT";
+
+
+      } else if (chunks.abstractText.match(/^(tag:WDT chunk:NP chunk:VP chunk:VP)( chunk:PP)*$/)) {
+
+        //which events does arctic monkeys perform tonight (at my favorite club)
+        questionType = "Q_INVERSE_EXPLICIT";
+
+      } else if (chunks.abstractText.match(/^(tag:WDT chunk:NP chunk:VP tag:VB)$/)) {
+
+        //which events does arctic monkeys perform?
+        questionType = "Q_INVERSE_IMPLICIT";
+      }
+
+      // var nps = chunkUtils.filter(chunks.parts, {
+      //   chunkType: "VP"
+      // });
+      // console.log("VP", nps);
 
       res.json({
+        questionType: questionType,
         tags: tags,
         chunks: sChunk,
         tree: chunks,
-        // toplevel: chunks.parts.
       });
 
 
