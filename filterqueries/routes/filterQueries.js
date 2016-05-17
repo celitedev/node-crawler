@@ -289,6 +289,7 @@ var chunkUtils = {
     return _.filter(parts, function (part) {
 
       var result = _.compact(_.map(filterObj, function (regex, key) {
+        if (!part[key]) return false;
         return !!part[key].match(regex);
       }));
 
@@ -326,7 +327,7 @@ var chunkUtils = {
 
         part = sChunk.substring(startPartAt, i + 1).trim();
 
-        if (part.trim()) { //don't add spaces
+        if (part) { //don't add spaces
 
           if (!startPartAt) { //we're at start. Possibly the chunk type
             currentChunk.chunkType = part;
@@ -336,8 +337,9 @@ var chunkUtils = {
               type: "tag",
               tag: wordTag[1],
               word: wordTag[0],
+              text: wordTag[0],
               path: part,
-              text: wordTag[0]
+              abstract: ["tag:" + wordTag[1]]
             };
             currentChunk.parts = currentChunk.parts || [];
             currentChunk.parts.push(part);
@@ -357,6 +359,13 @@ var chunkUtils = {
     delete currentChunk.path;
     currentChunk.path = curPath;
 
+    currentChunk.abstract = _.reduce(currentChunk.parts, function (sOut, part) {
+      if (part.type === "chunk") {
+        return sOut.concat(["chunk:" + part.chunkType]);
+      } else {
+        return sOut.concat(part.abstract);
+      }
+    }, []);
     return currentChunk;
   },
 };
@@ -372,7 +381,12 @@ var middleware = {
         type: "top"
       };
 
+      //STEP 1. 
+      //find NP
 
+      var regex = [
+        "chunk:NP"
+      ];
       var chunks = chunkUtils.getParts(currentChunk, sChunk);
 
       var nps = chunkUtils.filter(chunks.parts, {
@@ -380,11 +394,11 @@ var middleware = {
       });
       console.log("VP", nps);
 
-
       res.json({
         tags: tags,
         chunks: sChunk,
-        tree: chunks
+        tree: chunks,
+        // toplevel: chunks.parts.
       });
 
 

@@ -91,7 +91,7 @@ var ruleMapDate = {
   //10 to five
   TIMEOFDAY2: {
     ruleType: "tokens",
-    pattern: "[{chunk:CD}] [{word:/to|after|before|past?/}] [{chunk:CD}]",
+    pattern: "[{chunk:CD}] [{word:/to|after|before|past/}] [{chunk:CD}]",
     result: "TIMEOFDAY"
   },
 
@@ -113,7 +113,7 @@ var ruleMapDate = {
   //at 5. (words 'at' needs to be here, otherwise not clear enough it indicates time)
   TIMEOFDAY5: {
     ruleType: "tokens",
-    pattern: "[{word:at}] [{chunk:CD}]",
+    pattern: "[{tag:IN}] [{chunk:CD}] [{word:/pm|am/}]{0,1}",
     result: "TIMEOFDAY"
   },
 
@@ -228,15 +228,23 @@ var ruleMapDate = {
     result: "DATE"
   },
 
-  //(the) afternoon of DATE
+
   DATE_FROM_TIMEOFDAY1: {
+    ruleType: "tokens",
+    pattern: "[{chunk:/DATE|WEEKDAY/}] [{word:/starting|ending/}]* [{chunk:TIMEOFDAY}]",
+    result: "DATE"
+  },
+
+
+  //(the) afternoon of DATE
+  DATE_FROM_TIMEOFDAY2: {
     ruleType: "tokens",
     pattern: "[{tag:DT}]* [{chunk:TIMEOFDAY}] [{tag:IN}]* [{chunk:/DATE|WEEKDAY/}] ",
     result: "DATE"
   },
 
   //last night, etc
-  DATE_FROM_TIMEOFDAY2: {
+  DATE_FROM_TIMEOFDAY3: {
     ruleType: "tokens",
     pattern: "[{word:/the|this|last|next|coming|following|last|prior|previous/}] [{tag:/RB(R|S)*|JJ(R|S)*/}]* [{chunk:TIMEOFDAY}]",
     result: "DATE"
@@ -313,6 +321,18 @@ var ruleMapNP = {
     result: 'NP'
   },
 
+  //HMMM, WAY TOO EXPENSIVE. WHY?
+  // NP_BOOL: {
+  //   ruleType: 'tokens',
+  //   pattern: '[{chunk:NP}] [{word:/and|or/}] [{chunk:/NP|NP_COMBO/}]',
+  //   result: 'NP_COMBO'
+  // },
+
+  // NP_BOOL1: {
+  //   ruleType: 'tokens',
+  //   pattern: '[{word:/not/}] [{chunk:/NP|NP_COMBO/}]',
+  //   result: 'NP_COMBO'
+  // },
 
   //prepositional phrase is a noun phrase preceded by a preposition
   //e.g.: 'in the house' and 'by the cold pool' 
@@ -456,6 +476,7 @@ NLPRules.getChunks = function (tags) {
     NLPRules.DATE_FROM_TIMEOFDAY,
     NLPRules.DATE_FROM_TIMEOFDAY1,
     NLPRules.DATE_FROM_TIMEOFDAY2,
+    NLPRules.DATE_FROM_TIMEOFDAY3,
     NLPRules.WEEKDAY_TO_DATE,
     NLPRules.THIS_DATE,
     NLPRules.DATE_COMPOUND
@@ -472,6 +493,8 @@ NLPRules.getChunks = function (tags) {
   chunks = chunker.chunk(chunks, [
     NLPRules.NP,
     NLPRules.NP_POSSESSIVE,
+    // NLPRules.NP_BOOL,
+    // NLPRules.NP_BOOL1,
     NLPRules.PP,
     NLPRules.PP_TAG,
     NLPRules.PP_DATE,
