@@ -369,7 +369,7 @@ var ruleMapNP = {
   //KWHEN: play in the garden?
   VP: {
     ruleType: 'tokens',
-    pattern: '[ { tag:/VB.*?/ } ] [ { chunk:/NP|PP/ } ]+',
+    pattern: '[ { tag:/VB.*?|MD/ } ] [ { chunk:/NP|PP/ } ]+',
     result: 'VP'
   },
 
