@@ -1,15 +1,20 @@
 var elasticsearch = require('elasticsearch');
+var Promise = require("bluebird");
+var redis = Promise.promisifyAll(require("redis"));
 
+var _ = require("lodash");
 
+var domainConfig = require("../schemas/domain/_definitions/config");
 
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
   checkSoundness: true,
-  config: require("../schemas/domain/_definitions/config"),
+  config: domainConfig,
   properties: require("../schemas/domain/_definitions").properties,
   types: require("../schemas/domain/_definitions").types,
   schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
 });
 
+var roots = domainConfig.domain.roots;
 
 var config = require("../config");
 
@@ -18,6 +23,9 @@ var r = require('rethinkdbdash')(config.rethinkdb);
 
 //Elasticsearch 
 var esClient = new elasticsearch.Client(config.elasticsearch);
+
+//Redis
+var redisClient = redis.createClient(config.redis);
 
 
 /////////////
@@ -35,12 +43,44 @@ app.use(bodyParser());
 app.use(methodOverride());
 
 
+var cacheUtils = {
+
+  supportedTagsPerRoot: {},
+
+  updateInProcessCaches: function updateInProcessCaches() {
+
+
+    ///update cache that stores supported attributes per root
+    Promise.map(roots, function (root) {
+      var redisKey = cacheUtils.getRedisKeyForSupportedAttribsForRoot(root);
+      return Promise.resolve()
+        .then(function () {
+          return redisClient.getAsync(redisKey);
+        })
+        .then(function (sDelimited) {
+          cacheUtils.supportedTagsPerRoot[root] = sDelimited.split(",");
+        });
+    });
+  },
+  getRedisKeyForSupportedAttribsForRoot: function getRedisKeyForSupportedAttribsForRoot(root) {
+    return "attribs-" + root.toLowerCase();
+  }
+
+};
+
+//Update redis cache each 5 minutes. 
+//This rechecks ES
+setInterval(cacheUtils.updateInProcessCaches, 5 * 60 * 1000); //update each 5 minutes
+cacheUtils.updateInProcessCaches();
+
 var command = {
   app: app,
   generatedSchemas: generatedSchemas,
   r: r,
   config: config,
-  esClient: esClient
+  esClient: esClient,
+  redisClient: redisClient,
+  cacheUtils: cacheUtils
 };
 
 ///////////////

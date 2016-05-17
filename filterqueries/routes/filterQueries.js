@@ -15,6 +15,8 @@ var subtypeToFilterQuery = require("../queryGen/fakeNLP").subtypeToFilterQuery;
 
 var NLPRules = require("../nlp/rules");
 
+
+
 function createRelatedFilterQueries(filterQuery) {
   return [filterQuery, filterQuery, filterQuery];
 }
@@ -281,10 +283,13 @@ var middleware = {
       var tags = NLPRules.getTags(req.body.question);
       var chunks = NLPRules.getChunks(tags);
 
+
+
       res.json({
         tags: tags,
         chunks: chunks
       });
+
 
       return;
       // return next();
@@ -338,11 +343,14 @@ var middleware = {
 
 module.exports = function (command) {
 
+
   var app = command.app;
   var config = command.config;
   var generatedSchemas = command.generatedSchemas;
   var r = command.r;
   var erdEntityTable = r.table(domainUtils.statics.ERDTABLE);
+  var cacheUtils = command.cacheUtils;
+  var redisClient = command.redisClient;
 
   var filterQueryUtils = require("../utils")(generatedSchemas, r);
 
@@ -355,6 +363,52 @@ module.exports = function (command) {
     erdMappingConfig: erdMappingConfig,
     filterQueryUtils: filterQueryUtils,
     esClient: command.esClient,
+    redisClient: command.redisClient
+  });
+
+  //Update Redis NLP Cache from ES
+  app.post("/reloadNLPCache", function (req, res) {
+
+    var promiseMap = _.reduce(roots, function (agg, root) {
+
+      var searchQuery = {
+        index: "kwhen-" + root.toLowerCase(),
+        type: 'type1',
+        body: {
+          "size": 0,
+          "aggs": {
+            "allTags": {
+              "terms": {
+                "field": "all_tags",
+                "size": 0
+              }
+            }
+          }
+        }
+      };
+
+      var redisKey = cacheUtils.getRedisKeyForSupportedAttribsForRoot(root);
+      agg[root] = Promise.resolve()
+        .then(function () {
+          return command.esClient.search(searchQuery);
+        })
+        .then(function (result) {
+          var supportedKeys = _.pluck(result.aggregations.allTags.buckets, "key");
+          return redisClient.setAsync(redisKey, supportedKeys.join(","));
+        })
+        .then(function () {
+          return redisClient.getAsync(redisKey);
+        });
+
+      return agg;
+
+    }, {});
+
+    return Promise.props(promiseMap)
+      .then(function (resultJSON) {
+        cacheUtils.updateInProcessCaches();
+        res.json(resultJSON);
+      });
   });
 
   app.get('/', function (req, res) {
