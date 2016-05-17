@@ -214,14 +214,14 @@ var ruleMapDate = {
   //in 3 weeks
   DATE_FROM_RELATIVEDATE4: {
     ruleType: "tokens",
-    pattern: "[{tag:IN}] [{chunk:RELATIVE_DATE}]",
+    pattern: "[{tag:/IN|TO/}] [{chunk:RELATIVE_DATE}]",
     result: "DATE"
   },
 
   //friday afternoon
   DATE_FROM_TIMEOFDAY: {
     ruleType: "tokens",
-    pattern: "[{chunk:/DATE|WEEKDAY/}] [{tag:IN}]* [{chunk:TIMEOFDAY}]",
+    pattern: "[{chunk:/DATE|WEEKDAY/}] [{tag:/IN|TO/}]* [{chunk:TIMEOFDAY}]",
     result: "DATE"
   },
 
@@ -236,7 +236,7 @@ var ruleMapDate = {
   //(the) afternoon of DATE
   DATE_FROM_TIMEOFDAY2: {
     ruleType: "tokens",
-    pattern: "[{tag:DT}]* [{chunk:TIMEOFDAY}] [{tag:IN}]* [{chunk:/DATE|WEEKDAY/}] ",
+    pattern: "[{tag:DT}]* [{chunk:TIMEOFDAY}] [{tag:/IN|TO/}]* [{chunk:/DATE|WEEKDAY/}] ",
     result: "DATE"
   },
 
@@ -338,14 +338,14 @@ var ruleMapNP = {
   //KWHEN: often denoting where / when
   PP: {
     ruleType: 'tokens',
-    pattern: '[{tag:IN}] [{chunk:/NP|DATE|DURATION|TIMEOFDAY/}]',
+    pattern: '[{tag:/IN|TO/}] [{chunk:/NP|DATE|DURATION|TIMEOFDAY/}]',
     result: 'PP'
   },
 
   //e.g.: near me
   PP_TAG: {
     ruleType: 'tokens',
-    pattern: '[{tag:IN}] [{tag:/PRP|PRP$|WP|WP$/}]', //NOTE TOO SURE: added all pronouns as found in peen treebank
+    pattern: '[{tag:IN}] [{tag:/PRP|PRP$|WP|WP$|WDT/}]', //NOTE TOO SURE: added all pronouns as found in peen treebank
     result: 'PP'
   },
 
@@ -359,6 +359,12 @@ var ruleMapNP = {
     result: 'PP'
   },
 
+  PP_IN: {
+    ruleType: 'tokens',
+    pattern: '[ {tag:/TO|IN|WP|WP$|WDT/} ] [ { chunk:PP } ]',
+    result: 'PP'
+  },
+
   // verb phrase:  verb followed by one or more noun or prepositional phrases
   //e.g.: 'washed the dog in the bath'
   //
@@ -369,9 +375,10 @@ var ruleMapNP = {
   //KWHEN: play in the garden?
   VP: {
     ruleType: 'tokens',
-    pattern: '[ { tag:/VB.*?|MD/ } ] [ { chunk:/NP|PP/ } ]+',
+    pattern: '[ {tag:/TO|IN|WP|WP$|WDT/} ]* [{ tag:MD}]{0,1} [{ tag:/VB.*?|MD/}] [ { chunk:/NP|PP/ } ]+',
     result: 'VP'
   },
+
 
   //COSTLY! the warm blanket -> 1500ms
   // //e.g.: (when does) miley cyrus play in the garden?
@@ -492,6 +499,7 @@ NLPRules.getChunks = function (tags) {
     // NLPRules.NP_BOOL,
     // NLPRules.NP_BOOL1,
     NLPRules.PP,
+    NLPRules.PP_IN,
     NLPRules.PP_TAG,
     NLPRules.PP_DATE,
     NLPRules.VP,

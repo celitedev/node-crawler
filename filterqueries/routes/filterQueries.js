@@ -401,47 +401,44 @@ var middleware = {
 
       var questionType = "UNKNOWN";
 
+      ///////////////////////////////////////////////////////////////
+      //NOTE: THERE'S A PATTERN IN HOW EXPLICIT AND IMPLICIT DIFFER
+      /////////////////////////////////////////////////////////////////
 
-      if (chunks.abstractText.match(/^(tag:WDT chunk:NP chunk:VP)( chunk:PP)*$/)) {
+      if (chunks.abstractText.match(/^tag:WDT chunk:NP( chunk:VP)+( chunk:PP)*$/)) {
         //which restaurants are open tonight
+        //which restaurants will be open tonight
         //which artist plays tonight in madison square garden
         //which jazz bands play tonight at my favorite club
         //which fine italian restaurants allow for reservations tomorrow night near grand central station
+        //which events does arctic monkeys perform tonight at my favorite club 
+        //which events does arctic monkeys perform tonight that are still available
+        //which restaurants are fine to go to tonight
         questionType = "Q_ACTIVE_EXPLICIT";
 
-      } else if (chunks.abstractText.match(/^(tag:WDT chunk:NP tag:VBP tag:VB)$/)) {
+      } else if (chunks.abstractText.match(/^tag:WDT chunk:NP( chunk:VP)*( tag:(VB.*?|MD))* (tag:VB.*?)$/)) {
 
-        //which restaurants are open
+        //which restaurants are|will open
+        //which artist will play
+        //which events does arctic monkeys perform
         questionType = "Q_ACTIVE_IMPLICIT";
 
       } else if (chunks.abstractText.match(/^(chunk:QUESTION chunk:VP chunk:VP)( chunk:PP)*$/)) {
 
-        //when does the crazy goose open tonight in bla
+        //when does|will the crazy goose open tonight in bla
         //do the avengers play tomorrow in the AMC at 6 pm
+
+        //when do the arctic monkeys perform tonight
         questionType = "Q_PASSIVE_EXPLICIT";
 
-      } else if (chunks.abstractText.match(/^(chunk:QUESTION chunk:VP tag:VB)$/)) {
+      } else if (chunks.abstractText.match(/^(chunk:QUESTION chunk:VP( tag:(VB.*?|MD))* tag:VB.*?)$/)) {
 
         //when does the crazy goose open
         //do the avengers play (where | when is also implicit here)
+        //when do the arctic monkeys perform
         questionType = "Q_PASSIVE_IMPLICIT";
 
-
-      } else if (chunks.abstractText.match(/^(tag:WDT chunk:NP chunk:VP chunk:VP)( chunk:PP)*$/)) {
-
-        //which events does arctic monkeys perform tonight (at my favorite club)
-        questionType = "Q_INVERSE_EXPLICIT";
-
-      } else if (chunks.abstractText.match(/^(tag:WDT chunk:NP chunk:VP tag:VB)$/)) {
-
-        //which events does arctic monkeys perform?
-        questionType = "Q_INVERSE_IMPLICIT";
       }
-
-      // var nps = chunkUtils.filter(chunks.parts, {
-      //   chunkType: "VP"
-      // });
-      // console.log("VP", nps);
 
       res.json({
         questionType: questionType,
