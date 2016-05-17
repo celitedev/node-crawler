@@ -436,6 +436,7 @@ var middleware = {
         //when does the crazy goose open
         //do the avengers play (where | when is also implicit here)
         //when do the arctic monkeys perform
+        //is the green lantarn open (!! SPECIAL CASE)
         questionType = "Q_PASSIVE_IMPLICIT";
 
       } else if (chunks.abstractText.match(/^(chunk:NP( chunk:VP)+)$/)) {
