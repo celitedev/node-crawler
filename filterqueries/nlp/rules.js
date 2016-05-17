@@ -113,19 +113,16 @@ var ruleMapDate = {
   //at 5. (words 'at' needs to be here, otherwise not clear enough it indicates time)
   TIMEOFDAY5: {
     ruleType: "tokens",
-    pattern: "[{tag:IN}] [{chunk:CD}] [{word:/pm|am/}]{0,1}",
+    pattern: "[{chunk:CD}] [{word:/pm|am/}]",
     result: "TIMEOFDAY"
   },
 
-  //combinator
-  TIMEOFDAY6: {
-    ruleType: "tokens",
-    pattern: "[{tag:IN}] [{chunk:TIMEOFDAY}]",
-    result: "TIMEOFDAY"
-  },
-
-
-
+  // //combinator
+  // TIMEOFDAY6: {
+  //   ruleType: "tokens",
+  //   pattern: "[{tag:IN}] [{chunk:TIMEOFDAY}]",
+  //   result: "TIMEOFDAY"
+  // },
   TIMESPAN: {
     ruleType: 'tokens',
     pattern: '[{word:/day(s)*|week(s)*|month(s)*|year(s)*/}]',
@@ -341,7 +338,7 @@ var ruleMapNP = {
   //KWHEN: often denoting where / when
   PP: {
     ruleType: 'tokens',
-    pattern: '[{tag:IN}] [{chunk:/NP|DATE|DURATION/}]',
+    pattern: '[{tag:IN}] [{chunk:/NP|DATE|DURATION|TIMEOFDAY/}]',
     result: 'PP'
   },
 
@@ -352,11 +349,10 @@ var ruleMapNP = {
     result: 'PP'
   },
 
-  // //Some dates are propositional phrases although no proposition (on, in) found. 
-  // //Examples: tonight, this saturday. 
-  // //For our purposes we match all dates as propositional phrases
+  // Some dates are propositional phrases although no proposition (on, in) found. 
+  // Examples: tonight, this saturday. 
+  // For our purposes we match all dates as propositional phrases
   //
-  //PROBLEM: this matches 
   PP_DATE: {
     ruleType: 'tokens',
     pattern: '[{chunk:/DATE|DURATION/}]',
