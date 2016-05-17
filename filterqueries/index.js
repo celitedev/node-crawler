@@ -49,7 +49,6 @@ var cacheUtils = {
 
   updateInProcessCaches: function updateInProcessCaches() {
 
-
     ///update cache that stores supported attributes per root
     Promise.map(roots, function (root) {
       var redisKey = cacheUtils.getRedisKeyForSupportedAttribsForRoot(root);
@@ -65,7 +64,6 @@ var cacheUtils = {
   getRedisKeyForSupportedAttribsForRoot: function getRedisKeyForSupportedAttribsForRoot(root) {
     return "attribs-" + root.toLowerCase();
   }
-
 };
 
 //Update redis cache each 5 minutes. 
