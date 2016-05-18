@@ -1,11 +1,13 @@
 var _ = require("lodash");
 var Promise = require("bluebird");
 
-var NLPRules = require("./rules");
 var chunkUtils = require("./utils");
 
 module.exports = function (command) {
 
+  var NLPRules = require("./rules")(command);
+
+  var roots = command.roots;
   var cacheUtils = command.cacheUtils;
 
   var NOUN_TYPE = {
@@ -13,6 +15,16 @@ module.exports = function (command) {
     PLURAL: "PLURAL",
     SINGULAR: "SINGLUAR"
   };
+
+  var rootsToProperCase = _.reduce(roots, function (agg, root) {
+    agg[root.toLowerCase()] = root;
+    return agg;
+  }, {});
+
+
+  function fetchRootProperCased(rootNameLower) {
+    return rootsToProperCase[rootNameLower];
+  }
 
   function createQueryPlan(question) {
 
@@ -43,14 +55,50 @@ module.exports = function (command) {
 
     };
 
-
     function processPlural(command) {
 
-      command.doFallback = true;
+      return Promise.resolve()
+        .then(function () {
 
+          var root = fetchRootProperCased(command.nounSignals.subtypeRoots[0]);
+          var supportedTags = cacheUtils.supportedAttribsPerRoot[root.toLowerCase()].tags;
 
+          var filterContext = {
+            filter: {},
+            type: root,
+            wantUnique: false, //plural
+          };
 
-      return;
+          var subtype = command.nounSignals.subtypeMatched;
+
+          //add subtype filter if matched subtype isn't root
+          if (subtype !== root.toLowerCase()) {
+            filterContext.filter.subtypes = subtype;
+          }
+
+          //build list of adverbs and adjectives
+          //add those as term-filters to 'tagsFromFact'
+          if (command.nounSignals.isComplexNoun) {
+
+            var foundTags = _.pluck(chunkUtils.filter(command.nounSignals.np.parts, {
+              tag: "(JJ*?|RB*?)"
+            }), "word");
+
+            var foundSupportedTags = _.intersection(foundTags, supportedTags);
+            filterContext.filter.tagsFromFact = foundSupportedTags;
+
+            //DEBUG: unsupported filters
+            command.sentenceSignals.filtersUnmatched = _.difference(foundTags, supportedTags);
+
+          }
+
+          //DEBUG: supported filters
+          command.sentenceSignals.filters = filterContext.filter;
+
+          filterContext.nlpMeta = command;
+
+          return filterContext;
+        });
     }
 
     function processSingular(command) {
@@ -78,6 +126,7 @@ module.exports = function (command) {
     };
 
     var err;
+
     return Promise.resolve()
       .then(function () {
 
@@ -112,8 +161,7 @@ module.exports = function (command) {
           //which events does arctic monkeys perform tonight at my favorite club 
           //which events does arctic monkeys perform tonight that are still available
           //which restaurants are fine to go to tonight
-          command.questionType = "Q_ACTIVE_EXPLICIT";
-
+          commandObj.questionType = "Q_ACTIVE_EXPLICIT";
 
           //- find NP
           //- decide on proper noun or not  (probably using couple of signals + confidence score in the end)
@@ -123,6 +171,7 @@ module.exports = function (command) {
           });
 
           //analyze noun structure. This gives signals on how to interpret noun. 
+          nounSignals.np = np;
           findNPSignals(nounSignals, np, getAllSubtypesMap());
 
           //For now...
@@ -248,14 +297,16 @@ module.exports = function (command) {
           //THEREFORE PROBABLY BETTER TO MAKE SPECIAL CASES SUCH AS 'SHOW ME'
         }
 
+        console.log(commandObj);
+
         switch (sentenceSignals.nounType) {
-          case "NOUN_TYPE.PLURAL":
+          case NOUN_TYPE.PLURAL:
             return processPlural(commandObj);
 
-          case "NOUN_TYPE.SINGULAR":
+          case NOUN_TYPE.SINGULAR:
             return processSingular(commandObj);
 
-          case "NOUN_TYPE.PLURAL":
+          case NOUN_TYPE.PLURAL:
             return processFallback(commandObj);
 
           default:
@@ -276,6 +327,7 @@ module.exports = function (command) {
     });
     return subtypeToRoots;
   }
+
 
   function findNPSignals(nounSignals, np, subtypeToRoots) {
 

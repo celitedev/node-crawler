@@ -84,12 +84,13 @@ var middleware = {
         var question = req.body.question;
 
         nlpQueryGenerator.createQueryPlan(question)
-          .then(function (result) {
-            if (result.doFallback) {
+          .then(function (filterContextOrFallback) {
+            if (filterContextOrFallback.doFallback) {
               return oldNLP();
             }
-            // if(resu)
-            res.json(result);
+            console.log("NLP GENERATED FILTERCONTEXT", filterContextOrFallback);
+            _.extend(req.body, filterContextOrFallback);
+            next();
           })
           .catch(function (err) {
             err.status = 400;
@@ -176,9 +177,16 @@ module.exports = function (command) {
     return Promise.all(promises)
       .then(function (jsons) {
 
-        var outputJson = {
-          results: jsons
-        };
+        var outputJson = {};
+
+        //add nl-stuff for debugging
+        if (req.body.nlpMeta) {
+          outputJson.meta = {
+            nlp: req.body.nlpMeta
+          };
+        }
+        outputJson.results = jsons;
+
 
         console.log("ANSWER response with attribs", _.keys(outputJson));
 

@@ -336,11 +336,25 @@ module.exports = function (command) {
       if (compoundKey === "name") {
         //TODO: should we allow other free text fields such as address?
         typeOfQuery = "FreeText";
+      } else if (compoundKey === "subtypes" || compoundKey === "tagsFromFact" || compoundKey === "all_tags") {
+        //TODO: we should look at ES_mapping instead or something this is not dry
+        typeOfQuery = "Enum";
       }
 
       var propFilter;
 
       switch (typeOfQuery) {
+        case "Enum":
+
+          //terms filter for exact matching
+          propFilter = {
+            terms: {}
+          };
+
+          propFilter.terms[compoundKey] = _.isArray(v) ? v : [v];
+
+
+          break;
         case "PrefixName":
           propFilter = {
             prefix: {
