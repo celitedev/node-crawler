@@ -110,7 +110,10 @@ require("./routes/filterQueries")(command);
 //Error HAndling //
 ///////////////////
 app.use(function jsonErrorHandler(err, req, res, next) {
+  console.log("########### ERROR PRINTED IN jsonErrorHandler");
   console.error(err.stack);
+
+
 
   var status = err.status || 500;
   var statusInBody = status;
@@ -125,7 +128,8 @@ app.use(function jsonErrorHandler(err, req, res, next) {
       status: statusInBody,
       filterQuery: err.filterQuery
     },
-    error: err.message
+    error: err.message,
+    details: err.details
   });
 });
 

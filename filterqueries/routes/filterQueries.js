@@ -43,6 +43,7 @@ var middleware = {
             res.json(result);
           })
           .catch(function (err) {
+            err.status = 400;
             next(err);
           });
 
