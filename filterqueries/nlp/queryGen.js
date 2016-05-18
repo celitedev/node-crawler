@@ -8,7 +8,48 @@ module.exports = function (command) {
 
   var cacheUtils = command.cacheUtils;
 
+  var NOUN_TYPE = {
+    PROPER: "PROPER",
+    PLURAL: "PLURAL",
+    SINGULAR: "SINGLUAR"
+  };
+
   function createQueryPlan(question) {
+
+    var nounSignals = {
+
+      //if true, we're likely looking at improper defined NP
+      //skip for now
+      noNounFound: false,
+
+      //if true, likely compound or improper defined NP
+      //skip for now
+      multipleNounsFound: false,
+
+      //if true, NP consists of multiple parts
+      isComplexNoun: false,
+
+      //if true, weak signal for non-proper noun
+      nounExistsAtEnd: false,
+
+      //set to the matched subtype if found
+      subtypeMatched: false,
+
+      //if true, noun is the plural of the subtype found
+      subtypePlural: false,
+
+      //if subtype found, defines a collection of roots that can contain this subtype.
+      subtypeRoots: null,
+
+    };
+
+    var sentenceSignals = {
+      nounType: null,
+      temporal: null, //specific, undefined (default now), past, present, future
+      spatial: null, //noun-place-indication, specific lat/long, address/corner/between, user-location
+      filters: {}, //based on JJ(.)? + RB(.)?
+      sort: null, //specific: JJ(good) / JJS(better) / JJS(best), (also RBR, RBS)  default based on (type, location to user, other context?)
+    };
 
     var err;
     return Promise.resolve()
@@ -48,38 +89,7 @@ module.exports = function (command) {
             chunkType: "NP"
           });
 
-          //TODO: other signals: 
-          //- check for 'the' -> signal for proper noun
-          //- check for plural -> signal for non-proper noun
-
-
-          var nounSignals = {
-
-            //if true, we're likely looking at improper defined NP
-            //skip for now
-            noNounFound: false,
-
-            //if true, likely compound or improper defined NP
-            //skip for now
-            multipleNounsFound: false,
-
-            //if true, NP consists of multiple parts
-            isComplexNoun: false,
-
-            //if true, weak signal for non-proper noun
-            nounExistsAtEnd: false,
-
-            //set to the matched subtype if found
-            subtypeMatched: false,
-
-            //if true, noun is the plural of the subtype found
-            subtypePlural: false,
-
-            //if subtype found, defines a collection of roots that can contain this subtype.
-            subtypeRoots: null,
-
-          };
-
+          //analyze noun structure. This gives signals on how to interpret noun. 
           findNPSignals(nounSignals, np, getAllSubtypesMap());
 
           //For now...
@@ -96,49 +106,65 @@ module.exports = function (command) {
             throw err;
           }
 
+          nounSignals.isProperNoun = "UNCLEAR";
 
 
-          //////////////
-          //based on various signals determine: 
-          //1. Proper noun
-          //2. noun plural 
-          //   - with | without constraints
-          //3. noun singlular
-          //   - with  | without constraints
+          if (nounSignals.subtypeMatched && nounSignals.subtypePlural) {
+            //Very likely that we're talking a non-proper noun. 
+            //
+            //This among other things because it's very unlikely that a proper noun 
+            //contains a plural form of a subtype. 
+            //
+            //e.g.: fine italian restaurants
+
+            nounSignals.isProperNoun = false;
+
+          } else {
+
+            //TODO: more signals to determine proper noun or not. This includes:
+            // - lookup of name
+            // - ...
+            // TODO: if confidence is low, we note this so that if we end up 
+            // doing fetch for isProper = false, we might want to give out a warning or something. 
+            // "we think you mean..." 
+          }
 
 
+          //Decicion time on Proper Noun!
+          if (nounSignals.isProperNoun === false) {
+
+            //confident that noun is NOT a proper noun
+
+            //Decide on singular or plural code-path. 
+            //Results can be totally different so we separate these cases out explicitly.
+            //
+            //SINGULAR, e.g.: 
+            // - which artist,... etc
+            // - might also have structure of plural, in which case we should treat as plural, and singular
+            //     might have been input error.
+            //
+            //PLURAL, e.g.: 
+            // - which restaurants
+            // - which artists
 
 
-          // if (subtypeArr.length === 1) {
-          //   var subtypeObj = subtypeArr[0];
+            //For now decide singular/plural by this simple check
+            //TODO: Stronger checks / more indicators.
+            // - Look at top verb (skip MD) or verb inside first VP -> ar vs. is, etc. 
+            sentenceSignals.nounType = nounSignals.subtypePlural ? NOUN_TYPE.PLURAL : NOUN_TYPE.SINGULAR;
 
+          } else if (nounSignals.isProperNoun === true) {
+            //confident that noun IS proper noun 
+            //because we just found it
 
-          //   if (noun === subtypeObj.subtype) {
-          //     //noun = subtype -> no adjectives, etc.
+            sentenceSignals.nounType = NOUN_TYPE.PROPER;
 
-          //     console.log("simple noun", noun, subtypeObj);
+          } else {
 
-          //   } else {
-          //     console.log("complex non-proper noun? ", noun, subtypeArr);
-          //   }
-          // } else if (subtypeArr.length > 1) {
-
-          // }
-
-          // if (subtypeArr.length) {
-
-          //   if (subtypeArr.length === 1) {
-
-          //   } else {
-          //     console.log("multiple subtypes found", noun, subtypeArr);
-          //   }
-          // } else {
-          //   //no subtypes matched. 
-          //   //stronish signal we're looking at proper noun
-          //   console.log("no subtypes found. Proper noun? ", noun);
-          // }
-
-
+            //TODO: we should always choose one or the other. 
+            //However, we might indicate a low confidence. See description above
+            sentenceSignals.nounUndecided = true;
+          }
 
 
           //STEP 2
@@ -190,6 +216,8 @@ module.exports = function (command) {
         }
 
         return {
+          sentenceSignals: sentenceSignals,
+          nounSignals: nounSignals,
           questionType: questionType,
           tags: tags,
           chunks: sChunk,

@@ -43,7 +43,7 @@ var ruleMapGeneral = {
 
   NUMBER_CHUNK1: {
     ruleType: 'tokens',
-    pattern: '[{ tag:CD}]',
+    pattern: '[{tag:CD}]',
     result: "CD"
   },
 
@@ -52,7 +52,14 @@ var ruleMapGeneral = {
   //who is
   QUESTION1: {
     ruleType: 'tokens',
-    pattern: '[{ tag:WRB}]',
+    pattern: '[{tag:/WRB|WP|WP$/}]',
+    result: "QUESTION"
+  },
+
+  //SWALLOW VERB
+  QUESTION2: {
+    ruleType: 'tokens',
+    pattern: '[{chunk:QUESTION}] [{ tag:/VB.*?|MD/}]',
     result: "QUESTION"
   },
 
@@ -587,10 +594,10 @@ var testPrepositionalPhrases = [{
 //TODO: MORE END TO END EXAMPLES
 var testE2E = [{
   question: "what restaurants are located near me",
-  chunks: "what/WP [NP restaurants/NN] [VP are/VBP located/VBN [PP near/IN me/PRP]]"
+  chunks: "[QUESTION what/WP] [NP restaurants/NN] [VP are/VBP located/VBN [PP near/IN me/PRP]]"
 }, {
   question: "what restaurants are located near the sutton hotel",
-  chunks: "what/WP [NP restaurants/NN] [VP are/VBP located/VBN [PP near/IN [NP the/DT sutton/NN hotel/NN]]]"
+  chunks: "[QUESTION what/WP] [NP restaurants/NN] [VP are/VBP located/VBN [PP near/IN [NP the/DT sutton/NN hotel/NN]]]"
 }, {
   question: "coldplay performs the coming months in the madison square garden",
   chunks: "[NP coldplay/NN] [VP performs/VBZ [PP [DURATION [RELATIVE_DATE [NP the/DT] [RELATIVE_DATE coming/VBG [TIMESPAN [NP months/NN]]]]]] [PP in/IN [NP the/DT madison/NN square/NN garden/NN]]]"
