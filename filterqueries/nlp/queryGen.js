@@ -10,6 +10,7 @@ module.exports = function (command) {
 
   function createQueryPlan(question) {
 
+    var err;
     return Promise.resolve()
       .then(function () {
 
@@ -80,7 +81,22 @@ module.exports = function (command) {
           };
 
           findNPSignals(nounSignals, np, getAllSubtypesMap());
-          console.log(np.text, nounSignals);
+
+          //For now...
+          if (nounSignals.noNounFound) {
+            err = new Error("no noun found");
+            err.details = nounSignals;
+            throw err;
+          }
+
+          //For now...
+          if (nounSignals.multipleNounsFound) {
+            err = new Error("multiple nouns found");
+            err.details = nounSignals;
+            throw err;
+          }
+
+
 
           //////////////
           //based on various signals determine: 
@@ -136,25 +152,6 @@ module.exports = function (command) {
           //STEP 4. 
           //voila a filterContext.
 
-
-          //given a needle of 1 term -> get the term-position in the haystack string
-          function findTermPosition(needle, haystack) {
-            var split = haystack.split(" ");
-            for (var i = 0; i < split.length; i++) {
-              if (!split[i].indexOf(needle)) {
-                return i;
-              }
-            }
-            return -1;
-          }
-
-          //is term found the last term found in the haystack?
-          function isTermLast(needle, haystack) {
-            //return true if no space found after needle
-            var termIndex = haystack.indexOf(needle);
-            if (!~termIndex) return false;
-            return !~haystack.indexOf(" ", termIndex);
-          }
 
         } else if (chunks.abstractText.match(/^tag:WDT chunk:NP( chunk:VP)*( tag:(VB.*?|MD))* (tag:VB.*?)$/)) {
 
