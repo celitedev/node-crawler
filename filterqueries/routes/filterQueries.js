@@ -85,6 +85,12 @@ var middleware = {
 
         nlpQueryGenerator.createQueryPlan(question)
           .then(function (filterContextOrFallback) {
+
+            //only show nlp meta
+            if (req.body.nlpMetaOnly) {
+              var meta = filterContextOrFallback.doFallback ? filterContextOrFallback : filterContextOrFallback.nlpMeta;
+              return res.json(meta);
+            }
             if (filterContextOrFallback.doFallback) {
               return oldNLP();
             }

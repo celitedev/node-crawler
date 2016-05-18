@@ -19,21 +19,21 @@ module.exports = function (command) {
   //HACK: set all tags to be adjectvices
   //this fixes things like 'italian', 'french' etc to be improperly tagged as NN
   var allTags = [];
-  var isTagOverwriteMapWarmed = false;
+  var isWordOverwriteMapWarmed = false;
 
-  function warmTagOverwriteMap() {
+  function warmWordOverwriteMap() {
     _.each(command.cacheUtils.supportedAttribsPerRoot, function (obj) {
       _.each(obj.tags, function (tag) {
-        tagOverwriteMap[tag] = "JJ";
+        wordOverwriteMap[tag] = "JJ";
       });
     });
-    if (!isTagOverwriteMapWarmed) {
-      isTagOverwriteMapWarmed = true;
-      console.log(("warmed tagOverwriteMap").green);
+    if (!isWordOverwriteMapWarmed) {
+      isWordOverwriteMapWarmed = true;
+      console.log(("warmed wordOverwriteMap").green);
     }
   }
   //feeds from other cache which may be updated at any time
-  setInterval(warmTagOverwriteMap, 5 * 1000);
+  setInterval(warmWordOverwriteMap, 1000); //each sec
 
   //be, do, have and modal verbs 
   var modalForms = [
@@ -460,6 +460,7 @@ module.exports = function (command) {
         var tag = wordOverwriteMap[word] || tagOverwriteMap[val[1]] || val[1];
         tags += " " + word + "/" + tag;
       });
+
       tags = tags.trim();
     }
 
