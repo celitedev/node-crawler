@@ -43,27 +43,44 @@ app.use(bodyParser());
 app.use(methodOverride());
 
 
+
+var cachePropertyMap = {
+  all: {
+    esField: "all_tags",
+  },
+  tags: {
+    esField: "tagsFromFact"
+  },
+  subtypes: {
+    esField: "subtypes"
+  }
+};
 var cacheUtils = {
 
-  supportedTagsPerRoot: {},
-
+  cachePropertyMap: cachePropertyMap,
+  supportedAttribsPerRoot: {},
   updateInProcessCaches: function updateInProcessCaches() {
 
     ///update cache that stores supported attributes per root
     Promise.map(roots, function (root) {
-      var redisKey = cacheUtils.getRedisKeyForSupportedAttribsForRoot(root);
-      return Promise.resolve()
-        .then(function () {
-          return redisClient.getAsync(redisKey);
-        })
-        .then(function (sDelimited) {
-          cacheUtils.supportedTagsPerRoot[root] = sDelimited.split(",");
+
+      root = root.toLowerCase();
+
+      var propMap = _.reduce(_.keys(cachePropertyMap), function (agg, k) {
+        var redisKey = "cache-" + root + "-" + k;
+        agg[k] = redisClient.getAsync(redisKey);
+        return agg;
+      }, {});
+
+      return Promise.props(propMap)
+        .then(function (props) {
+          cacheUtils.supportedAttribsPerRoot[root] = _.reduce(props, function (agg, sDelimited, k) {
+            agg[k] = !sDelimited ? [] : sDelimited.split(",");
+            return agg;
+          }, {});
         });
     });
   },
-  getRedisKeyForSupportedAttribsForRoot: function getRedisKeyForSupportedAttribsForRoot(root) {
-    return "attribs-" + root.toLowerCase();
-  }
 };
 
 //Update redis cache each 5 minutes. 
