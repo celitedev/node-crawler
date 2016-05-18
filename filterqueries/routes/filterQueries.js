@@ -542,33 +542,36 @@ module.exports = function (command) {
 
     var promiseMap = _.reduce(roots, function (agg, root) {
 
+      var cachePropMap = cacheUtils.cachePropertyMap;
+
       var searchQuery = {
         index: "kwhen-" + root.toLowerCase(),
         type: 'type1',
         body: {
           "size": 0,
-          "aggs": {
-            "allTags": {
+          "aggs": _.reduce(cachePropMap, function (agg, v, k) {
+            agg[k] = {
               "terms": {
-                "field": "all_tags",
+                "field": v.esField,
                 "size": 0
               }
-            }
-          }
+            };
+            return agg;
+          }, {})
         }
       };
 
-      var redisKey = cacheUtils.getRedisKeyForSupportedAttribsForRoot(root);
+      //cache into redis buckets
       agg[root] = Promise.resolve()
         .then(function () {
           return command.esClient.search(searchQuery);
         })
         .then(function (result) {
-          var supportedKeys = _.pluck(result.aggregations.allTags.buckets, "key");
-          return redisClient.setAsync(redisKey, supportedKeys.join(","));
-        })
-        .then(function () {
-          return redisClient.getAsync(redisKey);
+          return Promise.map(_.keys(cachePropMap), function (k) {
+            var redisKey = "cache-" + root.toLowerCase() + "-" + k;
+            var supportedKeys = _.pluck(result.aggregations[k].buckets, "key");
+            return redisClient.setAsync(redisKey, supportedKeys.join(","));
+          });
         });
 
       return agg;
