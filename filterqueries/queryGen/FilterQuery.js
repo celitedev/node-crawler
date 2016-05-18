@@ -348,11 +348,17 @@ module.exports = function (command) {
 
           //terms filter for exact matching
           propFilter = {
-            terms: {}
+            bool: {
+              must: _.map(_.isArray(v) ? v : [v], function (singleVal) {
+                var singleFilter = {
+                  term: {}
+                };
+
+                singleFilter.term[compoundKey] = singleVal;
+                return singleFilter;
+              })
+            }
           };
-
-          propFilter.terms[compoundKey] = _.isArray(v) ? v : [v];
-
 
           break;
         case "PrefixName":
@@ -375,6 +381,7 @@ module.exports = function (command) {
           propFilter = filterQueryUtils.performRangeQuery(v, path);
           break;
       }
+
 
       //add filter to AND
       mustObj.push(propFilter);

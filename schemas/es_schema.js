@@ -168,6 +168,7 @@ module.exports = function (generatedSchemas) {
           fields: ["root"],
 
         },
+        mapping: mappings.enum,
         enum: vocabs.subtypes
       },
 
