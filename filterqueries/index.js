@@ -90,6 +90,7 @@ cacheUtils.updateInProcessCaches();
 
 var command = {
   app: app,
+  roots: roots,
   generatedSchemas: generatedSchemas,
   r: r,
   config: config,
