@@ -416,6 +416,8 @@ var middleware = {
         //which restaurants are fine to go to tonight
         questionType = "Q_ACTIVE_EXPLICIT";
 
+        //extract noun
+        //lookup noun
       } else if (chunks.abstractText.match(/^tag:WDT chunk:NP( chunk:VP)*( tag:(VB.*?|MD))* (tag:VB.*?)$/)) {
 
         //which restaurants are|will open
@@ -439,10 +441,11 @@ var middleware = {
         //is the green lantarn open (!! SPECIAL CASE)
         questionType = "Q_PASSIVE_IMPLICIT";
 
-      } else if (chunks.abstractText.match(/^(chunk:NP( chunk:VP)+)$/)) {
+      } else if (chunks.abstractText.match(/^(chunk:NP( chunk:(VP|PP))+)$/)) {
         //all bands who|that|which play tonight (that have high ratings)
         //all bands playing tonight
-
+        //jazz concerts tonight (no verb)
+        //
         questionType = "IMPERATIVE";
 
         //TODO: show me all bands playing tonight. -> chunk:NP chunk:NP chunk:VP
