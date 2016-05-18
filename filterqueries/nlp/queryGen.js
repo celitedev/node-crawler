@@ -43,6 +43,32 @@ module.exports = function (command) {
 
     };
 
+
+    function processPlural(command) {
+
+      command.doFallback = true;
+
+
+
+      return;
+    }
+
+    function processSingular(command) {
+      command.doFallback = true;
+      return command;
+    }
+
+    function processProper(command) {
+      command.doFallback = true;
+      return command;
+    }
+
+    function processFallback(command) {
+      command.doFallback = true;
+      return command;
+    }
+
+
     var sentenceSignals = {
       nounType: null,
       temporal: null, //specific, undefined (default now), past, present, future
@@ -64,13 +90,20 @@ module.exports = function (command) {
 
         var chunks = chunkUtils.getParts(currentChunk, sChunk);
 
-        var questionType = "UNKNOWN";
-
         ///////////////////////////////////////////////////////////////
         //NOTE: THERE'S A PATTERN IN HOW EXPLICIT AND IMPLICIT DIFFER
         /////////////////////////////////////////////////////////////////
 
-        if (chunks.abstractText.match(/^tag:WDT chunk:NP( chunk:VP)+( chunk:PP)*$/)) {
+        var commandObj = {
+          sentenceSignals: sentenceSignals,
+          nounSignals: nounSignals,
+          questionType: "UNKNOWN",
+          tags: tags,
+          chunks: sChunk,
+          tree: chunks,
+        };
+
+        if (chunks.abstractText.match(/^chunk:QUESTION chunk:NP( chunk:VP)+( chunk:PP)*$/)) {
           //which restaurants are open tonight
           //which restaurants will be open tonight
           //which artist plays tonight in madison square garden
@@ -79,7 +112,7 @@ module.exports = function (command) {
           //which events does arctic monkeys perform tonight at my favorite club 
           //which events does arctic monkeys perform tonight that are still available
           //which restaurants are fine to go to tonight
-          questionType = "Q_ACTIVE_EXPLICIT";
+          command.questionType = "Q_ACTIVE_EXPLICIT";
 
 
           //- find NP
@@ -166,7 +199,6 @@ module.exports = function (command) {
             sentenceSignals.nounUndecided = true;
           }
 
-
           //STEP 2
           //decide on sentence form, starting with 'who, which, when, where', etc. 
           //decide on missing context / defaulting. I.e.: for Q_ACTIVE_IMPLICIT | Q_PASSIVE_EXPLICIT
@@ -179,12 +211,12 @@ module.exports = function (command) {
           //voila a filterContext.
 
 
-        } else if (chunks.abstractText.match(/^tag:WDT chunk:NP( chunk:VP)*( tag:(VB.*?|MD))* (tag:VB.*?)$/)) {
+        } else if (chunks.abstractText.match(/^chunk:QUESTION chunk:NP( chunk:VP)*( tag:(VB.*?|MD))* (tag:VB.*?)$/)) {
 
           //which restaurants are|will open
           //which artist will play
           //which events does arctic monkeys perform
-          questionType = "Q_ACTIVE_IMPLICIT";
+          commandObj.questionType = "Q_ACTIVE_IMPLICIT";
 
         } else if (chunks.abstractText.match(/^(chunk:QUESTION chunk:VP chunk:VP)( chunk:PP)*$/)) {
 
@@ -192,22 +224,23 @@ module.exports = function (command) {
           //do the avengers play tomorrow in the AMC at 6 pm
 
           //when do the arctic monkeys perform tonight
-          questionType = "Q_PASSIVE_EXPLICIT";
+          commandObj.questionType = "Q_PASSIVE_EXPLICIT";
 
         } else if (chunks.abstractText.match(/^(chunk:QUESTION chunk:VP( tag:(VB.*?|MD))* tag:VB.*?)$/)) {
 
           //when does the crazy goose open
+          //when will ...
           //do the avengers play (where | when is also implicit here)
           //when do the arctic monkeys perform
           //is the green lantarn open (!! SPECIAL CASE)
-          questionType = "Q_PASSIVE_IMPLICIT";
+          commandObj.questionType = "Q_PASSIVE_IMPLICIT";
 
         } else if (chunks.abstractText.match(/^(chunk:NP( chunk:(VP|PP))+)$/)) {
           //all bands who|that|which play tonight (that have high ratings)
           //all bands playing tonight
           //jazz concerts tonight (no verb)
           //
-          questionType = "IMPERATIVE";
+          commandObj.questionType = "IMPERATIVE";
 
           //TODO: show me all bands playing tonight. -> chunk:NP chunk:NP chunk:VP
           //IS THIS SOMETHING WE CAN IMEPLEMENT GENERALLY?
@@ -215,16 +248,21 @@ module.exports = function (command) {
           //THEREFORE PROBABLY BETTER TO MAKE SPECIAL CASES SUCH AS 'SHOW ME'
         }
 
-        return {
-          sentenceSignals: sentenceSignals,
-          nounSignals: nounSignals,
-          questionType: questionType,
-          tags: tags,
-          chunks: sChunk,
-          tree: chunks,
-        };
-      });
+        switch (sentenceSignals.nounType) {
+          case "NOUN_TYPE.PLURAL":
+            return processPlural(commandObj);
 
+          case "NOUN_TYPE.SINGULAR":
+            return processSingular(commandObj);
+
+          case "NOUN_TYPE.PLURAL":
+            return processFallback(commandObj);
+
+          default:
+            return processFallback(commandObj);
+
+        }
+      });
   }
 
   function getAllSubtypesMap() {

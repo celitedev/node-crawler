@@ -34,23 +34,8 @@ var middleware = {
     var nlpQueryGenerator = nlpQueryGeneratorFn(command);
 
     return function superSweetNLP(req, res, next) {
-      if (req.body.isNew && !req.type && req.body.question !== undefined) {
 
-        var question = req.body.question;
-
-        nlpQueryGenerator.createQueryPlan(question)
-          .then(function (result) {
-            res.json(result);
-          })
-          .catch(function (err) {
-            err.status = 400;
-            next(err);
-          });
-
-        return;
-      }
-      if (!req.type && req.body.question !== undefined) { //change question into filtercontext if filtercontext not already present
-
+      function oldNLP() {
         var lowerBodySplit = _.compact(req.body.question.toLowerCase().split(" ")); //remove empty
         var err;
 
@@ -90,8 +75,31 @@ var middleware = {
         _.extend(req.body, filterContext, {
           wantUnique: false
         });
+
+        next();
       }
-      next();
+
+      if (!req.type && req.body.question !== undefined) {
+
+        var question = req.body.question;
+
+        nlpQueryGenerator.createQueryPlan(question)
+          .then(function (result) {
+            if (result.doFallback) {
+              return oldNLP();
+            }
+            // if(resu)
+            res.json(result);
+          })
+          .catch(function (err) {
+            err.status = 400;
+            next(err);
+          });
+
+      } else {
+        next();
+      }
+
     };
   }
 };

@@ -52,17 +52,9 @@ var ruleMapGeneral = {
   //who is
   QUESTION1: {
     ruleType: 'tokens',
-    pattern: '[{tag:/WRB|WP|WP$/}]',
+    pattern: '[{tag:/WRB|WP|WP$|WDT/}]',
     result: "QUESTION"
   },
-
-  //SWALLOW VERB
-  QUESTION2: {
-    ruleType: 'tokens',
-    pattern: '[{chunk:QUESTION}] [{ tag:/VB.*?|MD/}]',
-    result: "QUESTION"
-  },
-
 };
 
 var ruleMapDate = {
