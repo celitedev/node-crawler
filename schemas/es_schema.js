@@ -164,6 +164,10 @@ module.exports = function (generatedSchemas) {
             return "kind of " + facetLabelForType(type);
           },
         },
+        populate: {
+          fields: ["root"],
+
+        },
         enum: vocabs.subtypes
       },
 
