@@ -9,13 +9,9 @@ var roots = domainConfig.domain.roots;
 var cardViewModel = require("../cardViewModel");
 var FilterQuery;
 
-var appRoot = require('app-root-path');
-
 var subtypeToFilterQuery = require("../queryGen/fakeNLP").subtypeToFilterQuery;
 
-var NLPRules = require("../nlp/rules");
-
-
+var nlpQueryGeneratorFn = require("../nlp/queryGen");
 
 function createRelatedFilterQueries(filterQuery) {
   return [filterQuery, filterQuery, filterQuery];
@@ -275,239 +271,72 @@ function createFilterQuery(command) {
   return filterQuery;
 }
 
-var chunkUtils = {
 
-  //Allow regex on one or more properties. Supplied as a map
-  //Only those parts are returned for which all properties match corresponding regex
-  filter: function (parts, filterObj) {
-
-    //make regex
-    _.each(filterObj, function (v, k) {
-      filterObj[k] = new RegExp(v, "g");
-    });
-
-    return _.filter(parts, function (part) {
-
-      var result = _.compact(_.map(filterObj, function (regex, key) {
-        if (!part[key]) return false;
-        return !!part[key].match(regex);
-      }));
-
-      return result.length === _.size(filterObj);
-
-    });
-  },
-  getParts: function (currentChunk, sChunk) {
-
-    var depth = 0;
-    var startPartAt = 0;
-
-    sChunk = sChunk.trim();
-    currentChunk.path = sChunk;
-
-    var part;
-    for (var i = 0; i < sChunk.length; i++) {
-      var c = sChunk.charAt(i);
-      if (c === '[') {
-        depth++;
-      } else if (c === ']') {
-        depth--;
-        if (!depth) {
-
-          part = {
-            type: "chunk",
-            path: sChunk.substring(startPartAt, i + 1).trim(),
-          };
-          currentChunk.parts = currentChunk.parts || [];
-          currentChunk.parts.push(chunkUtils.getParts(part, part.path.substring(1, part.path.length - 1)));
-
-          startPartAt = i + 1;
-        }
-      } else if ((c === " " || i === sChunk.length - 1) && !depth) {
-
-        part = sChunk.substring(startPartAt, i + 1).trim();
-
-        if (part) { //don't add spaces
-
-          if (!startPartAt && !~part.indexOf("/")) { //we're at start. Possibly the chunk type
-            currentChunk.chunkType = part;
-          } else {
-            var wordTag = part.split("/");
-            part = {
-              type: "tag",
-              tag: wordTag[1],
-              word: wordTag[0],
-              text: wordTag[0],
-              path: part,
-              abstract: ["tag:" + wordTag[1]]
-            };
-            currentChunk.parts = currentChunk.parts || [];
-            currentChunk.parts.push(part);
-          }
-        }
-
-        startPartAt = i;
-      }
-    }
-
-    currentChunk.text = _.reduce(currentChunk.parts, function (sOut, part) {
-      return sOut + " " + part.text;
-    }, "").trim();
-
-    //more sensible order for human consumption
-    var curPath = currentChunk.path;
-    delete currentChunk.path;
-    currentChunk.path = curPath;
-
-    currentChunk.abstract = _.reduce(currentChunk.parts, function (sOut, part) {
-      if (part.type === "chunk" || part.type === "top") {
-        return sOut.concat(["chunk:" + part.chunkType]);
-      } else {
-        return sOut.concat(part.abstract);
-      }
-    }, []);
-
-    currentChunk.abstractText = currentChunk.abstract.join(" ").trim();
-
-    return currentChunk;
-  },
-};
-
-chunkOrders = {
-
-  question: [
-    /chunk:QUESTION( chunk:VP)+/
-  ]
-};
 
 var middleware = {
-  superSweetNLP: function superSweetNLP(req, res, next) {
-    if (req.body.isNew && !req.type && req.body.question !== undefined) {
+  superSweetNLP: function (command) {
 
-      var tags = NLPRules.getTags(req.body.question);
-      var sChunk = NLPRules.getChunks(tags);
+    var nlpQueryGenerator = nlpQueryGeneratorFn(command);
 
-      var currentChunk = {
-        type: "top"
-      };
+    return function superSweetNLP(req, res, next) {
+      if (req.body.isNew && !req.type && req.body.question !== undefined) {
 
-      //STEP 1. 
-      //find NP
+        var question = req.body.question;
 
-      var regex = [
-        "chunk:NP"
-      ];
-      var chunks = chunkUtils.getParts(currentChunk, sChunk);
+        nlpQueryGenerator.createQueryPlan(question)
+          .then(function (result) {
+            res.json(result);
+          })
+          .catch(function (err) {
+            next(err);
+          });
 
-      var questionType = "UNKNOWN";
-
-      ///////////////////////////////////////////////////////////////
-      //NOTE: THERE'S A PATTERN IN HOW EXPLICIT AND IMPLICIT DIFFER
-      /////////////////////////////////////////////////////////////////
-
-      if (chunks.abstractText.match(/^tag:WDT chunk:NP( chunk:VP)+( chunk:PP)*$/)) {
-        //which restaurants are open tonight
-        //which restaurants will be open tonight
-        //which artist plays tonight in madison square garden
-        //which jazz bands play tonight at my favorite club
-        //which fine italian restaurants allow for reservations tomorrow night near grand central station
-        //which events does arctic monkeys perform tonight at my favorite club 
-        //which events does arctic monkeys perform tonight that are still available
-        //which restaurants are fine to go to tonight
-        questionType = "Q_ACTIVE_EXPLICIT";
-
-        //extract noun
-        //lookup noun
-      } else if (chunks.abstractText.match(/^tag:WDT chunk:NP( chunk:VP)*( tag:(VB.*?|MD))* (tag:VB.*?)$/)) {
-
-        //which restaurants are|will open
-        //which artist will play
-        //which events does arctic monkeys perform
-        questionType = "Q_ACTIVE_IMPLICIT";
-
-      } else if (chunks.abstractText.match(/^(chunk:QUESTION chunk:VP chunk:VP)( chunk:PP)*$/)) {
-
-        //when does|will the crazy goose open tonight in bla
-        //do the avengers play tomorrow in the AMC at 6 pm
-
-        //when do the arctic monkeys perform tonight
-        questionType = "Q_PASSIVE_EXPLICIT";
-
-      } else if (chunks.abstractText.match(/^(chunk:QUESTION chunk:VP( tag:(VB.*?|MD))* tag:VB.*?)$/)) {
-
-        //when does the crazy goose open
-        //do the avengers play (where | when is also implicit here)
-        //when do the arctic monkeys perform
-        //is the green lantarn open (!! SPECIAL CASE)
-        questionType = "Q_PASSIVE_IMPLICIT";
-
-      } else if (chunks.abstractText.match(/^(chunk:NP( chunk:(VP|PP))+)$/)) {
-        //all bands who|that|which play tonight (that have high ratings)
-        //all bands playing tonight
-        //jazz concerts tonight (no verb)
-        //
-        questionType = "IMPERATIVE";
-
-        //TODO: show me all bands playing tonight. -> chunk:NP chunk:NP chunk:VP
-        //IS THIS SOMETHING WE CAN IMEPLEMENT GENERALLY?
-        //PROBLEM HERE IS THAT IT'S DIFFICULT (IMPOSSIBLE FOR THE GENERAL CASE?) TO DECIDE WHAT THE 'OPERATING NOUN' IS.
-        //THEREFORE PROBABLY BETTER TO MAKE SPECIAL CASES SUCH AS 'SHOW ME'
+        return;
       }
+      if (!req.type && req.body.question !== undefined) { //change question into filtercontext if filtercontext not already present
 
-      res.json({
-        questionType: questionType,
-        tags: tags,
-        chunks: sChunk,
-        tree: chunks,
-      });
+        var lowerBodySplit = _.compact(req.body.question.toLowerCase().split(" ")); //remove empty
+        var err;
 
-
-      return;
-      // return next();
-    }
-    if (!req.type && req.body.question !== undefined) { //change question into filtercontext if filtercontext not already present
-
-      var lowerBodySplit = _.compact(req.body.question.toLowerCase().split(" ")); //remove empty
-      var err;
-
-      if (!lowerBodySplit.length) {
-        err = new Error("Not sure what you mean! try to search for something like `movie theater` or `events`");
-        err.status = 400;
-        return next(err);
-      }
-
-      //lookup on type
-      var termFound;
-      var filterContext = _.reduce(lowerBodySplit, function (agg, term) {
-        if (agg) return agg; //if already found
-        var fc = subtypeToFilterQuery[term];
-        if (fc) {
-          termFound = term;
+        if (!lowerBodySplit.length) {
+          err = new Error("Not sure what you mean! try to search for something like `movie theater` or `events`");
+          err.status = 400;
+          return next(err);
         }
-        return fc;
-      }, null);
 
-      //if type no found to a 'all-type' query which is later on separated
-      //Also make sure 'filter' object exists
-      filterContext = _.defaults(filterContext || {}, {
-        filter: {},
-        type: "all"
-      });
+        //lookup on type
+        var termFound;
+        var filterContext = _.reduce(lowerBodySplit, function (agg, term) {
+          if (agg) return agg; //if already found
+          var fc = subtypeToFilterQuery[term];
+          if (fc) {
+            termFound = term;
+          }
+          return fc;
+        }, null);
 
-      //termFound was used for type-lookup. Remove that for lookup of name
-      if (termFound) {
-        lowerBodySplit = _.difference(lowerBodySplit, [termFound]);
+        //if type no found to a 'all-type' query which is later on separated
+        //Also make sure 'filter' object exists
+        filterContext = _.defaults(filterContext || {}, {
+          filter: {},
+          type: "all"
+        });
+
+        //termFound was used for type-lookup. Remove that for lookup of name
+        if (termFound) {
+          lowerBodySplit = _.difference(lowerBodySplit, [termFound]);
+        }
+
+        if (lowerBodySplit.length) {
+          filterContext.filter.name = lowerBodySplit.join(" ").trim();
+        }
+
+        _.extend(req.body, filterContext, {
+          wantUnique: false
+        });
       }
-
-      if (lowerBodySplit.length) {
-        filterContext.filter.name = lowerBodySplit.join(" ").trim();
-      }
-
-      _.extend(req.body, filterContext, {
-        wantUnique: false
-      });
-    }
-    next();
+      next();
+    };
   }
 };
 
@@ -536,6 +365,70 @@ module.exports = function (command) {
     esClient: command.esClient,
     redisClient: command.redisClient
   });
+
+
+  //used by Answer page. 
+  app.post('/question', middleware.superSweetNLP(command), function (req, res, next) {
+
+    //always include cardFormatting
+    var command = _.extend({}, req.body, {
+      includeCardFormatting: true
+    });
+
+    //typeless query -> should be split multiple typed queries
+    var filterQueries;
+    try {
+
+      if (command.type === "all") {
+
+        //group filter queries by type
+        filterQueries = _.map(fixedTypesInOrder, function (type) {
+          return createFilterQuery(_.defaults({
+            type: type
+          }, command));
+        });
+      } else {
+        //temporary way of adding related filter queries
+        filterQueries = createRelatedFilterQueries(createFilterQuery(command));
+      }
+    } catch (err) {
+      return next(err);
+    }
+
+    var promises = _.map(filterQueries, function (filterQuery) {
+      return Promise.resolve()
+        .then(function () {
+          //perform query
+          return filterQuery.performQuery();
+        })
+        .then(createDTOS({
+          filterContext: filterQuery,
+          includeCardFormatting: command.includeCardFormatting
+        }))
+        .then(function (combinedResult) {
+          return combinedResult.results;
+        });
+    });
+
+    return Promise.all(promises)
+      .then(function (jsons) {
+
+        var outputJson = {
+          results: jsons
+        };
+
+        console.log("ANSWER response with attribs", _.keys(outputJson));
+
+        res.json(outputJson);
+
+      })
+      .catch(function (err) {
+        err.filterQuery = req.filterQuery;
+        return next(err);
+      });
+  });
+
+
 
   //Update Redis NLP Cache from ES
   app.post("/reloadNLPCache", function (req, res) {
@@ -860,67 +753,6 @@ module.exports = function (command) {
       })
       .catch(function (err) {
         err.filterQuery = filterQuery;
-        return next(err);
-      });
-  });
-
-  //used by Answer page. 
-  app.post('/question', middleware.superSweetNLP, function (req, res, next) {
-
-    //always include cardFormatting
-    var command = _.extend({}, req.body, {
-      includeCardFormatting: true
-    });
-
-    //typeless query -> should be split multiple typed queries
-    var filterQueries;
-    try {
-
-      if (command.type === "all") {
-
-        //group filter queries by type
-        filterQueries = _.map(fixedTypesInOrder, function (type) {
-          return createFilterQuery(_.defaults({
-            type: type
-          }, command));
-        });
-      } else {
-        //temporary way of adding related filter queries
-        filterQueries = createRelatedFilterQueries(createFilterQuery(command));
-      }
-    } catch (err) {
-      return next(err);
-    }
-
-    var promises = _.map(filterQueries, function (filterQuery) {
-      return Promise.resolve()
-        .then(function () {
-          //perform query
-          return filterQuery.performQuery();
-        })
-        .then(createDTOS({
-          filterContext: filterQuery,
-          includeCardFormatting: command.includeCardFormatting
-        }))
-        .then(function (combinedResult) {
-          return combinedResult.results;
-        });
-    });
-
-    return Promise.all(promises)
-      .then(function (jsons) {
-
-        var outputJson = {
-          results: jsons
-        };
-
-        console.log("ANSWER response with attribs", _.keys(outputJson));
-
-        res.json(outputJson);
-
-      })
-      .catch(function (err) {
-        err.filterQuery = req.filterQuery;
         return next(err);
       });
   });
