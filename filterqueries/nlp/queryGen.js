@@ -212,7 +212,7 @@ module.exports = function (command) {
           }
 
 
-          //Decicion time on Proper Noun!
+          //Decision time on Proper Noun!
           if (nounSignals.isProperNoun === false) {
 
             //confident that noun is NOT a proper noun
