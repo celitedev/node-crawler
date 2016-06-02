@@ -1,12 +1,11 @@
 var _ = require("lodash");
 var Promise = require("bluebird");
-var roots = require("../../schemas/domain/_definitions/config").domain.roots;
-
 module.exports = function (command) {
 
   var app = command.app;
   var cacheUtils = command.cacheUtils;
   var redisClient = command.redisClient;
+  var roots = command.roots;
 
   //Update Redis NLP Cache from ES
   app.post("/reloadNLPCache", function (req, res) {
