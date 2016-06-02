@@ -103,7 +103,12 @@ var simpleCardFormatters = {
     var raw = json.raw,
       formatted = json.formatted;
 
-    formatted.category = formatted.category || raw.tag[0]; //e.g.: performer
+    //if genre is defined
+    var genreFact = _.find(raw.fact, {
+      name: "genre"
+    });
+
+    formatted.category = formatted.category || (genreFact ? genreFact.val[0] : raw.tagsFromFact[0]);
     formatted.identifiers1 = raw.name;
   },
 
@@ -115,7 +120,7 @@ var simpleCardFormatters = {
     //if category not yet defined, simply use the fist (most specific) type
     formatted.category = formatted.category || raw.types[0];
 
-    formatted.databits2 = (formatted.databits2 || []).concat(raw.tag);
+    formatted.databits2 = (formatted.databits2 || []).concat(raw.tagsFromFact);
 
     //if imagePrimaryURL not set explicitly, set it to the first element in the image-array
     if (!raw.imagePrimaryUrl && raw.image && raw.image.length) {
@@ -152,8 +157,53 @@ function enrichViewModel(json, expand) {
   return json;
 }
 
+
+function conditionalEnrichWithCardViewmodel(command, json) {
+  if (!command.includeCardFormatting) {
+    return json.hits;
+  }
+
+  var results = _.map(json.hits, function (hit) {
+    var obj = {
+      raw: hit,
+      formatted: {}
+    };
+
+    return enrichViewModel(obj, json.expand);
+  });
+
+  return results;
+}
+
+function createDTOS(command) {
+  return function (json) {
+
+    return {
+
+      query: {
+        //TODO: what is this used for?
+      },
+      answerNLP: "TODO: below should be a DIFFERENT filtercontext. It's not very useful now", //TODO
+
+      filterContext: command.filterContext,
+
+      //conditionally enrich results with cardViewModel
+      results: conditionalEnrichWithCardViewmodel(command, json),
+
+      totalResults: json.meta.elasticsearch.hits.total,
+
+      expand: json.expand,
+
+      meta: json.meta
+    };
+  };
+}
+
+
 //API
 module.exports = {
   simpleCardFormatters: simpleCardFormatters,
-  enrichViewModel: enrichViewModel
+  enrichViewModel: enrichViewModel,
+  conditionalEnrichWithCardViewmodel: conditionalEnrichWithCardViewmodel,
+  createDTOS: createDTOS
 };

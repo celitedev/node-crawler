@@ -1,14 +1,60 @@
 var _ = require("lodash");
 
-module.exports = function (generatedSchemas, r) {
+var roots = require("../schemas/domain/_definitions/config").domain.roots;
+var domainUtils = require("../schemas/domain/utils");
 
-  var erdConfig = require("../schemas/es_schema")(generatedSchemas);
-  var domainConfig = require("../schemas/domain/_definitions/config");
-  var rootUtils = require("../schemas/domain/utils/rootUtils")(generatedSchemas);
 
-  var domainUtils = require("../schemas/domain/utils");
-  var erdEntityTable = r.table(domainUtils.statics.ERDTABLE);
+//This map statically defines per type which references should be expanded
+var expandMap = {
+  Event: [
+    "location.containedInPlace",
+    "location",
+    "workFeatured"
+  ],
+  PlaceWithOpeninghours: [],
+  CreativeWork: [],
+  OrganizationAndPerson: []
+};
 
+//used for type-less query
+var fixedTypesInOrder = ["Event", "PlaceWithOpeninghours", "CreativeWork", "OrganizationAndPerson"];
+
+//Exposes suggest endpoint. 
+//By default returns results for each type
+//
+//body: 
+// {
+//  query: "some query"  
+//}
+//
+//Optionally constrain to type to be returned: 
+//
+//{
+//  query: "some query", 
+//  type: "PlaceWithOpening"
+//}
+//
+//
+var rootsLowerCaseMap = _.reduce(fixedTypesInOrder, function (agg, root) {
+  agg[root.toLowerCase()] = root;
+  return agg;
+}, {});
+
+
+
+module.exports = function (command) {
+
+  var generatedSchemas = command.generatedSchemas;
+  var r = command.r;
+  var erdConfig = command.erdMappingConfig;
+  var erdEntityTable = command.erdEntityTable;
+
+  var rootUtils = command.rootUtils;
+
+  //NOTE: we need to pass FilterQueryUtils to FilterQueries
+  var filterQueryUtils = command.filterQueryUtils = {};
+
+  var FilterQuery = require("./FilterQuery")(command);
 
 
   //Get all possible properties per root (including the properties defined on subtypes of said root)
@@ -22,7 +68,7 @@ module.exports = function (generatedSchemas, r) {
   //- type for ES calc fields
   //- ways to see if we can do range queries (either ordinal OR number)
   //- ...
-  var roots = domainConfig.domain.roots;
+
   var domainPropertyMap = {};
   var rootPropertyMap = _.reduce(roots, function (agg, root) {
 
@@ -399,6 +445,41 @@ module.exports = function (generatedSchemas, r) {
     return wrapWithNestedQueryIfNeeed(rangeQuery, k);
   }
 
+  function createFilterQuery(command) {
+
+    if (!command.type) {
+      throw new Error("command.type shoud be defined");
+    }
+
+    //auto load expand-map
+    if (command.includeCardFormatting) {
+      var refs = command.meta.refs = command.meta.refs || {};
+      refs.expand = refs.expand || expandMap[command.type];
+    }
+
+    command.page = command.page || 0;
+
+    //default sort
+    command.sort = command.sort || {
+      type: "doc"
+    };
+
+    //sort is an array
+    command.sort = _.isArray(command.sort) ? command.sort : [command.sort];
+
+    command.filter = command.filter || command.filters; //filter and filters are both supported
+
+    //create filterQuery object
+    var filterQuery = FilterQuery(command);
+
+    //asserts
+    if (!~roots.indexOf(filterQuery.type)) {
+      throw new Error("filterQuery.type should be a known root: " + roots.join(","));
+    }
+
+    return filterQuery;
+  }
+
 
   var mergeFN = function (a, b) {
     return (a || []).concat(_.isArray(b) ? b : [b]);
@@ -494,7 +575,9 @@ module.exports = function (generatedSchemas, r) {
   }
 
 
-  return {
+  //inject properties in filterQueryUtils and return
+  return _.extend(filterQueryUtils, {
+    createFilterQuery: createFilterQuery,
     performTemporalQuery: performTemporalQuery,
     performRangeQuery: performRangeQuery,
     performTextQuery: performTextQuery,
@@ -508,7 +591,12 @@ module.exports = function (generatedSchemas, r) {
     getValuesForPaths: getValuesForPaths,
     recurseReferencesToExpand: recurseReferencesToExpand,
     getRootMap: getRootMap,
-    erdConfig: erdConfig
-  };
+    erdConfig: erdConfig,
+
+    expandMap: expandMap,
+    fixedTypesInOrder: fixedTypesInOrder,
+    rootsLowerCaseMap: rootsLowerCaseMap
+  });
+
 
 };
