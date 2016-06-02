@@ -85,6 +85,54 @@ var functionLib = {
 };
 
 
+///////////////////
+//Some job stats //
+///////////////////
+var jobIdCounter = 0;
+
+function createJobId() {
+  return "job-" + jobIdCounter++;
+}
+
+function JobStatCollection() {
+  this.jobs = [];
+}
+JobStatCollection.prototype.push = function (job) {
+  this.jobs.push(job);
+};
+
+JobStatCollection.prototype.toJSON = function () {
+
+  return {
+    active: _.filter(this.jobs, {
+      state: "active"
+    }),
+
+  };
+
+};
+
+function JobStat(url) {
+  this.id = createJobId();
+  this.start = new Date().getTime();
+  this.state = "active";
+  this.url = url;
+}
+
+JobStat.prototype.toJSON = function () {
+  return ((new Date().getTime() - this.start) / 1000) + "  " + this.url;
+};
+
+var jobsStats = {
+  nrOfJobsProcessing: 0,
+  nrOfJobsDone: 0,
+  nrOfJobsError: 0,
+  nrOfJobsOutdated: 0,
+  jobs: new JobStatCollection()
+};
+/////////////////////////
+
+
 //DNS caching such as http://manpages.ubuntu.com/manpages/natty/man8/nscd.8.html
 console.log("Remembered to install proper DNS caching on the box such as nscd?".green);
 
@@ -149,7 +197,8 @@ function startCrawlerQueue(crawlConfig) {
         nrErrorsNonValidation: 0, //TODO: can we get more granular?
         unzippedInBytes: 0
       }
-    }
+    },
+    startAt: new Date().getTime()
   };
 
   proxyAndCacheDriver.setTotalStats(resource.stats.total);
@@ -189,13 +238,16 @@ function deleteJob(job, done) {
 }
 
 
-
 ////////////////////////
 //Process actual work //
 ////////////////////////
 function processJob(job, done) {
 
   var data = job.data;
+
+  jobsStats.nrOfJobsProcessing++;
+  var jobStat = new JobStat(data.url);
+  jobsStats.jobs.push(jobStat);
 
   if (!data.source) {
     throw new Error("'source' not defined on job: " + JSON.stringify(job));
@@ -456,7 +508,8 @@ function processJob(job, done) {
     });
   }
 
-  promise = promise.filter(function genericPrunerToCheckForSourceId(doc) {
+  promise = promise
+    .filter(function genericPrunerToCheckForSourceId(doc) {
       //This is a generic filter that removes all ill-selected results, e.g.: headers and footers
 
       //The fact that a sourceId is required allows is to select based on this. 
@@ -533,11 +586,11 @@ function processJob(job, done) {
           //TODO: still to process / save in same way?
           //We do at least want to save crawlVersion and schemaVersion 
           // crawl: {
-          // 	batchId: parseInt(data.batchId), //the large batch.
-          // 	jobId: data.jobId, //the specific mini job within this batch. 
-          // 	createdAt: new Date().toISOString(),
-          // 	crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
-          // 	typeVersion: outputMessageSchema.version, //specific version of the target message/type schema. 
+          //  batchId: parseInt(data.batchId), //the large batch.
+          //  jobId: data.jobId, //the specific mini job within this batch. 
+          //  createdAt: new Date().toISOString(),
+          //  crawlVersion: crawlSchema.version, //specific version for this schema, i.e.: Eventful Events v1.0
+          //  typeVersion: outputMessageSchema.version, //specific version of the target message/type schema. 
           // }
 
           return domainObject;
@@ -633,19 +686,36 @@ function processJob(job, done) {
     });
   }
 
-  promise = promise.then(function () {
-    done(); //be sure to call done without arguments
-  });
+  promise = promise
+    .then(function () {
+      jobStat.stop = new Date().getTime();
+      jobStat.state = "done";
+      jobsStats.nrOfJobsDone++;
+
+      done(); //be sure to call done without arguments
+    });
 
   if (argv.throwErrors) {
     promise.catch(function (err) {
+
+      jobStat.stop = new Date().getTime();
+      jobStat.state = "error";
+      jobsStats.nrOfJobsError++;
+
+      done(err); //otherwise jobs keep lingering?
       throw err;
     });
   } else {
 
-    promise.catch(function catchall(err) {
+    promise
+      .catch(function catchall(err) {
 
         if (err.outdated) {
+
+          jobStat.stop = new Date().getTime();
+          jobStat.state = "outdated";
+          jobsStats.nrOfJobsOutdated++;
+
           //remove outdated jobs
           //logging was done earlier.
           return done();
@@ -666,8 +736,13 @@ function processJob(job, done) {
         if (err.status) {
           var errTmp = new Error(err.message);
           errTmp.status = err.status;
+          errTmp.url = err.url;
           err = errTmp;
         }
+
+        jobStat.stop = new Date().getTime();
+        jobStat.state = "error";
+        jobsStats.nrOfJobsError++;
 
         console.log("ERR", err);
         done(new Error("job error: orig: " + err.message));
@@ -714,21 +789,24 @@ function manageCrawlerLifecycle(resource) {
     }, 0);
 
 
+
     function showStats(limitToFields) {
       //Show some stats
       console.log("#####", resource.crawlerName);
+      console.log(JSON.stringify(jobsStats, null, 2));
       console.log(_.extend(generateStats(resource, limitToFields), {
         "QUEUE": {
           inactiveCount: lengths[0],
           activeCount: lengths[1]
         }
       }));
+      console.log("TOTAL PROCESSING TIME (SEC)", ((new Date().getTime() - resource.startAt) / 1000));
     }
 
     if (argv.showStats || argv.stats) {
       showStats();
     } else {
-      showStats(["nrItemsComplete"]);
+      showStats(["nrItemsComplete", "nrErrorsNonValidation"]);
     }
 
     if (countTotal) { //busy -> check when 
