@@ -71,6 +71,7 @@ command.filterQueryUtils = require("./filterQueryUtils")(command);
 require("./routes/filterQueries")(command);
 require("./routes/search")(command);
 require("./routes/entities")(command);
+require("./routes/suggest")(command);
 require("./routes/reloadNLP")(command);
 
 
