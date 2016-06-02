@@ -44,9 +44,6 @@ app.use(cors());
 app.use(bodyParser());
 app.use(methodOverride());
 
-//load NLP cache 
-//NOTE: these keeps refreshing
-var cacheUtils = require("./nlp/cacheUtils").loadCache(redisClient);
 
 var command = {
   app: app,
@@ -59,7 +56,7 @@ var command = {
   erdEntityTable: r.table(domainUtils.statics.ERDTABLE),
   erdMappingConfig: require("../schemas/es_schema")(generatedSchemas),
   rootUtils: require("../schemas/domain/utils/rootUtils")(generatedSchemas),
-  cacheUtils: cacheUtils,
+  cacheUtils: null, //require("./_nlp_deprecated/cacheUtils").loadCache(redisClient)
 };
 
 command.filterQueryUtils = require("./filterQueryUtils")(command);
@@ -72,7 +69,7 @@ require("./routes/filterQueries")(command);
 require("./routes/search")(command);
 require("./routes/entities")(command);
 require("./routes/suggest")(command);
-require("./routes/reloadNLP")(command);
+// require("./routes/reloadNLP")(command); //part of deprecated NLP
 
 
 

@@ -3,7 +3,7 @@ var Promise = require("bluebird");
 
 var cardViewModel = require("../cardViewModel");
 
-var subtypeToFilterQuery = require("../queryGen/fakeNLP").subtypeToFilterQuery;
+var subtypeToFilterQuery = require("../fakeNLP").subtypeToFilterQuery;
 
 var middleware = {
   superSweetNLP: function (command) {
