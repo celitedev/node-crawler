@@ -6,12 +6,7 @@ var cardViewModel = require("../cardViewModel");
 module.exports = function (command) {
 
   var app = command.app;
-  var config = command.config;
-  var generatedSchemas = command.generatedSchemas;
-  var r = command.r;
-  var erdEntityTable = command.erdEntityTable;
   var filterQueryUtils = command.filterQueryUtils;
-  var roots = command.roots;
 
   //used by Search page. 
   app.post('/search', function (req, res, next) {
