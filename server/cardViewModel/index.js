@@ -170,11 +170,35 @@ function conditionalEnrichWithCardViewmodel(command, json) {
   return results;
 }
 
+function createDTOS(command) {
+  return function (json) {
+
+    return {
+
+      query: {
+        //TODO: what is this used for?
+      },
+      answerNLP: "TODO: below should be a DIFFERENT filtercontext. It's not very useful now", //TODO
+
+      filterContext: command.filterContext,
+
+      //conditionally enrich results with cardViewModel
+      results: conditionalEnrichWithCardViewmodel(command, json),
+
+      totalResults: json.meta.elasticsearch.hits.total,
+
+      expand: json.expand,
+
+      meta: json.meta
+    };
+  };
+}
 
 
 //API
 module.exports = {
   simpleCardFormatters: simpleCardFormatters,
   enrichViewModel: enrichViewModel,
-  conditionalEnrichWithCardViewmodel: conditionalEnrichWithCardViewmodel
+  conditionalEnrichWithCardViewmodel: conditionalEnrichWithCardViewmodel,
+  createDTOS: createDTOS
 };
