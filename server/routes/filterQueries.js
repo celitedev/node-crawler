@@ -1,10 +1,7 @@
 var _ = require("lodash");
 var Promise = require("bluebird");
-var colors = require("colors");
 
-
-var domainConfig = require("../../schemas/domain/_definitions/config");
-var roots = domainConfig.domain.roots;
+var roots = require("../../schemas/domain/_definitions/config").domain.roots;
 
 var cardViewModel = require("../cardViewModel");
 
@@ -172,63 +169,6 @@ module.exports = function (command) {
   });
 
 
-
-  //Single Item
-  app.get("/entities/:id", function (req, res, next) {
-
-    Promise.resolve()
-      .then(function () {
-        return erdEntityTable.get(req.params.id);
-      })
-      .then(function (entity) {
-
-        //if entity not found return a 404
-        if (null) {
-          var err = new Error("Entity not found");
-          err.status = 404;
-          throw err;
-        }
-
-        //fetch root and get the to-be-expanded fields
-        var root = entity.root;
-        var fieldsToExpand = filterQueryUtils.expandMap[root];
-        var entities = [entity];
-        var expand = {};
-
-        if (!fieldsToExpand) {
-          throw new Error("'type' not found in auto-expand map for type: " + root);
-        }
-
-        //fetch the expanded entities
-        return Promise.resolve()
-          .then(function () {
-            return filterQueryUtils.recurseReferencesToExpand(entities, root, fieldsToExpand, expand);
-          })
-          .then(function () {
-            return {
-              hits: entities,
-              expand: expand
-            };
-          });
-      })
-      .then(function (json) {
-        return conditionalEnrichWithCardViewmodel({
-          includeCardFormatting: true
-        }, json);
-      })
-      .then(function (entities) {
-
-        if (!entities.length) {
-          throw new Error("Sanity check: entities.length = 0 but we've found an entity before?!");
-        }
-        res.json(entities[0]);
-      })
-      .catch(function (err) {
-        next(err);
-      });
-  });
-
-
   //quick search returning results on every kepress
   //Used in
   //- collection "add dialog"
@@ -370,7 +310,7 @@ module.exports = function (command) {
             return {
               totalResults: json.meta.elasticsearch.hits.total,
               filterContext: command.filterContext,
-              results: conditionalEnrichWithCardViewmodel(command, json),
+              results: cardViewModel.conditionalEnrichWithCardViewmodel(command, json),
             };
           })
           .catch(function (err) {
@@ -449,7 +389,7 @@ function createDTOS(command) {
         filterContext: command.filterContext,
 
         //conditionally enrich results with cardViewModel
-        results: conditionalEnrichWithCardViewmodel(command, json),
+        results: cardViewModel.conditionalEnrichWithCardViewmodel(command, json),
 
         totalResults: json.meta.elasticsearch.hits.total,
 
@@ -618,21 +558,4 @@ function enrichWithFilters(command, filterQueryUtils) {
     //
 
   };
-}
-
-function conditionalEnrichWithCardViewmodel(command, json) {
-  if (!command.includeCardFormatting) {
-    return json.hits;
-  }
-
-  var results = _.map(json.hits, function (hit) {
-    var obj = {
-      raw: hit,
-      formatted: {}
-    };
-
-    return cardViewModel.enrichViewModel(obj, json.expand);
-  });
-
-  return results;
 }
