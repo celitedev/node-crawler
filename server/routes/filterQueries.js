@@ -119,7 +119,6 @@ module.exports = function (command) {
   var generatedSchemas = command.generatedSchemas;
   var r = command.r;
   var erdEntityTable = r.table(domainUtils.statics.ERDTABLE);
-  var cacheUtils = command.cacheUtils;
 
   var filterQueryUtils = require("../utils")(generatedSchemas, r);
 
@@ -132,7 +131,6 @@ module.exports = function (command) {
     erdMappingConfig: erdMappingConfig,
     filterQueryUtils: filterQueryUtils,
     esClient: command.esClient,
-    redisClient: command.redisClient
   });
 
 
@@ -202,11 +200,6 @@ module.exports = function (command) {
         err.filterQuery = req.filterQuery;
         return next(err);
       });
-  });
-
-
-  app.get('/', function (req, res) {
-    res.send('Use POST silly');
   });
 
   //Exposes suggest endpoint. 
