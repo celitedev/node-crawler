@@ -2,31 +2,14 @@ var _ = require("lodash");
 var Promise = require("bluebird");
 var colors = require("colors");
 
-var domainUtils = require("../../schemas/domain/utils");
+
 var domainConfig = require("../../schemas/domain/_definitions/config");
 var roots = domainConfig.domain.roots;
 
 var cardViewModel = require("../cardViewModel");
-var FilterQuery;
 
 var subtypeToFilterQuery = require("../queryGen/fakeNLP").subtypeToFilterQuery;
 var nlpQueryGeneratorFn = require("../nlp/queryGen");
-
-
-//This map statically defines per type which references should be expanded
-var expandMap = {
-  Event: [
-    "location.containedInPlace",
-    "location",
-    "workFeatured"
-  ],
-  PlaceWithOpeninghours: [],
-  CreativeWork: [],
-  OrganizationAndPerson: []
-};
-
-//used for type-less query
-var fixedTypesInOrder = ["Event", "PlaceWithOpeninghours", "CreativeWork", "OrganizationAndPerson"];
 
 var middleware = {
   superSweetNLP: function (command) {
@@ -113,26 +96,12 @@ var middleware = {
 
 module.exports = function (command) {
 
-
   var app = command.app;
   var config = command.config;
   var generatedSchemas = command.generatedSchemas;
   var r = command.r;
-  var erdEntityTable = r.table(domainUtils.statics.ERDTABLE);
-
-  var filterQueryUtils = require("../utils")(generatedSchemas, r);
-
-  //ERD
-  var erdMappingConfig = require("../../schemas/es_schema")(generatedSchemas);
-
-  FilterQuery = require("../queryGen/FilterQuery")({
-    r: command.r,
-    erdEntityTable: erdEntityTable,
-    erdMappingConfig: erdMappingConfig,
-    filterQueryUtils: filterQueryUtils,
-    esClient: command.esClient,
-  });
-
+  var erdEntityTable = command.erdEntityTable;
+  var filterQueryUtils = command.filterQueryUtils;
 
   //used by Answer page. 
   app.post('/question', middleware.superSweetNLP(command), function (req, res, next) {
@@ -149,14 +118,14 @@ module.exports = function (command) {
       if (command.type === "all") {
 
         //group filter queries by type
-        filterQueries = _.map(fixedTypesInOrder, function (type) {
-          return createFilterQuery(_.defaults({
+        filterQueries = _.map(filterQueryUtils.fixedTypesInOrder, function (type) {
+          return filterQueryUtils.createFilterQuery(_.defaults({
             type: type
           }, command));
         });
       } else {
         //temporary way of adding related filter queries
-        filterQueries = createRelatedFilterQueries(createFilterQuery(command));
+        filterQueries = createRelatedFilterQueries(filterQueryUtils.createFilterQuery(command));
       }
     } catch (err) {
       return next(err);
@@ -202,26 +171,6 @@ module.exports = function (command) {
       });
   });
 
-  //Exposes suggest endpoint. 
-  //By default returns results for each type
-  //
-  //body: 
-  // {
-  //  query: "some query"  
-  //}
-  //
-  //Optionally constrain to type to be returned: 
-  //
-  //{
-  //  query: "some query", 
-  //  type: "PlaceWithOpening"
-  //}
-  //
-  //
-  var rootsLowerCaseMap = _.reduce(fixedTypesInOrder, function (agg, root) {
-    agg[root.toLowerCase()] = root;
-    return agg;
-  }, {});
 
 
   //Single Item
@@ -242,7 +191,7 @@ module.exports = function (command) {
 
         //fetch root and get the to-be-expanded fields
         var root = entity.root;
-        var fieldsToExpand = expandMap[root];
+        var fieldsToExpand = filterQueryUtils.expandMap[root];
         var entities = [entity];
         var expand = {};
 
@@ -293,10 +242,10 @@ module.exports = function (command) {
       return next(err);
     }
 
-    var types = _.keys(rootsLowerCaseMap);
+    var types = _.keys(filterQueryUtils.rootsLowerCaseMap);
     if (body.type) {
       var type = body.type.toLowerCase();
-      if (rootsLowerCaseMap[type]) {
+      if (filterQueryUtils.rootsLowerCaseMap[type]) {
         types = [type];
       } else {
         err = new Error("'type' body param should be one of existing types: " + types.join(","));
@@ -313,7 +262,7 @@ module.exports = function (command) {
     //create suggest body. 
     //This consists of a group per type
     var esBody = _.reduce(types, function (agg, type) {
-      var rootCorrectCase = rootsLowerCaseMap[type];
+      var rootCorrectCase = filterQueryUtils.rootsLowerCaseMap[type];
       agg[rootCorrectCase] = {
         completion: {
           field: "suggest",
@@ -358,10 +307,10 @@ module.exports = function (command) {
     var body = req.body;
     var err;
 
-    var types = _.keys(rootsLowerCaseMap);
+    var types = _.keys(filterQueryUtils.rootsLowerCaseMap);
     if (body.type) {
       var type = body.type.toLowerCase();
-      if (rootsLowerCaseMap[type]) {
+      if (filterQueryUtils.rootsLowerCaseMap[type]) {
         types = [type];
       } else {
         err = new Error("'type' body param should be one of existing types: " + types.join(","));
@@ -377,10 +326,10 @@ module.exports = function (command) {
     var promiseMap;
     try {
       promiseMap = _.reduce(types, function (agg, type) {
-        var typeCorrectCase = rootsLowerCaseMap[type.toLowerCase()];
+        var typeCorrectCase = filterQueryUtils.rootsLowerCaseMap[type.toLowerCase()];
 
         if (!typeCorrectCase) {
-          err = new Error("'type' body param should be one of existing types: " + _.keys(rootsLowerCaseMap).join(","));
+          err = new Error("'type' body param should be one of existing types: " + _.keys(filterQueryUtils.rootsLowerCaseMap).join(","));
           err.status = 400;
           throw err;
         }
@@ -409,7 +358,7 @@ module.exports = function (command) {
           command.filter["name.raw"] = body.query.toLowerCase().trim();
         }
 
-        var filterQuery = createFilterQuery(command);
+        var filterQuery = filterQueryUtils.createFilterQuery(command);
         command.filterContext = filterQuery;
 
         var singleReqPromise = Promise.resolve()
@@ -454,7 +403,7 @@ module.exports = function (command) {
 
     var filterQuery;
     try {
-      filterQuery = createFilterQuery(command);
+      filterQuery = filterQueryUtils.createFilterQuery(command);
       command.filterContext = filterQuery;
     } catch (err) {
       return next(err);
@@ -686,39 +635,4 @@ function conditionalEnrichWithCardViewmodel(command, json) {
   });
 
   return results;
-}
-
-function createFilterQuery(command) {
-
-  if (!command.type) {
-    throw new Error("command.type shoud be defined");
-  }
-
-  //auto load expand-map
-  if (command.includeCardFormatting) {
-    var refs = command.meta.refs = command.meta.refs || {};
-    refs.expand = refs.expand || expandMap[command.type];
-  }
-
-  command.page = command.page || 0;
-
-  //default sort
-  command.sort = command.sort || {
-    type: "doc"
-  };
-
-  //sort is an array
-  command.sort = _.isArray(command.sort) ? command.sort : [command.sort];
-
-  command.filter = command.filter || command.filters; //filter and filters are both supported
-
-  //create filterQuery object
-  var filterQuery = FilterQuery(command);
-
-  //asserts
-  if (!~roots.indexOf(filterQuery.type)) {
-    throw new Error("filterQuery.type should be a known root: " + roots.join(","));
-  }
-
-  return filterQuery;
 }
