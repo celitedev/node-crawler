@@ -1,8 +1,6 @@
 var _ = require("lodash");
 var Promise = require("bluebird");
 
-var roots = require("../../schemas/domain/_definitions/config").domain.roots;
-
 var cardViewModel = require("../cardViewModel");
 
 var subtypeToFilterQuery = require("../queryGen/fakeNLP").subtypeToFilterQuery;
@@ -99,6 +97,7 @@ module.exports = function (command) {
   var r = command.r;
   var erdEntityTable = command.erdEntityTable;
   var filterQueryUtils = command.filterQueryUtils;
+  var roots = command.roots;
 
   //used by Answer page. 
   app.post('/question', middleware.superSweetNLP(command), function (req, res, next) {
