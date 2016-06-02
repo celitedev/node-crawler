@@ -76,15 +76,17 @@ module.exports = {
 
     //timeout on individual request. 
     //Result: fail job and put back in queue as oer config.job.retries
-    timeoutMS: 40000,
+    timeoutMS: 40 * 1000, //40 sec
 
     //local proxy, e.g.: TOR
-    proxy: "socks://localhost:5566",
+    proxy: "http://localhost:5566",
 
     //Default Headers for all requests
     headers: {
       "Accept-Encoding": 'gzip, deflate'
-    }
+    },
+
+    doCache: true
   },
   schema: {
     version: "0.1", //version of this schema
@@ -172,7 +174,27 @@ module.exports = {
           return +val;
         },
 
-      }
+      },
+
+      reducer: function (obj) {
+
+        var factArr = obj.fact = obj.fact || [];
+
+        //Map genre to fact.genre as well, to use it in NLP
+        if (obj.genre) {
+
+          factArr.push({
+            name: "genre",
+            val: obj.genre
+          });
+        }
+
+        if (!obj.fact.length) {
+          delete obj.fact;
+        }
+        return obj;
+      },
+
     }
   }
 };

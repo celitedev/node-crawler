@@ -69,27 +69,35 @@ module.exports = {
     //
     //#6: distribute concurrency per <source,type> or <source>
     //for more controlled throttling.
-    concurrentJobs: 10,
+    concurrentJobs: 20,
+
+
+    //job-level retries before fail. 
+    //This is completely seperate for urls that are individually retried by driver
     retries: 5,
 
     // fail job if not complete in 40 seconds. This is used because a consumer/box can fail/crash
     // In that case the job would get stuck indefinitely in 'active' state. 
     // With this solution, the job is placed back on the queue, and retried according to 'retries'-policy
-    ttl: 40 * 1000,
+    ttl: 100 * 1000,
   },
   driver: {
 
     //timeout on individual request. 
     //Result: fail job and put back in queue as oer config.job.retries
-    timeoutMS: 40000,
+    timeoutMS: 50 * 1000,
 
     //local proxy, e.g.: TOR
-    proxy: "socks://localhost:5566",
+    proxy: "http://localhost:5566",
 
     //Default Headers for all requests
     headers: {
       "Accept-Encoding": 'gzip, deflate'
-    }
+    },
+
+    //cache to simple fileCache. 
+    //NOT FIT FOR PRODUCTION SINCE This doesn't do any TTL or whatever  
+    doCache: true
   },
   schema: {
     version: "0.1", //version of this schema
@@ -101,15 +109,15 @@ module.exports = {
       //may be a string an array or string or a function producing any of those
       seedUrls: function () {
         var urls = [];
-        for (var i = 1; i < 20; i++) {
+        for (var i = 1; i < 1650; i++) {
           urls.push("http://eventful.com/performers?page_number=" + i);
         }
         return urls;
       },
 
-      nextUrlFN: function (el) {
-        return el.find(".next > a").attr("href");
-      },
+      // nextUrlFN: function (el) {
+      //   return el.find(".next > a").attr("href");
+      // },
 
 
       // STOP CRITERIA when processing nextUrlFN
@@ -151,10 +159,12 @@ module.exports = {
 
       schema: function (x, detailObj) { //schema for each individual result
         return {
+
+
           _sourceUrl: "a.tn-frame@href",
           _sourceId: "a.tn-frame@href",
           name: "h4 > a",
-          tag: "h4 + p", //p following h4. TODO: is this stable?
+          _genreDelimited: "h4 + p", //p following h4. TODO: is this stable?
           image: x("a > img", [{
             _ref: {
               contentUrl: "@src",
@@ -162,6 +172,8 @@ module.exports = {
             }
           }])
 
+          ///////////////////////////////////
+          //MORE AND POTENTIALLY BIGGER IMAGES
           // _detail: x("a.tn-frame@href", {
           //   name: "[itemprop=name] > span",
           //   image: x(".image-viewer li", [{
@@ -179,62 +191,66 @@ module.exports = {
       //mapping allow function(entire obj) || strings or array of those
       //returning undefined removes them
       mapping: {
-        // //Example of #115: "How to allow multi _types and subtypes in specific crawlers"
-        // _type: function (val) {
-        //   return ["LocalBusiness"]; //must be subs of entity.type (here: PlaceWithOpeninghours)
-        // },
-
 
         //some url magic to get to a bigger image
         image: function mapImage(val) {
 
           if (!val) return val;
-          return _.map(val, function (imgObj) {
+          var imageArr = _.compact(_.map(val, function (imgObj) {
+
             var url = imgObj._ref.contentUrl
               .replace("block", "block400"); //when fetching from detail page
 
+            if (!url) {
+              return undefined;
+            }
+
+            if (~url.indexOf("fallback")) {
+              return undefined;
+            }
             _.extend(imgObj._ref, {
               contentUrl: url,
               url: url
             });
 
             return imgObj;
-          });
+          }));
+
+          if (!imageArr.length) {
+            return undefined;
+          }
+
+          return imageArr;
         },
 
-        tag: function mapTag(tagDelimited) {
-
-          if (!tagDelimited) return tagDelimited;
-
-          var tags = _.map(tagDelimited.split("/"), function (tag) {
-            return tag.trim();
-          });
-
-          //explicitly add "performer" to tags
-          tags.unshift("performer");
-
-          return tags;
-        },
-
-        // "_detail.image": function mapNeighborhood(val) {
-
-        //   if (!val) return val;
-        //   var out = _.map(val, function (imgObj) {
-
-        //     var url = imgObj._ref.contentUrl
-        //       .replace("edpborder500", "block400"); //when fetching from detail page
-
-        //     _.extend(imgObj._ref, {
-        //       contentUrl: url,
-        //       url: url
-        //     });
-
-        //     return imgObj;
-        //   });
-        //   return val;
-        // },
       },
 
+      reducer: function (obj) {
+
+        var factArr = [];
+
+        var genres = ["performer"];
+
+        if (obj._genreDelimited) {
+
+          genres = genres.concat(_.map(obj._genreDelimited.split("/"), function (genre) {
+            return genre.trim();
+          }));
+        }
+
+        factArr.push({
+          name: "genre",
+          val: genres
+        });
+
+
+        ////
+        //make sure we're only adding facts when they actually exist
+        if (factArr.length) {
+          obj.fact = (obj.fact || []).concat(factArr);
+        }
+        return obj;
+      },
     }
   }
 };

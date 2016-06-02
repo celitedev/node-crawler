@@ -4,13 +4,10 @@ var nycUtils = require("./utils/nycUtils")({
   DEBUG_OPENINGHOURS: false
 });
 
-//crawlSchema for: 
-//source: Eventful
-//type: events
 module.exports = {
   _meta: {
-    name: "NYC Nightlife",
-    description: "Distributed Crawler for NYC.com Nightlife"
+    name: "NYC Attractions",
+    description: "Distributed Crawler for NYC.com Attractions"
   },
   source: {
     name: "NYC"
@@ -69,8 +66,8 @@ module.exports = {
       //may be a string an array or string or a function producing any of those
       seedUrls: function () {
         var urls = [];
-        for (var i = 0; i < 55; i++) { //manual check: ~110 results -> 1100 / 20 (result per page) -> 55 pages
-          urls.push("http://www.nyc.com/search/find.aspx?secid=5&pagefrom=" + (i * 20 + 1));
+        for (var i = 0; i < 40; i++) { //manual check: ~800 results -> 800 / 20 (result per page) -> 40 pages
+          urls.push("http://www.nyc.com/search/find.aspx?secid=2&pagefrom=" + (i * 20 + 1));
         }
         return urls;
       },
@@ -108,7 +105,7 @@ module.exports = {
               addressRegion: '[property="business:contact_data:region"]@content',
               addressCountry: '[property="business:contact_data:country_name"]@content',
               neighborhood: "#pnlNeighborhood h3",
-              telephone: ".rating address" //needs post mapping
+              telephone: '[property="business:contact_data:phone_number"]@content',
             },
 
             sameAs: ".rating address > a@href", //own website
@@ -138,7 +135,7 @@ module.exports = {
       //returning undefined removes them
       mapping: {
         _type: function (val) {
-          return ["LocalBusiness"];
+          return ["TouristAttraction"];
         },
         description: function (val, obj) {
           return obj._detail._descFull || obj._detail._descFallback;
@@ -149,7 +146,7 @@ module.exports = {
           }
 
           //placeholder
-          if (~imgUrl.indexOf("icon_nightlife")) {
+          if (~imgUrl.indexOf("icon_attractions")) {
             return undefined;
           }
 
@@ -192,15 +189,6 @@ module.exports = {
           return val.substring(0, index).trim();
         },
 
-        "_detail.address.telephone": function mapTel(val) {
-          //lots of text. Need to only extract tel
-          if (!val) return undefined;
-
-          //Regex: http://stackoverflow.com/questions/16699007/regular-expression-to-match-standard-10-digit-phone-number
-          var telArr = val.match(/(\+\d{1,2}\s)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g);
-          if (!telArr) return undefined;
-          return telArr[0];
-        },
         "_detail.aggregateRating": function mapRating(val) {
           if (!val) {
             return val;
@@ -220,62 +208,30 @@ module.exports = {
         var factArr = obj.fact = obj.fact || [];
 
 
-        //ALL TYPES SEEN ON NYC RESTAURANTS
-        // 'Editorial Rating',
-        // 'Admission And Hours',
-        // 'Featured On';
-        // 
         var factsRaw = obj._detail._factRaw;
 
         var factsWeTrack = [
-          'Editorial Rating', //no map
-          'Admission And Hours', //map!
-          'Featured On' //no map
+          "This Week&apos;s Hours", //mapped
+          'Editorial Rating', //already mapped above
+          'Featured On', //not mapped
+          "Admission And Tickets" //not mapped
         ];
 
         var factsWeMissed = _.difference(_.keys(factsRaw), factsWeTrack);
         if (factsWeMissed.length) {
-          console.log("FACTS WE MISSED", _.keys(factsWeMissed));
+          console.log("FACTS WE MISSED", factsWeMissed);
         }
 
-        //shows values like: "Other Popular Cabaret & Revue"
         if (obj._detail._otherPopular) {
-          var genre = obj._detail._otherPopular.substring("Other Popular".length).trim().toLowerCase();
-          var subtypes = ["Nightlife"];
-          if (genre) { //sometimes the text just says: "Other Popular" in case we skip
-
-            //other tags are better as adverbs to specific types
-            //This is controlled in vocabulary.
-
-            //wine bar -> subtype = [wine bar, bar] + genre = wine
-            if (~genre.indexOf("bar") && genre.split(" ").length === 2) {
-
-              var split = genre.split(" ");
-
-              subtypes.push(genre); //wine bar
-              subtypes.push(split[1]); //bar
-
-              factArr.push({ //wine
-                name: "genre",
-                val: [split[0]]
-              });
-
-            } else {
-
-              subtypes.push(genre);
-
-              factArr.push({
-                name: "genre",
-                val: [genre]
-              });
-            }
-
+          var genre = obj._detail._otherPopular.substring("Other".length);
+          genre = genre.substring(0, genre.length - "Attractions".length).trim();
+          if (genre) { //sometimes it says :"other attractions" in case we skip
+            obj.subtypes = [genre];
           }
-          obj.subtypes = subtypes;
         }
 
-        if (factsRaw["Admission And Hours"]) {
-          var openingHours = nycUtils.processOpeninghoursTotal(factsRaw["Admission And Hours"]);
+        if (factsRaw["This Week&apos;s Hours"]) {
+          var openingHours = nycUtils.processOpeninghoursTotal(factsRaw["This Week&apos;s Hours"]);
           if (openingHours) {
             obj.openingHoursSpecification = openingHours;
           }
@@ -294,10 +250,30 @@ module.exports = {
       pruner: function (result) {
 
         if (!result._detail.name || ~result._detail.name.indexOf("CLOSED")) {
-          //NYC.com way of denoting restaurant is closed. Let's skip these.
+          //NYC.com way of denoting place is closed. Let's skip these.
           return undefined;
         }
 
+        if (result.subtypes) {
+
+          //these are events. Skip
+          if (~result.subtypes.indexOf("parades & festivals")) {
+            return undefined;
+          }
+
+          //weird. Skip
+          if (~result.subtypes.indexOf("dance")) {
+            return undefined;
+          }
+        }
+
+
+        if (!result._detail.address.streetAddress) {
+          //some attractions don't have a streetaddress, such as governer's island: 
+          //http://www.nyc.com/arts__attractions/governors_island.1192384/
+          //For now let's skip these.
+          return undefined;
+        }
         return result;
       }
     }
