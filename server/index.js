@@ -74,6 +74,7 @@ require("./routes/entities")(command);
 require("./routes/reloadNLP")(command);
 
 
+
 ///////////////////
 //Error HAndling //
 ///////////////////
@@ -97,14 +98,6 @@ app.use(function jsonErrorHandler(err, req, res, next) {
     error: err.message,
     details: err.details
   });
-});
-
-
-/////////////////
-//Start Server //
-/////////////////
-app.server = app.listen(3000, function () {
-  console.log(('Tester for Kwhen FilterQueries. Do a POST to localhost:3000 to get started').yellow);
 });
 
 
@@ -134,3 +127,12 @@ process.on('exit', exitHandler.bind(null, {
 process.on('SIGINT', exitHandler.bind(null, {
   exit: true
 }));
+
+
+
+/////////////////
+//Start Server //
+/////////////////
+app.server = app.listen(3000, function () {
+  console.log(('Tester for Kwhen FilterQueries. Do a POST to localhost:3000 to get started').yellow);
+});
