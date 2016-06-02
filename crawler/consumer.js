@@ -23,23 +23,23 @@ var moment = require("moment");
 var utils = require("./utils");
 var proxyDriver = require("./drivers/proxyDriver");
 
-var generatedSchemas = require("./schemas/domain/createDomainSchemas.js")({
+var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
   checkSoundness: true,
-  config: require("./schemas/domain/_definitions/config"),
-  properties: require("./schemas/domain/_definitions").properties,
-  types: require("./schemas/domain/_definitions").types,
-  schemaOrgDef: require("./schemas/domain/_definitions/schemaOrgDef")
+  config: require("../schemas/domain/_definitions/config"),
+  properties: require("../schemas/domain/_definitions").properties,
+  types: require("../schemas/domain/_definitions").types,
+  schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
 });
 
-var config = require("./config");
+var config = require("../config");
 var redisClient = redis.createClient(config.redis);
 var r = require('rethinkdbdash')(config.rethinkdb);
 
-var entities = require("./schemas/domain/entities")(generatedSchemas, r);
+var entities = require("../schemas/domain/entities")(generatedSchemas, r);
 var CanonicalEntity = entities.CanonicalEntity;
 var SourceEntity = entities.SourceEntity;
 
-var domainUtils = require("./schemas/domain/utils");
+var domainUtils = require("../schemas/domain/utils");
 
 
 var queue = kue.createQueue({
