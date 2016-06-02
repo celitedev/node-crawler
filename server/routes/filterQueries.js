@@ -4,12 +4,9 @@ var Promise = require("bluebird");
 var cardViewModel = require("../cardViewModel");
 
 var subtypeToFilterQuery = require("../queryGen/fakeNLP").subtypeToFilterQuery;
-var nlpQueryGeneratorFn = require("../nlp/queryGen");
 
 var middleware = {
   superSweetNLP: function (command) {
-
-    var nlpQueryGenerator = nlpQueryGeneratorFn(command);
 
     return function superSweetNLP(req, res, next) {
 
@@ -54,32 +51,36 @@ var middleware = {
           wantUnique: false
         });
 
+        console.log("FILTERCONTEXT", JSON.stringify(filterContext, null, 2));
+
         next();
       }
 
       if (!req.type && req.body.question !== undefined) {
 
-        var question = req.body.question;
+        // var question = req.body.question;
 
-        nlpQueryGenerator.createQueryPlan(question)
-          .then(function (filterContextOrFallback) {
+        // nlpQueryGenerator.createQueryPlan(question)
+        //   .then(function (filterContextOrFallback) {
 
-            //only show nlp meta
-            if (req.body.nlpMetaOnly) {
-              var meta = filterContextOrFallback.doFallback ? filterContextOrFallback : filterContextOrFallback.nlpMeta;
-              return res.json(meta);
-            }
-            if (filterContextOrFallback.doFallback) {
-              return oldNLP();
-            }
-            console.log("NLP GENERATED FILTERCONTEXT", filterContextOrFallback);
-            _.extend(req.body, filterContextOrFallback);
-            next();
-          })
-          .catch(function (err) {
-            err.status = 400;
-            next(err);
-          });
+        //     //only show nlp meta
+        //     if (req.body.nlpMetaOnly) {
+        //       var meta = filterContextOrFallback.doFallback ? filterContextOrFallback : filterContextOrFallback.nlpMeta;
+        //       return res.json(meta);
+        //     }
+        //     if (filterContextOrFallback.doFallback) {
+        //       return oldNLP();
+        //     }
+        //     console.log("NLP GENERATED FILTERCONTEXT", filterContextOrFallback);
+        //     _.extend(req.body, filterContextOrFallback);
+        //     next();
+        //   })
+        //   .catch(function (err) {
+        //     err.status = 400;
+        //     next(err);
+        //   });
+
+        return oldNLP();
 
       } else {
         next();
@@ -93,12 +94,7 @@ var middleware = {
 module.exports = function (command) {
 
   var app = command.app;
-  var config = command.config;
-  var generatedSchemas = command.generatedSchemas;
-  var r = command.r;
-  var erdEntityTable = command.erdEntityTable;
   var filterQueryUtils = command.filterQueryUtils;
-  var roots = command.roots;
 
   //used by Answer page. 
   app.post('/question', middleware.superSweetNLP(command), function (req, res, next) {
@@ -167,173 +163,6 @@ module.exports = function (command) {
         return next(err);
       });
   });
-
-
-  //quick search returning results on every kepress
-  //Used in
-  //- collection "add dialog"
-  app.post('/suggest', function (req, res, next) {
-
-    var body = req.body;
-    var err;
-    if (!body.query) {
-      err = new Error("'query' body param required");
-      err.status = 400;
-      return next(err);
-    }
-
-    var types = _.keys(filterQueryUtils.rootsLowerCaseMap);
-    if (body.type) {
-      var type = body.type.toLowerCase();
-      if (filterQueryUtils.rootsLowerCaseMap[type]) {
-        types = [type];
-      } else {
-        err = new Error("'type' body param should be one of existing types: " + types.join(","));
-        err.status = 400;
-        return next(err);
-      }
-    }
-
-    //compound all indices together that we want to query
-    var indexString = _.map(types, function (type) {
-      return "kwhen-" + type;
-    }).join(",");
-
-    //create suggest body. 
-    //This consists of a group per type
-    var esBody = _.reduce(types, function (agg, type) {
-      var rootCorrectCase = filterQueryUtils.rootsLowerCaseMap[type];
-      agg[rootCorrectCase] = {
-        completion: {
-          field: "suggest",
-          context: {
-            root: rootCorrectCase
-          }
-        }
-      };
-      return agg;
-    }, {
-      "text": body.query
-    });
-
-    command.esClient.suggest({
-        index: indexString,
-        body: esBody
-      })
-      .then(function (esResult) {
-        delete esResult._shards;
-
-        res.json(_.reduce(esResult, function (agg, groupForType, typeName) {
-          if (groupForType[0].options.length) {
-            agg[typeName] = groupForType[0].options;
-          }
-          return agg;
-        }, {}));
-      })
-      .catch(function (err) {
-        console.log(err);
-        next(err);
-      });
-  });
-
-
-  //Search returns results on suggestion Enter
-  //Used in
-  //- collection "add dialog"
-  //
-  //Frontend needs to do a query per type.
-  app.post('/suggestCards', function (req, res, next) {
-
-    var body = req.body;
-    var err;
-
-    var types = _.keys(filterQueryUtils.rootsLowerCaseMap);
-    if (body.type) {
-      var type = body.type.toLowerCase();
-      if (filterQueryUtils.rootsLowerCaseMap[type]) {
-        types = [type];
-      } else {
-        err = new Error("'type' body param should be one of existing types: " + types.join(","));
-        err.status = 400;
-        return next(err);
-      }
-    }
-
-    //pagination
-    var page = body.page || 0;
-
-    //create promises
-    var promiseMap;
-    try {
-      promiseMap = _.reduce(types, function (agg, type) {
-        var typeCorrectCase = filterQueryUtils.rootsLowerCaseMap[type.toLowerCase()];
-
-        if (!typeCorrectCase) {
-          err = new Error("'type' body param should be one of existing types: " + _.keys(filterQueryUtils.rootsLowerCaseMap).join(","));
-          err.status = 400;
-          throw err;
-        }
-
-        //if type no found to a 'all-type' query which is later on separated
-        //Also make sure 'filter' object exists
-        var command = _.extend({
-          wantUnique: false,
-          type: typeCorrectCase,
-          includeCardFormatting: true,
-          page: page,
-          pageSize: body.type ? 10 : 5, //5 per page. Since we show multiple types, 
-          sort: {
-            type: "score"
-          },
-          meta: {
-            includeCardFormatting: true
-          }
-        });
-
-        //addq uery-param. Not
-        if (body.query) {
-          command.filter = {};
-          //name.raw has enum-mapping: 1 token, lowercased. 
-          //This allows to do prefix
-          command.filter["name.raw"] = body.query.toLowerCase().trim();
-        }
-
-        var filterQuery = filterQueryUtils.createFilterQuery(command);
-        command.filterContext = filterQuery;
-
-        var singleReqPromise = Promise.resolve()
-          .then(function () {
-            //perform query
-            return filterQuery.performQuery();
-          })
-          .then(function (json) {
-            return {
-              totalResults: json.meta.elasticsearch.hits.total,
-              filterContext: command.filterContext,
-              results: cardViewModel.conditionalEnrichWithCardViewmodel(command, json),
-            };
-          })
-          .catch(function (err) {
-            err.filterQuery = filterQuery;
-            return err; //error passed as result
-          });
-
-        agg[typeCorrectCase] = singleReqPromise;
-        return agg;
-      }, {});
-
-      return Promise.props(promiseMap)
-        .then(function (json) {
-          return res.json(json);
-        });
-
-    } catch (error) {
-      next(error); //error sync -> 500
-    }
-
-  });
-
-
 };
 
 
