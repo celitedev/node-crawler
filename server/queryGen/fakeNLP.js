@@ -1,8 +1,6 @@
 //simply the most fantastic NLP stuff evarrr..
 var subtypeToFilterQuery = {
 
-
-
   //top level types
   "creativework": {
     type: "CreativeWork"

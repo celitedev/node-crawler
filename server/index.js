@@ -103,7 +103,8 @@ var command = {
 //add routes //
 ///////////////
 require("./routes/filterQueries")(command);
-// require("./routes/nlp")(command);
+require("./routes/reloadNLP")(command);
+
 
 
 
