@@ -1,15 +1,14 @@
 var _ = require("lodash");
+var moment = require("moment");
+require("moment-timezone");
 
-//crawlSchema for: 
-//source: Eventful
-//type: events
 module.exports = {
   _meta: {
-    name: "Eventful Events",
-    description: "Distributed Crawler for Eventful.com Events"
+    name: "Eventbrite Events",
+    description: "Distributed Crawler for Eventbrite.com Events"
   },
   source: {
-    name: "Eventful"
+    name: "Eventbrite"
   },
   entity: {
     type: "Event",
@@ -68,15 +67,12 @@ module.exports = {
     //- EACH DAY: Run pruneList = batch + pruntEntity = batch 
   },
   job: {
-    //x concurrent kue jobs
-    //
-    //NOTE: depending on the type of crawl this can be a master page, which 
-    //within that job will set off concurrent detail-page fetches. 
-    //In that case total concurrency is higher than specified here. 
-    //
-    //#6: distribute concurrency per <source,type> or <source>
-    //for more controlled throttling.
-    concurrentJobs: 20,
+
+    //Can't use proxy (see below)
+    //Also hitting 429: Too many requests, while crawling from single ip. 
+    //Therefore concurrentJobs = 1; 
+    //TODO: revisit with payed rotating proxies that support https + redirects
+    concurrentJobs: 1,
 
     //job-level retries before fail. 
     //This is completely seperate for urls that are individually retried by driver
@@ -95,7 +91,8 @@ module.exports = {
     timeoutMS: 50 * 1000,
 
     //local proxy, e.g.: TOR
-    proxy: "http://localhost:5566",
+    //Eventbrite has redirects over https which don't seem to be supported through tor proxy
+    proxy: null,
 
     //Default Headers for all requests
     headers: {
@@ -113,50 +110,23 @@ module.exports = {
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
 
-      //may be a string an array or string or a function producing any of those
+      //Eventbrite caps to 500 list pages
       seedUrls: function () {
         var urls = [];
-        for (var i = 1; i < 1000; i++) { //array to kickstart the lot
-          urls.push("http://newyorkcity.eventful.com/events/categories?page_number=" + i);
+        for (var i = 1; i < 500; i++) { //
+          urls.push("https://www.eventbrite.com/d/ny--new-york/events/?page=" + i);
         }
         return urls;
       },
 
-
-      // nextUrlFN: function (el) {
-      //   return el.find(".next > a").attr("href");
-      // },
-
-
-      // STOP CRITERIA when processing nextUrlFN
-      // When processing one page after another using nextUrlFN, we need a way to check if we're done.
-      // A couple of standard checks are always performed to this end: 
-      //
-      // - check if nextUrl is the same as currentUrl. This is often employed by sites and is 
-      //  used as a sure sign we're done
-      // - nextUrl is not an url (i.e if nexturl() finds a 'href' that isn't there anymore)
-      //
-      // Besides that a crawler may implement specific stop criteria based on domain knowledge:
-      // - Templated functions (referenced by string or object with attrib name = name of template function)
-      // - custom function. Signature : function(el, cb) TO BE IMPLEMENTED
-      //
-      // Available Templated functions: 
-      // - zeroResults: uses `results.selector` + optional `selectorPostFilter` to check for 0 results. 
-      //
-      // Below is a working example. 
-      // It's superfloous for this crawler through, since general checks desribed above are enough.
       stop: [{
         name: "zeroResults", //zeroResults
-        selectorPostFilter: function (result) {
-          //as described above this is s
-          return result.attribs.itemscope !== undefined;
-        }
       }]
     },
     results: {
       //WEIRD: selector: ".search-results > li[itemscope]" produces 9 instead of 10 results
       //We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
-      selector: ".search-results > li", //selector for results
+      selector: ".list-card-v2", //selector for results
 
       //does detailPage pruning. For this to work: 
       //- _sourceUrl should exist and should equal detail page visisted
@@ -166,44 +136,57 @@ module.exports = {
       schema: function (x, detailObj) { //schema for each individual result
 
         return {
-          _sourceUrl: "a.tn-frame@href",
-          _sourceId: "a.tn-frame@href",
-          _detail: x("a.tn-frame@href", {
-            name: "[itemprop=name] > span",
-            description: "[itemprop=description]",
-            location: x("[itemprop=location]", "> a@href"), //no array. This way we omit a fault google maps location
-            performer: x("[itemprop=performer]", ["> a@href"]),
-            startDate: "[itemprop=startDate]@content",
 
-            // image: x(".image-viewer li", [{
-            //   _ref: { //notice: _ref here.
-            //     contentUrl: "a@href",
-            //     url: "a@href",
-            //     caption: "@title",
-            //   }
-            // }]),
+          _sourceUrl: "a.list-card__main@href",
+          _sourceId: "a.list-card__main@href",
 
-            _genreHref: "#event-price + p > a@href",
+          name: ".list-card__title",
+          startDate: ".list-card__date",
+          // location: ".list-card__venue", //only has a name instead of link so can't hook up reliably
 
-          }, undefined, detailObj)
+          _genre: [".list-card__tags > a"],
+
+          image: x(".list-card__image", [{
+            _ref: { //notice: _ref here.
+              contentUrl: "img@src",
+              url: "img@src",
+            }
+          }]),
         };
       },
 
       mapping: {
-        "_detail.description": function (desc, obj) {
-          if (desc === "There is no description for this event.") {
+        startDate: function (sDate) {
+
+          //start: Sat, Jun 4 10:00 PM
+
+          if (!sDate) return undefined;
+
+          sDate = sDate.substring(sDate.indexOf(",") + 1).trim();
+          //sdate: Jun 4 10:00 PM
+
+          //NOTE/TODO: when we find a recurring event we only process the first. 
+          //sdate: Jun 4 10:00 PM & 31 more
+          if (~sDate.indexOf("&")) {
+            sDate = sDate.substring(0, sDate.indexOf("&")).trim();
+          }
+
+          // Convoluted way to get a date in NYC timezone
+          // Root cause in unsafe date construction not longer supported: 
+          // https://github.com/moment/moment/issues/1407
+
+          var date = moment(new Date(sDate));
+          if (!date.isValid()) {
+            console.log("invalid date", sDate);
             return undefined;
           }
-          return desc;
-        },
-        "_detail.location": function (location, obj) {
-          if (!location) return undefined;
-          return location.length ? location : undefined;
-        },
-        "_detail.performer": function (performer, obj) {
-          if (!performer) return undefined;
-          return performer.length ? performer : undefined;
-        },
+
+          var dtCurrentZone = date.format();
+          dtCurrentZone = dtCurrentZone.substring(0, dtCurrentZone.length - 6);
+          return moment.tz(dtCurrentZone, "America/New_York").format();
+
+          //out: "2016-06-10T14:00:00-04:00"
+        }
       },
 
       reducer: function (obj) {
@@ -211,13 +194,15 @@ module.exports = {
         var factArr = [];
 
         //based on url we infer genre, e.g.: music, singles_social
-        if (obj._detail._genreHref) {
-          var genreHref = obj._detail._genreHref;
-          var val = genreHref.substring(genreHref.lastIndexOf("/") + 1);
+        if (obj._genre.length) {
+
+          var genres = _.map(obj._genre, function (genre) {
+            return genre.substring(1);
+          });
 
           factArr.push({
             name: "genre",
-            val: [val] //needs to be array!
+            val: genres
           });
         }
 
