@@ -1,24 +1,24 @@
 var argv = require('yargs').argv;
 var _ = require("lodash");
 var colors = require("colors");
-var config = require("../../domain/_definitions/config");
+var config = require("../domain/_definitions/config");
 
 if (!argv.type) {
   throw new Error("commandline --type required");
 }
 
 
-var utils = require("../../domain/utils");
+var utils = require("../domain/utils");
 
-var generatedSchemas = require("../../domain/createDomainSchemas.js")({
+var generatedSchemas = require("../domain/createDomainSchemas.js")({
   checkSoundness: argv.soundness,
-  config: require("../../domain/_definitions/config"),
-  properties: require("../../domain/_definitions").properties,
-  types: require("../../domain/_definitions").types,
-  schemaOrgDef: require("../../domain/_definitions/schemaOrgDef")
+  config: require("../domain/_definitions/config"),
+  properties: require("../domain/_definitions").properties,
+  types: require("../domain/_definitions").types,
+  schemaOrgDef: require("../domain/_definitions/schemaOrgDef")
 });
 
-var rootUtils = require("../../domain/utils/rootUtils")(generatedSchemas);
+var rootUtils = require("../domain/utils/rootUtils")(generatedSchemas);
 
 var typeName = argv.type;
 var type = generatedSchemas.types[typeName];

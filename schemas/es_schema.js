@@ -29,7 +29,7 @@ module.exports = function (generatedSchemas) {
 
   if (singleton) return singleton; //important! since we'll modify below object, which is not idempotent.
 
-  var vocabs = require("../vocabularies")(generatedSchemas);
+  var vocabs = require("./vocabularies")(generatedSchemas);
 
   var obj = {
 

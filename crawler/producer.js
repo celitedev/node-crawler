@@ -11,7 +11,7 @@ var kue = require('kue');
 var Promise = require("bluebird");
 var utils = require("./utils");
 
-var config = require("./config");
+var config = require("../config");
 var redisClient = redis.createClient(config.redis);
 
 /////////

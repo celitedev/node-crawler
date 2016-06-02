@@ -1,7 +1,5 @@
-fileCache
 node_modules
 npm-debug.log
 nohup.out
-rethinkdb_data
 corenlp
 *.log
