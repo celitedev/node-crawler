@@ -7,6 +7,7 @@ module.exports = function (command) {
 
   var app = command.app;
   var erdEntityTable = command.erdEntityTable;
+  var sourceEntityTable = command.sourceEntityTable;
   var filterQueryUtils = command.filterQueryUtils;
 
   //Single Item
@@ -48,16 +49,34 @@ module.exports = function (command) {
           });
       })
       .then(function (json) {
-        return cardViewModel.conditionalEnrichWithCardViewmodel({
-          includeCardFormatting: true
-        }, json);
+        return Promise.resolve()
+          .then(function () {
+            return cardViewModel.conditionalEnrichWithCardViewmodel({
+              includeCardFormatting: true
+            }, json);
+          })
+          .then(function (entities) {
+            return entities[0];
+          });
       })
-      .then(function (entities) {
-
-        if (!entities.length) {
-          throw new Error("Sanity check: entities.length = 0 but we've found an entity before?!");
-        }
-        res.json(entities[0]);
+      .then(function (entity) {
+        return Promise.resolve()
+          .then(function () {
+            return sourceEntityTable.get(entity.raw.id);
+          })
+          .then(function (sourceEntity) {
+            entity.raw.sources = [{
+              sourceId: sourceEntity.id,
+              name: sourceEntity._sourceType,
+              url: sourceEntity._sourceUrl
+            }];
+          })
+          .then(function () {
+            return entity;
+          });
+      })
+      .then(function (entity) {
+        res.json(entity);
       })
       .catch(function (err) {
         next(err);
