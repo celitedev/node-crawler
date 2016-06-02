@@ -1,9 +1,9 @@
 var argv = require('yargs').argv;
 var _ = require("lodash");
 var colors = require('colors');
-var utils = require("../../domain/utils");
+var utils = require("../domain/utils");
 
-var config = require("../../domain/_definitions/config");
+var config = require("../domain/_definitions/config");
 
 var commands = ["typeHierarchy", "allDefined", "ambiguous"];
 
@@ -12,12 +12,12 @@ if (!command || commands.indexOf(command) === -1) {
   throw new Error("commandline --command required. Available options: " + commands.join(","));
 }
 
-var generatedSchemas = require("../../domain/createDomainSchemas.js")({
+var generatedSchemas = require("../domain/createDomainSchemas.js")({
   checkSoundness: argv.soundness,
-  config: require("../../domain/_definitions/config"),
-  properties: require("../../domain/_definitions").properties,
-  types: require("../../domain/_definitions").types,
-  schemaOrgDef: require("../../domain/_definitions/schemaOrgDef")
+  config: require("../domain/_definitions/config"),
+  properties: require("../domain/_definitions").properties,
+  types: require("../domain/_definitions").types,
+  schemaOrgDef: require("../domain/_definitions/schemaOrgDef")
 });
 
 

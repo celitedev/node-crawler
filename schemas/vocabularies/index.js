@@ -2,7 +2,7 @@ var _ = require("lodash");
 var path = require('path');
 var glob = require("glob");
 
-var domainUtils = require("../schemas/domain/utils");
+var domainUtils = require("../domain/utils");
 
 var singleton;
 

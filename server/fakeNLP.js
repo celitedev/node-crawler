@@ -1,8 +1,6 @@
 //simply the most fantastic NLP stuff evarrr..
 var subtypeToFilterQuery = {
 
-
-
   //top level types
   "creativework": {
     type: "CreativeWork"
@@ -20,7 +18,7 @@ var subtypeToFilterQuery = {
   "movie": {
     type: "CreativeWork",
     filter: {
-      subtypes: "Movie"
+      subtypes: "movie"
     }
   },
 
@@ -28,7 +26,7 @@ var subtypeToFilterQuery = {
   "screeningevent": {
     type: "Event",
     filter: {
-      subtypes: "ScreeningEvent"
+      subtypes: "screeningEvent"
     }
   },
 
@@ -36,19 +34,19 @@ var subtypeToFilterQuery = {
   restaurant: {
     type: "PlaceWithOpeninghours",
     filter: {
-      subtypes: "Restaurant"
+      subtypes: "restaurant"
     }
   },
   bar: {
     type: "PlaceWithOpeninghours",
     filter: {
-      subtypes: "Bar"
+      subtypes: "bar"
     }
   },
   store: {
     type: "PlaceWithOpeninghours",
     filter: {
-      subtypes: "Store"
+      subtypes: "store"
     }
   },
   movietheater: {

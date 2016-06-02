@@ -6,6 +6,8 @@ var _ = require("lodash");
 
 var domainConfig = require("../schemas/domain/_definitions/config");
 
+var domainUtils = require("../schemas/domain/utils");
+
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
   checkSoundness: true,
   config: domainConfig,
@@ -43,51 +45,6 @@ app.use(bodyParser());
 app.use(methodOverride());
 
 
-
-var cachePropertyMap = {
-  all: {
-    esField: "all_tags",
-  },
-  tags: {
-    esField: "tagsFromFact"
-  },
-  subtypes: {
-    esField: "subtypes"
-  }
-};
-var cacheUtils = {
-
-  cachePropertyMap: cachePropertyMap,
-  supportedAttribsPerRoot: {},
-  updateInProcessCaches: function updateInProcessCaches() {
-
-    ///update cache that stores supported attributes per root
-    Promise.map(roots, function (root) {
-
-      root = root.toLowerCase();
-
-      var propMap = _.reduce(_.keys(cachePropertyMap), function (agg, k) {
-        var redisKey = "cache-" + root + "-" + k;
-        agg[k] = redisClient.getAsync(redisKey);
-        return agg;
-      }, {});
-
-      return Promise.props(propMap)
-        .then(function (props) {
-          cacheUtils.supportedAttribsPerRoot[root] = _.reduce(props, function (agg, sDelimited, k) {
-            agg[k] = !sDelimited ? [] : sDelimited.split(",");
-            return agg;
-          }, {});
-        });
-    });
-  },
-};
-
-//Update redis cache each 5 minutes. 
-//This rechecks ES
-setInterval(cacheUtils.updateInProcessCaches, 5 * 60 * 1000); //update each 5 minutes
-cacheUtils.updateInProcessCaches();
-
 var command = {
   app: app,
   roots: roots,
@@ -96,14 +53,23 @@ var command = {
   config: config,
   esClient: esClient,
   redisClient: redisClient,
-  cacheUtils: cacheUtils
+  erdEntityTable: r.table(domainUtils.statics.ERDTABLE),
+  erdMappingConfig: require("../schemas/es_schema")(generatedSchemas),
+  rootUtils: require("../schemas/domain/utils/rootUtils")(generatedSchemas),
+  cacheUtils: null, //require("./_nlp_deprecated/cacheUtils").loadCache(redisClient)
 };
+
+command.filterQueryUtils = require("./filterQueryUtils")(command);
+
 
 ///////////////
 //add routes //
 ///////////////
 require("./routes/filterQueries")(command);
-// require("./routes/nlp")(command);
+require("./routes/search")(command);
+require("./routes/entities")(command);
+require("./routes/suggest")(command);
+// require("./routes/reloadNLP")(command); //part of deprecated NLP
 
 
 
@@ -113,8 +79,6 @@ require("./routes/filterQueries")(command);
 app.use(function jsonErrorHandler(err, req, res, next) {
   console.log("########### ERROR PRINTED IN jsonErrorHandler");
   console.error(err.stack);
-
-
 
   var status = err.status || 500;
   var statusInBody = status;
@@ -132,14 +96,6 @@ app.use(function jsonErrorHandler(err, req, res, next) {
     error: err.message,
     details: err.details
   });
-});
-
-
-/////////////////
-//Start Server //
-/////////////////
-app.server = app.listen(3000, function () {
-  console.log(('Tester for Kwhen FilterQueries. Do a POST to localhost:3000 to get started').yellow);
 });
 
 
@@ -169,3 +125,12 @@ process.on('exit', exitHandler.bind(null, {
 process.on('SIGINT', exitHandler.bind(null, {
   exit: true
 }));
+
+
+
+/////////////////
+//Start Server //
+/////////////////
+app.server = app.listen(3000, function () {
+  console.log(('Tester for Kwhen FilterQueries. Do a POST to localhost:3000 to get started').yellow);
+});
