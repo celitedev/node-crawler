@@ -3,13 +3,19 @@
  */
 
 var Promise = require("bluebird");
+var _ = require("lodash");
+
 var fs = Promise.promisifyAll(require("fs"));
 var mkdirp = Promise.promisify(require('mkdirp'));
+var colors = require("colors");
 
-var _ = require("lodash");
-var superagent = require('superagent');
 var debugUrls = require('debug')('kwhen-crawler-urls');
+var debug = require('debug')('kwhen-crawler');
+
+var superagent = require('superagent');
+
 require('superagent-proxy')(superagent);
+require('superagent-retry')(superagent);
 
 var md5 = require('md5');
 var cacheUtils = {
@@ -133,12 +139,53 @@ function driver(driverOpts) {
       processUrl(driverOpts);
     }
 
+    var retries = 0;
+    var maxRetries = 5;
+
+    //https://github.com/segmentio/superagent-retry is flaky. 
+    //DIY retry on following codes
+    var retryCodes = [
+      404, //not found. On eventful.com this happens under load
+      500, //internal server error 
+      502, //bad gateway erro
+      503, //should be caught by superagent-rety but isn't? 
+      504 //bad gateway error
+    ];
+
     function processUrl(driverOpts) {
       if (!driverOpts) {
         throw new Error("driveOpts not passed");
       }
-
       Promise.resolve()
+        .then(function () {
+          return processUrlInner();
+        })
+        .then(function (ctx) {
+          return fn(null, ctx);
+        })
+        .catch(function errorCB(err) {
+
+          if (err.status && ~retryCodes.indexOf(err.status) && retries < maxRetries) {
+
+            retries++;
+
+            debug(JSON.stringify({
+              retry: err.url,
+              status: err.status,
+              url: err.url
+            }, null, 2));
+
+            //retry 
+            return processUrl(driverOpts);
+
+          } else {
+            return fn(err);
+          }
+        });
+    }
+
+    function processUrlInner() {
+      return Promise.resolve()
         .then(function conditionalFetchFromCache() {
           if (!driverOpts.doCache) return;
 
@@ -149,6 +196,7 @@ function driver(driverOpts) {
             });
         })
         .then(function (cachedDTO) {
+
           if (cachedDTO) {
             return cachedDTO;
           }
@@ -157,6 +205,7 @@ function driver(driverOpts) {
 
           return Promise.resolve()
             .then(function () {
+
               return new Promise(function (resolve, reject) {
                 agent
                   .get(ctx.url)
@@ -183,14 +232,15 @@ function driver(driverOpts) {
                   })
                   .end(function (err, res) {
 
-
                     //This includes request errors (4xx and 5xx) as well as node errors, which is what we want. 
                     //Result: Job fails in entirety and retry later. 
                     //This is preferred since we're not able to do partial retries (we don't want to)
                     //
                     //See https://github.com/lapwinglabs/x-ray-crawler/pull/1 for the opposite viewpoint
                     //which we need share for our particular usecase.
+
                     if (err) { //WAS: (err && !err.status) 
+                      err.url = ctx.url;
                       return reject(err);
                     }
 
@@ -206,11 +256,13 @@ function driver(driverOpts) {
                     resolve(dto);
                   });
               });
+
             })
             .then(function conditionalAddToCache(dto) {
               if (!driverOpts.doCache) return dto;
               return cacheUtils.set(cachePath, dto);
             });
+
         })
         .then(function doneCB(dto) {
 
@@ -219,10 +271,7 @@ function driver(driverOpts) {
           ctx.url = dto.url;
           ctx.set(dto.headers);
 
-          return fn(null, ctx);
-        })
-        .catch(function errorCB(err) {
-          return fn(err);
+          return ctx;
         });
     }
 
