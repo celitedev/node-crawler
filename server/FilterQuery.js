@@ -4,7 +4,8 @@ var Promise = require("bluebird");
 var moment = require("moment");
 require("moment-timezone");
 
-var roots = require("../schemas/domain/_definitions/config").roots;
+var domainConfig = require("../../schemas/domain/_definitions/config");
+var roots = domainConfig.domain.roots;
 
 var DEFAULT_PAGESIZE = 10;
 module.exports = function (command) {
@@ -291,13 +292,20 @@ module.exports = function (command) {
     var query = {
       query: {
         bool: {}
-      },
-      "filter": {
+      }
+    };
+
+    //All types except events are filtered if no image exists. 
+    //Events often get their image transplanted from either location / performer / 
+    //workFeatured, (out of bound info at this moment) so we won't filter on this for events.
+    if (this.type !== "Event") {
+      query.filter = {
         "exists": {
           "field": "image"
         }
-      }
-    };
+      };
+    }
+
 
     if (!this.filter) {
       return query;
@@ -417,6 +425,7 @@ module.exports = function (command) {
           }
         });
 
+        console.log("ES", JSON.stringify(searchQuery, null, 2));
         return esClient.search(searchQuery);
       })
       .then(function (esResult) {
@@ -437,6 +446,18 @@ module.exports = function (command) {
               return r.table(erdEntityTable).getAll.apply(erdEntityTable, _.pluck(hits, "_id"))
                 .then(function (entities) {
                   return Promise.all(_.map(entities, erdMappingConfig.cleanupEnumSynonymsInRethinkDTO));
+                })
+                .then(function orderInHitOrder(entities) {
+
+                  var entityMap = _.reduce(entities, function (agg, e) {
+                    agg[e.id] = e;
+                    return agg;
+                  }, {});
+
+                  return _.map(hits, function (hit) {
+                    return entityMap[hit._id];
+                  });
+
                 });
             }
           })
