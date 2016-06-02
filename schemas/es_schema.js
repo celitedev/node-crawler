@@ -166,12 +166,11 @@ module.exports = function (generatedSchemas) {
         },
         populate: {
           fields: ["root"],
-
         },
         mapping: mappings.enum,
-        enum: vocabs.subtypes
+        enum: vocabs.subtypes,
+        enumKeepOriginal: true, //COmbine enum + raw
       },
-
 
       ratingValue: {
         facet: {
@@ -273,40 +272,92 @@ module.exports = function (generatedSchemas) {
       },
 
 
-      // ////////////////////////////////////////
-      // //Raw fields: use for vaocab creation by looking at what is avail //
-      // ////////////////////////////////////////
-      // raw_subtypes: {
-      //   roots: true, //true (all) or (array of) rootNames
-      //   isMulti: true,
-      //   mapping: mappings.enum,
-      //   populate: {
-      //     fields: "subtypes",
-      //   },
-      // },
-      // raw_tag: {
-      //   roots: true, //true (all) or (array of) rootNames
-      //   isMulti: true,
-      //   mapping: mappings.enum,
-      //   populate: {
-      //     fields: "tag",
-      //   },
-      // },
-      // raw_genre: {
-      //   roots: "CreativeWork",
-      //   isMulti: true,
-      //   mapping: mappings.enum,
-      //   populate: {
-      //     fields: "genre"
-      //   },
-      // },
+      subtypes_controlled: {
+        roots: true,
+        isMulti: true,
+        populate: {
+          fields: ["subtypes"],
+        },
+        mapping: mappings.enum,
+        enum: vocabs.subtypes,
+      },
 
+      subtypes_raw: {
+        roots: true,
+        isMulti: true,
+        populate: {
+          fields: ["subtypes"],
+        },
+        mapping: mappings.enum,
+      },
+
+      //All the tags
       tagsFromFact: {
         roots: true,
         isMulti: true,
         mapping: mappings.enum,
         enum: vocabs.facts,
-        enumKeepOriginal: true, //this allows for aliasing instead of strict vocabulary
+        enumKeepOriginal: true, //COmbine enum + raw
+        populate: {
+          fields: ["fact"],
+          strategy: function (factArr) {
+
+            //skip these facts for now
+            var factsToSkip = [
+              "urlOpenTable",
+              "priceRange"
+            ];
+
+            //each fact can have multiple values. 
+            //Simply combine them all in one big array
+            return _.reduce(factArr, function (arr, fact) {
+              if (~factsToSkip.indexOf(fact.name._value)) {
+                return arr;
+              }
+              return arr.concat(_.map(_.pluck(fact.val, "_value"), function (v) {
+                return v.toLowerCase();
+              }));
+            }, []);
+          }
+        }
+      },
+
+      tagsFromFact_controlled: {
+        roots: true,
+        isMulti: true,
+        mapping: mappings.enum,
+        enum: vocabs.facts,
+        enumKeepOriginal: false, //only the controlled stuff
+        populate: {
+          fields: ["fact"],
+          strategy: function (factArr) {
+
+            //skip these facts for now
+            var factsToSkip = [
+              "urlOpenTable",
+              "priceRange"
+            ];
+
+            //each fact can have multiple values. 
+            //Simply combine them all in one big array
+            return _.reduce(factArr, function (arr, fact) {
+              if (~factsToSkip.indexOf(fact.name._value)) {
+                return arr;
+              }
+              return arr.concat(_.map(_.pluck(fact.val, "_value"), function (v) {
+                return v.toLowerCase();
+              }));
+            }, []);
+          }
+        }
+      },
+
+      //Raw fact values
+      //This is used by admins for creating controlled vocabularies.
+      tagsFromFact_raw: {
+        roots: true,
+        isMulti: true,
+        mapping: mappings.enum,
         populate: {
           fields: ["fact"],
           strategy: function (factArr) {
@@ -332,71 +383,55 @@ module.exports = function (generatedSchemas) {
       },
 
 
-      all_tags: {
-        roots: true,
-        isMulti: true,
-        mapping: mappings.enum,
-        postPopulate: { //populate *after* vocab lookup + transform
-          fields: ["root", "subtypes", "genre", "tagsFromFact"],
-          strategy: function (val) {
-            if (val === undefined) return [];
-            return _.map(_.isArray(val) ? val : [val], function (v) {
-              return v.toLowerCase();
-            });
-          }
-        },
-      },
+      // ///////////////
+      // //SUGGESTERS //
+      // ///////////////
 
+      // // https://www.elastic.co/guide/en/elasticsearch/reference/current/search-suggesters-completion.html
+      // // https://www.elastic.co/guide/en/elasticsearch/reference/current/suggester-context.html
 
-      ///////////////
-      //SUGGESTERS //
-      ///////////////
+      // //suggester on name:
+      // suggest: {
+      //   roots: true, //true (all) or (array of) rootNames
+      //   isMulti: false,
+      //   mapping: mappings.suggestWithRoot,
+      //   populate: {
+      //     fields: "name",
+      //   },
+      //   postReduce: function (val, props) {
+      //     return {
+      //       input: val,
+      //       // context: { //not needed since defined by path=root in mapping
+      //       // 	root: props.root
+      //       // },
+      //       payload: {
+      //         id: props.id,
+      //         root: props.root,
+      //         subtypes: props.subtypes
+      //       }
+      //     };
+      //   }
+      // },
 
-      // https://www.elastic.co/guide/en/elasticsearch/reference/current/search-suggesters-completion.html
-      // https://www.elastic.co/guide/en/elasticsearch/reference/current/suggester-context.html
-
-      //suggester on name:
-      suggest: {
-        roots: true, //true (all) or (array of) rootNames
-        isMulti: false,
-        mapping: mappings.suggestWithRoot,
-        populate: {
-          fields: "name",
-        },
-        postReduce: function (val, props) {
-          return {
-            input: val,
-            // context: { //not needed since defined by path=root in mapping
-            // 	root: props.root
-            // },
-            payload: {
-              id: props.id,
-              root: props.root,
-              subtypes: props.subtypes
-            }
-          };
-        }
-      },
-
-      //search without need for context, so we can search all types in 1 go.
-      suggestAll: {
-        roots: true, //true (all) or (array of) rootNames
-        isMulti: false,
-        mapping: mappings.suggestWithRootAll,
-        populate: {
-          fields: "name",
-        },
-        postReduce: function (val, props) {
-          return {
-            input: val,
-            payload: {
-              id: props.id,
-              root: props.root,
-              subtypes: props.subtypes
-            }
-          };
-        }
-      },
+      // //search without need for context, so we can search all types in 1 go.
+      // suggestAll: {
+      //   roots: true, //true (all) or (array of) rootNames
+      //   isMulti: false,
+      //   mapping: mappings.suggestWithRootAll,
+      //   populate: {
+      //     fields: "name",
+      //   },
+      //   postReduce: function (val, props) {
+      //     return {
+      //       input: val,
+      //       payload: {
+      //         id: props.id,
+      //         root: props.root,
+      //         subtypes: props.subtypes
+      //       }
+      //     };
+      //   }
+      // },
 
     },
 
