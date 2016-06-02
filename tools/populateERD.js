@@ -53,14 +53,25 @@ Promise.resolve()
     if (argv.reset) {
       console.log(("Resetting _state.modifiedERD for testing").yellow);
 
-      if (!argv.type) {
-        return tableCanonicalEntity.update({
+      if (argv.id) {
+
+        return tableCanonicalEntity.filter({
+          id: argv.id
+        }).update({
+          _state: {
+            modifiedERD: null
+          }
+        });
+
+      } else if (argv.type) {
+
+        return tableCanonicalEntity.filter(r.row('_type').contains(argv.type)).update({
           _state: {
             modifiedERD: null
           }
         });
       } else {
-        return tableCanonicalEntity.filter(r.row('_type').contains(argv.type)).update({
+        return tableCanonicalEntity.update({
           _state: {
             modifiedERD: null
           }
@@ -84,6 +95,11 @@ Promise.resolve()
             if (argv.type) {
               console.log(("Only processing: + " + argv.type).yellow);
               getAll = getAll.filter(r.row('_type').contains(argv.type));
+            } else if (argv.id) {
+              console.log(("Only processing: + " + argv.id).yellow);
+              getAll = getAll.filter({
+                id: argv.id
+              });
             }
 
             return getAll.limit(data.state.batch);
