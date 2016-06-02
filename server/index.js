@@ -6,6 +6,8 @@ var _ = require("lodash");
 
 var domainConfig = require("../schemas/domain/_definitions/config");
 
+var domainUtils = require("../schemas/domain/utils");
+
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
   checkSoundness: true,
   config: domainConfig,
@@ -42,6 +44,9 @@ app.use(cors());
 app.use(bodyParser());
 app.use(methodOverride());
 
+//load NLP cache 
+//NOTE: these keeps refreshing
+var cacheUtils = require("./nlp/cacheUtils").loadCache(redisClient);
 
 var command = {
   app: app,
@@ -51,10 +56,14 @@ var command = {
   config: config,
   esClient: esClient,
   redisClient: redisClient,
-  //load NLP cache 
-  //NOTE: these keeps refreshing
-  cacheUtils: require("./nlp/cacheUtils").loadCache(redisClient)
+  erdEntityTable: r.table(domainUtils.statics.ERDTABLE),
+  erdMappingConfig: require("../schemas/es_schema")(generatedSchemas),
+  rootUtils: require("../schemas/domain/utils/rootUtils")(generatedSchemas),
+  cacheUtils: cacheUtils,
 };
+
+command.filterQueryUtils = require("./filterQueryUtils")(command);
+
 
 ///////////////
 //add routes //
@@ -69,8 +78,6 @@ require("./routes/reloadNLP")(command);
 app.use(function jsonErrorHandler(err, req, res, next) {
   console.log("########### ERROR PRINTED IN jsonErrorHandler");
   console.error(err.stack);
-
-
 
   var status = err.status || 500;
   var statusInBody = status;
