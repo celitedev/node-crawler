@@ -103,7 +103,12 @@ var simpleCardFormatters = {
     var raw = json.raw,
       formatted = json.formatted;
 
-    formatted.category = formatted.category || raw.tag[0]; //e.g.: performer
+    //if genre is defined
+    var genreFact = _.find(raw.fact, {
+      name: "genre"
+    });
+
+    formatted.category = formatted.category || (genreFact ? genreFact.val[0] : raw.tagsFromFact[0]);
     formatted.identifiers1 = raw.name;
   },
 
@@ -115,7 +120,7 @@ var simpleCardFormatters = {
     //if category not yet defined, simply use the fist (most specific) type
     formatted.category = formatted.category || raw.types[0];
 
-    formatted.databits2 = (formatted.databits2 || []).concat(raw.tag);
+    formatted.databits2 = (formatted.databits2 || []).concat(raw.tagsFromFact);
 
     //if imagePrimaryURL not set explicitly, set it to the first element in the image-array
     if (!raw.imagePrimaryUrl && raw.image && raw.image.length) {
