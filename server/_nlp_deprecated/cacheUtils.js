@@ -21,26 +21,23 @@ var cacheUtils = {
   supportedAttribsPerRoot: {},
   updateInProcessCaches: function updateInProcessCaches() {
 
-    console.log("UPDATE NLP CACHE");
+    ///update cache that stores supported attributes per type
+    Promise.map(_.keys(generatedSchemas.types), function (type) {
 
-    ///update cache that stores supported attributes per root
-    Promise.map(roots, function (root) {
-
-      root = root.toLowerCase();
+      type = type.toLowerCase();
 
       var propMap = _.reduce(_.keys(cachePropertyMap), function (agg, k) {
-        var redisKey = "cache-" + root + "-" + k;
+        var redisKey = "cache-" + type + "-" + k;
         agg[k] = redisClient.getAsync(redisKey);
         return agg;
       }, {});
 
       return Promise.props(propMap)
         .then(function (props) {
-          cacheUtils.supportedAttribsPerRoot[root] = _.reduce(props, function (agg, sDelimited, k) {
+          cacheUtils.supportedAttribsPerType[type] = _.reduce(props, function (agg, sDelimited, k) {
             agg[k] = !sDelimited ? [] : sDelimited.split(",");
             return agg;
           }, {});
-
         });
     });
   },
