@@ -89,6 +89,7 @@ var middleware = {
   }
 };
 
+
 module.exports = function (command) {
 
   var app = command.app;
@@ -133,12 +134,12 @@ module.exports = function (command) {
           //perform query
           return filterQuery.performQuery();
         })
-        .then(createDTOS({
+        .then(cardViewModel.createDTOS({
           filterContext: filterQuery,
           includeCardFormatting: command.includeCardFormatting
         }))
-        .then(function (combinedResult) {
-          return combinedResult.results;
+        .then(function (result) {
+          return result;
         });
     });
 
@@ -332,229 +333,10 @@ module.exports = function (command) {
 
   });
 
-  //used by Search page. 
-  app.post('/search', function (req, res, next) {
-
-    //always do includeCardFormatting for simplicity
-    var command = _.extend({}, req.body, {
-      includeCardFormatting: true
-    });
-
-    var filterQuery;
-    try {
-      filterQuery = filterQueryUtils.createFilterQuery(command);
-      command.filterContext = filterQuery;
-    } catch (err) {
-      return next(err);
-    }
-
-    return Promise.resolve()
-      .then(function () {
-        //perform query
-        return filterQuery.performQuery();
-      })
-      .then(createDTOS(command))
-      .then(enrichWithFilters(command, filterQueryUtils))
-      .then(function returnDTO(dto) {
-        console.log("SEARCH response with attribs", _.keys(dto));
-        res.json(dto);
-      })
-      .catch(function (err) {
-        err.filterQuery = filterQuery;
-        return next(err);
-      });
-  });
-
 
 };
 
 
 function createRelatedFilterQueries(filterQuery) {
   return [filterQuery, filterQuery, filterQuery];
-}
-
-//used for answer and search
-function createDTOS(command) {
-  return function (json) {
-
-    return {
-      results: {
-
-        query: {
-          //TODO: what is this used for?
-        },
-        answerNLP: "TODO: below should be a DIFFERENT filtercontext. It's not very useful now", //TODO
-
-        filterContext: command.filterContext,
-
-        //conditionally enrich results with cardViewModel
-        results: cardViewModel.conditionalEnrichWithCardViewmodel(command, json),
-
-        totalResults: json.meta.elasticsearch.hits.total,
-
-        expand: json.expand,
-
-        meta: json.meta
-      },
-      original: json
-    };
-  };
-}
-
-function fakeFilters(combinedResult) {
-
-  return _.extend(combinedResult.results, {
-    schema: {
-      sort: [{
-        name: "userProximity",
-        label: "proximity to user",
-        isAcending: true, //ascending or decending,
-        help: "tooltip with more help" //optiona;
-      }, {
-        name: "rating",
-        label: "rating",
-        isAcending: true //ascending or decending,
-      }],
-
-      filters: [{
-        name: "subtypes",
-        label: "type", //used for display
-        type: "enum",
-        values: [{
-          val: "Movietheater",
-          nr: combinedResult.results.totalResults
-        }, {
-          val: "Restaurant",
-          nr: 42
-        }, {
-          val: "Bar",
-          nr: 13
-        }]
-      }, {
-        name: "neighborhood",
-        label: "neighborhood",
-        help: "what neighborhood bla bla description", //used for tooltip
-        type: "enum",
-        values: [{
-          val: "Soho",
-          nr: 48
-        }, {
-          val: "Brooklyn",
-          nr: 38
-        }, {
-          val: "Astoria",
-          nr: 38
-        }, {
-          val: "Brooklyn",
-          nr: 38
-        }, {
-          val: "Astoria",
-          nr: 38
-        }, {
-          val: "Brooklyn",
-          nr: 38
-        }, {
-          val: "Astoria",
-          nr: 38
-        }]
-      }]
-    }
-  });
-}
-
-function enrichWithFilters(command, filterQueryUtils) {
-  return function (combinedResult) {
-
-    var root = command.filterContext.getRoot();
-
-    if (root !== "CreativeWork") return fakeFilters(combinedResult);
-
-    //fetch all supported properties for root
-    var rootMap = filterQueryUtils.getRootMap(root);
-
-    //all properties that are indexed in ES and can thus be queried
-    var allProperties = filterQueryUtils.erdConfig.allProperties;
-
-    //get all the facetProperties supported by this root
-    var facetProperties = _.reduce(_.pick(allProperties, _.keys(rootMap)), function (agg, v, k) {
-      if (v.facet) {
-        agg[k] = v;
-      }
-      return agg;
-    }, {});
-
-    ////////////////////////////////////////
-    //TODO: FETCH BASED ON EXPAND AS WELL //
-    ////////////////////////////////////////
-
-    var supportedFilters = _.reduce(facetProperties, function (arr, v, k) {
-      var facetDTO = {
-        type: v.facet.type,
-        name: k, //TODO: this will be dot-notation for expand
-        label: k,
-        help: "we need to define help text" //TODO
-      };
-
-      //TODO: will change on dot-notated props. Then type is, say, location, while root is, say, event
-      var type = root;
-
-      if (v.facet.type === "enum") {
-        var label = v.facet.label;
-        if (label) {
-          facetDTO.label = _.isFunction(label) ? label(root, type) : label;
-        }
-        facetDTO.values = [{
-          val: "Brooklyn",
-          nr: 48
-        }, {
-          val: "Astoria",
-          nr: 48
-        }, {
-          val: "Soho",
-          nr: 48
-        }];
-
-        arr.push(facetDTO);
-      }
-      return arr;
-    }, []);
-
-    var result = _.extend(combinedResult.results, {
-      schema: {
-        sort: [{
-          name: "userProximity",
-          label: "proximity to user",
-          isAcending: true, //ascending or decending,
-          help: "tooltip with more help" //optiona;
-        }, {
-          name: "rating",
-          label: "rating",
-          isAcending: true //ascending or decending,
-        }],
-        filters: supportedFilters
-      }
-    });
-
-
-    return result;
-
-
-
-    //TODO PRESENTING FILTERS 
-    //1. fetch all available es-fields per root
-    //2. ... including expanded ones
-    //3. ... that are available for filtering? hmm, shouldn't this be all filters, since otherwise how to link NLP?
-    //4. intersect with all fields for which enums are set. 
-    //4. other filters that are deemed important such as ranges
-    //5. Create labels for all filters including expanded ones. 
-    //
-    //NO: NOT ALL FILTERS NEED TO BE SUPPORTED BY FACETS
-    //YES: ALL FILTERS NEED TO BE SUPPORTED BY *ACTIVE* FACETS
-    //
-    //TODO CREATING FILTERS: 
-    //1. FROM PATH
-    //filterQueryUtils.getPathForCompoundKey(root, "location.containedInPlace.name".split(".")));
-    //
-
-  };
 }
