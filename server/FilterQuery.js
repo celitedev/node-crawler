@@ -4,7 +4,7 @@ var Promise = require("bluebird");
 var moment = require("moment");
 require("moment-timezone");
 
-var domainConfig = require("../../schemas/domain/_definitions/config");
+var domainConfig = require("../schemas/domain/_definitions/config");
 var roots = domainConfig.domain.roots;
 
 var DEFAULT_PAGESIZE = 10;
