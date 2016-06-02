@@ -152,8 +152,29 @@ function enrichViewModel(json, expand) {
   return json;
 }
 
+
+function conditionalEnrichWithCardViewmodel(command, json) {
+  if (!command.includeCardFormatting) {
+    return json.hits;
+  }
+
+  var results = _.map(json.hits, function (hit) {
+    var obj = {
+      raw: hit,
+      formatted: {}
+    };
+
+    return enrichViewModel(obj, json.expand);
+  });
+
+  return results;
+}
+
+
+
 //API
 module.exports = {
   simpleCardFormatters: simpleCardFormatters,
-  enrichViewModel: enrichViewModel
+  enrichViewModel: enrichViewModel,
+  conditionalEnrichWithCardViewmodel: conditionalEnrichWithCardViewmodel
 };
