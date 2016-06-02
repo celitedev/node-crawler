@@ -103,6 +103,33 @@ module.exports = function (generatedSchemas) {
       });
       return agg;
     }, {});
+
+
+    //aggregate all possible vocabulary values for this attribute for all roots
+    vocab.supportedValuesPerType = {};
+    _.each(_.keys(generatedSchemas.types), function (typeName) {
+
+      //Get keys for typeName
+      var vocabKeys = _.values(vocab.sourceMappings[typeName] || {});
+
+      if (!vocabKeys.length) return;
+
+      //for all keys, get all values annd flatten
+      vocab.supportedValuesPerType[typeName] = _.uniq(_.reduce(vocabKeys, function (arr, key) {
+
+        //each key can in turn be a single value or an array
+        return _.compact(_.uniq(_.reduce(_.isArray(key) ? key : [key], function (arr, k) {
+          if (vocab.vocabulary[k]) {
+            return arr.concat(vocab.vocabulary[k].values || []);
+          } else {
+            return arr;
+          }
+        }, arr)));
+
+
+        // return arr.concat(_.isArray(v.values) ? v.values : [v.values]);
+      }, []));
+    });
   });
 
 

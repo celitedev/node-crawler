@@ -10,7 +10,7 @@ module.exports = {
       "3d": "3d",
       "art house/foreign": ["art house", "foreign"],
       "action/adventure": ["action", "adventure"],
-      "ANIMATED": "animation",
+      "animated": "animation",
       "comedy": "comedy",
       "concert/special events": "concert",
       "documentary": "documentary",
