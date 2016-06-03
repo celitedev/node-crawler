@@ -58,12 +58,7 @@ var middleware = {
       //Show an ADDITIONAL row on top of the 4 rows, filtered on subtype.
       //
       // 4. If the question contains a subtype + a date/duration=>
-      //Show an ADDITIONAL row on top of the 4 rows + the row shown based on point 3 above, filtered on subtype + date/duration
-
-
-      //TODO: if type/subtype found (using subtypeToFilterQuery?)
-      //-> remove from keyword search
-      //-> apply as rules are per above
+      //TODO: Show an ADDITIONAL row on top of the 4 rows + the row shown based on point 3 above, filtered on subtype + date/duration
 
       var question = req.body.question.toLowerCase().trim();
 
@@ -79,9 +74,10 @@ var middleware = {
       //the first match found is the one we're going with. 
       //Based on ordening we favour large subtypes that sit at the end of the question
       _.each(ngrams, function (ngram) {
+        var ngramSingular = ngram[ngram.length - 1] = 's' && ngram.substring(0, ngram.length - 1);
         _.each(subtypeToFilterQuery, function (subtypeFilterContext, subtypeAlias) {
           if (nlpFilterContextProtos) return;
-          if (ngram === subtypeAlias) {
+          if (ngram === subtypeAlias || (ngramSingular && ngramSingular === subtypeAlias)) {
             nlpFilterContextProtos = subtypeFilterContext;
             matchingNgram = ngram;
           }
@@ -141,6 +137,7 @@ var middleware = {
         });
       }
 
+      //The ordinary/fallback rows
       var filterContexts = nlpContexts.concat(_.map(rootsInOrder, function (root) {
 
         var filterContext = _.merge({
@@ -174,7 +171,7 @@ var middleware = {
 
       req.body.filterContexts = filterContexts;
 
-      console.log(JSON.stringify(filterContexts, null, 2));
+      // console.log(JSON.stringify(filterContexts, null, 2));
       next();
 
     };
