@@ -198,7 +198,7 @@ function createDTOS(command) {
         }
       });
       var template = hogan.compile(humanContext.template);
-      humanAnswer = template.render(humanContext.templateData) + " in NYC";
+      humanAnswer = template.render(humanContext.templateData); // + " in NYC";
     } else {
       humanAnswer = "TODO: human answer not set. HumanContext available: " + !!humanContext;
     }

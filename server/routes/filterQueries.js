@@ -71,7 +71,7 @@ var middleware = {
       var ngrams = getNGramsInSizeOrder(question);
       var nlpContexts = [];
 
-      var nlFilterContextProto,
+      var nlpFilterContextProtos,
         matchingNgram;
 
       //We try to match the ngram against all defined subtype aliases
@@ -80,81 +80,73 @@ var middleware = {
       //Based on ordening we favour large subtypes that sit at the end of the question
       _.each(ngrams, function (ngram) {
         _.each(subtypeToFilterQuery, function (subtypeFilterContext, subtypeAlias) {
-          if (nlFilterContextProto) return;
+          if (nlpFilterContextProtos) return;
           if (ngram === subtypeAlias) {
-            nlFilterContextProto = subtypeFilterContext;
+            nlpFilterContextProtos = subtypeFilterContext;
             matchingNgram = ngram;
           }
         });
-        if (nlFilterContextProto) return;
+        if (nlpFilterContextProtos) return;
       });
 
 
-      if (nlFilterContextProto) {
+      if (nlpFilterContextProtos) {
 
-        //Get the question without the matched nlp
-        //The reamining stuff is the keyword search
-        var questionWithoutType = question.replace(matchingNgram, "").trim();
+        nlpFilterContextProtos = _.isArray(nlpFilterContextProtos) ? nlpFilterContextProtos : [nlpFilterContextProtos];
 
-        var nlpFilterContext = {
-          filter: {},
-          wantUnique: false,
-        };
+        _.each(nlpFilterContextProtos, function (nlpFilterContextProto) {
 
-        //get subtype if exists or type otherwise to use in human feedback
-        var typeOrSubtype = nlFilterContextProto.filter.subtypes || nlFilterContextProto.filter.type;
-        typeOrSubtype = _.isArray(typeOrSubtype) ? typeOrSubtype[0] : typeOrSubtype;
+          //Get the question without the matched nlp
+          //The reamining stuff is the keyword search
+          var questionWithoutType = question.replace(matchingNgram, "").trim();
 
-        if (questionWithoutType) {
-
-          nlpFilterContext.filter.name = questionWithoutType;
-
-          nlpFilterContext.humanContext = {
-            templateData: {
-              label: subtypeToFilterQuery[typeOrSubtype.toLowerCase()].label,
-              keyword: questionWithoutType
-            },
-            template: "Showing {{nrOfResults}} '{{keyword}}' {{label.pluralOrSingular}} {{label.sorted}}"
+          var nlpFilterContext = {
+            filter: {},
+            wantUnique: false,
           };
 
-        } else {
+          //get subtype if exists or type otherwise to use in human feedback
+          var typeOrSubtype = nlpFilterContextProto.filter.subtypes || nlpFilterContextProto.filter.type;
+          typeOrSubtype = _.isArray(typeOrSubtype) ? typeOrSubtype[0] : typeOrSubtype;
 
-          nlpFilterContext.humanContext = {
-            templateData: {
-              label: subtypeToFilterQuery[typeOrSubtype.toLowerCase()].label,
-            },
-            template: "Showing all {{nrOfResults}} {{label.pluralOrSingular}} {{label.sorted}}"
-          };
-        }
+          if (questionWithoutType) {
 
+            nlpFilterContext.filter.name = questionWithoutType;
 
-        _.merge(nlpFilterContext, nlFilterContextProto);
+            nlpFilterContext.humanContext = {
+              templateData: {
+                label: nlpFilterContextProto.label,
+                keyword: questionWithoutType
+              },
+              template: "{{nrOfResults}} '{{keyword}}' {{label.pluralOrSingular}} {{label.sorted}}"
+            };
 
-        nlpContexts.push(nlpFilterContext);
+          } else {
 
-        // //no keyword besides root/subtype. -> user probably only wants root so don't show other rows
-        // if (!questionWithoutType) {
-        //   rootsInOrder = [];
-        // }
+            nlpFilterContext.humanContext = {
+              templateData: {
+                label: nlpFilterContextProto.label,
+              },
+              template: "Showing all {{nrOfResults}} {{label.pluralOrSingular}} {{label.sorted}}"
+            };
+          }
 
-        //Note: this affects the other rows, but special cases (e.g.: when remaining question is empty)
-        //are taken care of.
-        // question = questionWithoutType;
+          nlpContexts.push(_.merge({}, nlpFilterContext, nlpFilterContextProto));
 
-        //A root was matched AND there's a keyword left to query -> 
-        //Remove fallback row for said root that we planned to show, bc. we're already showing it on top 
-        if (!nlFilterContextProto.subtypes && questionWithoutType) {
-          rootsInOrder.splice(rootsInOrder.indexOf(nlFilterContextProto.type), 1);
-        }
+          //A root was matched AND there's a keyword left to query -> 
+          //Remove fallback row for said root that we planned to show, bc. we're already showing it on top 
+          if (!nlpFilterContextProto.subtypes) {
+            rootsInOrder.splice(rootsInOrder.indexOf(nlpFilterContextProto.type), 1);
+          }
+        });
       }
 
       var filterContexts = nlpContexts.concat(_.map(rootsInOrder, function (root) {
 
-        var filterContext = {
-          type: root,
+        var filterContext = _.merge({
           filter: {},
           wantUnique: false,
-        };
+        }, subtypeToFilterQuery[root.toLowerCase()]);
 
         if (question) {
           filterContext.filter.name = question;
@@ -164,7 +156,7 @@ var middleware = {
               label: subtypeToFilterQuery[root.toLowerCase()].label,
               keyword: question
             },
-            template: "Showing {{nrOfResults}} {{label.pluralOrSingular}} for '{{keyword}}' {{label.sorted}}"
+            template: "{{nrOfResults}} {{label.pluralOrSingular}} for '{{keyword}}' {{label.sorted}}"
           };
 
         } else {
@@ -182,6 +174,7 @@ var middleware = {
 
       req.body.filterContexts = filterContexts;
 
+      console.log(JSON.stringify(filterContexts, null, 2));
       next();
 
     };
