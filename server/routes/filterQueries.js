@@ -5,86 +5,81 @@ var cardViewModel = require("../cardViewModel");
 
 var subtypeToFilterQuery = require("../fakeNLP").subtypeToFilterQuery;
 
+
+/**
+ * Each FilterContext is shown are 1 row. 
+ * @type {Object}
+ */
+
 var middleware = {
-  superSweetNLP: function (command) {
+  createFilterContextsFromQuestion: function (command) {
 
-    return function superSweetNLP(req, res, next) {
+    var filterQueryUtils = command.filterQueryUtils;
 
-      function oldNLP() {
-        var lowerBodySplit = _.compact(req.body.question.toLowerCase().split(" ")); //remove empty
-        var err;
+    return function (req, res, next) {
 
-        if (!lowerBodySplit.length) {
-          err = new Error("Not sure what you mean! try to search for something like `movie theater` or `events`");
+      var err;
+
+      //If body contains `type` we treat body as filterContext.
+      //Optionally we might want to calculate closeby filterContexts. 
+      // 
+      //Alternatively, if body contains `filterContexts`
+      if (req.filterContexts || req.type) {
+        if (req.filterContexts && req.type) {
+          err = new Error("body contains both 'type' and 'filterContexts'. These attributes are mutually exclusive");
           err.status = 400;
           return next(err);
         }
 
-        //lookup on type
-        var termFound;
-        var filterContext = _.reduce(lowerBodySplit, function (agg, term) {
-          if (agg) return agg; //if already found
-          var fc = subtypeToFilterQuery[term];
-          if (fc) {
-            termFound = term;
-          }
-          return fc;
-        }, null);
+        //TODO: if req.type + req.calculateNearbyFilterContexts -> calculate nearby FC. 
 
-        //if type no found to a 'all-type' query which is later on separated
-        //Also make sure 'filter' object exists
-        filterContext = _.defaults(filterContext || {}, {
-          filter: {},
-          type: "all"
-        });
+        return next();
+      }
 
-        //termFound was used for type-lookup. Remove that for lookup of name
-        if (termFound) {
-          lowerBodySplit = _.difference(lowerBodySplit, [termFound]);
-        }
+      if (req.body.question === undefined) {
+        err = new Error("body should either contain 'type', 'question' or 'filterContexts");
+        err.status = 400;
+        return next(err);
+      }
 
-        if (lowerBodySplit.length) {
-          filterContext.filter.name = lowerBodySplit.join(" ").trim();
-        }
+      //PRE: Based on question we generate multiple FilterContexts. 
+      //Strategy is as follows: 
+      //
+      // 1. we ALWAYS show 4 keyword-search based rows, 
+      //for type= Event, PlaceWithOpeninghours, CreativeWork, OrganizationAndPerson in this order.
+      //
+      // 2. If the question contains one of the 4 above roots (or an alias) =>
+      //Show the row for said root first. The remaining 3 rows are shown in fixed order
+      //
+      // 3. If the question contains a subtype (or an alias) =>
+      //Show an ADDITIONAL row on top of the 4 rows, filtered on subtype.
+      //
+      // 4. If the question contains a subtype + a date/duration=>
+      //Show an ADDITIONAL row on top of the 4 rows + the row shown based on point 3 above, filtered on subtype + date/duration
 
-        _.extend(req.body, filterContext, {
+
+      //TODO: if type/subtype found (using subtypeToFilterQuery?)
+      //-> remove from keyword search
+      //-> apply as rules are per above
+
+      var rootsInOrder = filterQueryUtils.fixedTypesInOrder;
+
+      var filterContexts = _.map(rootsInOrder, function (root) {
+
+        var filterContext = _.defaults(filterContext || {}, {
+          type: root,
+          filter: {
+            name: req.body.question
+          },
           wantUnique: false
         });
 
-        console.log("FILTERCONTEXT", JSON.stringify(filterContext, null, 2));
+        return filterContext;
+      });
 
-        next();
-      }
+      req.body.filterContexts = filterContexts;
 
-      if (!req.type && req.body.question !== undefined) {
-
-        // var question = req.body.question;
-
-        // nlpQueryGenerator.createQueryPlan(question)
-        //   .then(function (filterContextOrFallback) {
-
-        //     //only show nlp meta
-        //     if (req.body.nlpMetaOnly) {
-        //       var meta = filterContextOrFallback.doFallback ? filterContextOrFallback : filterContextOrFallback.nlpMeta;
-        //       return res.json(meta);
-        //     }
-        //     if (filterContextOrFallback.doFallback) {
-        //       return oldNLP();
-        //     }
-        //     console.log("NLP GENERATED FILTERCONTEXT", filterContextOrFallback);
-        //     _.extend(req.body, filterContextOrFallback);
-        //     next();
-        //   })
-        //   .catch(function (err) {
-        //     err.status = 400;
-        //     next(err);
-        //   });
-
-        return oldNLP();
-
-      } else {
-        next();
-      }
+      next();
 
     };
   }
@@ -97,65 +92,32 @@ module.exports = function (command) {
   var filterQueryUtils = command.filterQueryUtils;
 
   //used by Answer page. 
-  app.post('/question', middleware.superSweetNLP(command), function (req, res, next) {
+  app.post('/question', middleware.createFilterContextsFromQuestion(command), function (req, res, next) {
 
-    //always include cardFormatting
-    var command = _.extend({}, req.body, {
-      includeCardFormatting: true
+    //Body contains either 'filterContexts' or is a filterContext itself
+
+    var filterContexts = req.body.filterContexts || req.body;
+
+    var filterQueries = _.map(_.isArray(filterContexts) ? filterContexts : [filterContexts], function (fc) {
+      _.extend(fc, {
+        includeCardFormatting: true,
+        meta: {}
+      });
+      return filterQueryUtils.createFilterQuery(fc);
     });
 
-    //typeless query -> should be split multiple typed queries
-    var filterQueries;
-    try {
-
-      if (command.type === "all") {
-
-        //group filter queries by type
-        filterQueries = _.map(filterQueryUtils.fixedTypesInOrder, function (type) {
-          return filterQueryUtils.createFilterQuery(_.defaults({
-            type: type
-          }, command));
-        });
-      } else {
-        //temporary way of adding related filter queries
-        filterQueries = createRelatedFilterQueries(filterQueryUtils.createFilterQuery(command));
-      }
-    } catch (err) {
-      return next(err);
-    }
-
-    var promises = _.map(filterQueries, function (filterQuery) {
-      return Promise.resolve()
-        .then(function () {
-          //perform query
-          return filterQuery.performQuery();
-        })
-        .then(cardViewModel.createDTOS({
-          filterContext: filterQuery,
-          includeCardFormatting: command.includeCardFormatting
-        }))
-        .then(function (result) {
-          return result;
-        });
-    });
-
-    return Promise.all(promises)
+    return Promise.map(filterQueries, function (filterQuery) {
+        return Promise.resolve(filterQuery.performQuery())
+          .then(cardViewModel.createDTOS({
+            filterContext: filterQuery,
+            includeCardFormatting: true
+          }));
+      })
       .then(function (jsons) {
 
-        var outputJson = {};
-
-        //add nl-stuff for debugging
-        if (req.body.nlpMeta) {
-          outputJson.meta = {
-            nlp: req.body.nlpMeta
-          };
-        }
-        outputJson.results = jsons;
-
-
-        console.log("ANSWER response with attribs", _.keys(outputJson));
-
-        res.json(outputJson);
+        res.json({
+          results: jsons
+        });
 
       })
       .catch(function (err) {
