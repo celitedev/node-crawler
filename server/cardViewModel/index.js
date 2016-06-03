@@ -178,14 +178,24 @@ function conditionalEnrichWithCardViewmodel(command, json) {
 function createDTOS(command) {
   return function (json) {
 
+    var filterContext = command.filterContext;
+
+    var humanAnswer = "TODO: human answer not set";
+
+    //TODO: for now we assume filter.name indicates we're processing a fallback rows
+    if (filterContext.filter.name) {
+      humanAnswer = "Found " + json.meta.elasticsearch.hits.total + " " +
+        filterContext.type + " matching '" + filterContext.filter.name + "'";
+    }
+
     return {
 
       query: {
         //TODO: what is this used for?
       },
-      answerNLP: "TODO: below should be a DIFFERENT filtercontext. It's not very useful now", //TODO
+      answerNLP: humanAnswer,
 
-      filterContext: command.filterContext,
+      filterContext: filterContext,
 
       //conditionally enrich results with cardViewModel
       results: conditionalEnrichWithCardViewmodel(command, json),

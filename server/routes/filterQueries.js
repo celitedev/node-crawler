@@ -24,8 +24,8 @@ var middleware = {
       //Optionally we might want to calculate closeby filterContexts. 
       // 
       //Alternatively, if body contains `filterContexts`
-      if (req.filterContexts || req.type) {
-        if (req.filterContexts && req.type) {
+      if (req.body.filterContexts || req.body.type) {
+        if (req.body.filterContexts && req.body.type) {
           err = new Error("body contains both 'type' and 'filterContexts'. These attributes are mutually exclusive");
           err.status = 400;
           return next(err);
@@ -71,7 +71,7 @@ var middleware = {
           filter: {
             name: req.body.question
           },
-          wantUnique: false
+          wantUnique: false,
         });
 
         return filterContext;

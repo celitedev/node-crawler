@@ -45,6 +45,7 @@ module.exports = function (command) {
     meta: t.maybe(t.Object),
 
     pageSize: t.maybe(t.Number),
+
   }, 'FilterQuery');
 
 
