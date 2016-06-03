@@ -9,9 +9,18 @@ var subtypeToFilterQuery = {
   //top level types
   "event": {
     type: "Event",
+    "temporal": {
+      "gte": "now"
+    },
+    "sort": {
+      "type": "field",
+      "field": "startDate",
+      "asc": true
+    },
     label: {
       plural: "events",
-      singular: "event"
+      singular: "event",
+      sorted: "(soonest first)"
     }
   },
   "placewithopeninghours": {
@@ -46,9 +55,18 @@ var subtypeToFilterQuery = {
     filter: {
       subtypes: "screeningevent"
     },
+    "temporal": {
+      "gte": "now"
+    },
+    "sort": {
+      "type": "field",
+      "field": "startDate",
+      "asc": true
+    },
     label: {
       plural: "movie screenings",
-      singular: "movie screening"
+      singular: "movie screening",
+      sorted: "(soonest first)"
     }
   },
 
@@ -57,9 +75,18 @@ var subtypeToFilterQuery = {
     filter: {
       subtypes: "concert"
     },
+    "temporal": {
+      "gte": "now"
+    },
+    "sort": {
+      "type": "field",
+      "field": "startDate",
+      "asc": true
+    },
     label: {
       plural: "concerts",
-      singular: "concert"
+      singular: "concert",
+      sorted: "(soonest first)"
     }
   },
 
@@ -129,7 +156,29 @@ var subtypeToFilterQuery = {
 
   ////////////
   //CREATIVE WORK
-  "movie": {
+
+  //For movie we actually show: 
+  //1. screeningevent
+  //2. movie
+  "movie": [{
+    type: "Event",
+    filter: {
+      subtypes: "screeningevent"
+    },
+    "temporal": {
+      "gte": "now"
+    },
+    "sort": {
+      "type": "field",
+      "field": "startDate",
+      "asc": true
+    },
+    label: {
+      plural: "movie screenings",
+      singular: "movie screening",
+      sorted: "(soonest first)"
+    }
+  }, {
     type: "CreativeWork",
     filter: {
       subtypes: "movie"
@@ -142,9 +191,9 @@ var subtypeToFilterQuery = {
     label: {
       plural: "movies",
       singular: "movie",
-      sorted: "best rated first"
+      sorted: "(best rated first)"
     }
-  },
+  }],
 
   /////////////////////////////
   //ORGANIZATION AND PERSON
@@ -163,9 +212,14 @@ var subtypeToFilterQuery = {
 
 var labelsNotDefined = [];
 _.each(subtypeToFilterQuery, function (v, k) {
-  if (!v.label) {
-    labelsNotDefined.push(k);
-  }
+
+  _.each(_.isArray(v) ? v : [v], function (vIndiv) {
+    if (!vIndiv.label) {
+      labelsNotDefined.push(k);
+    } else {
+      vIndiv.filter = vIndiv.filter || {};
+    }
+  });
 });
 
 if (labelsNotDefined.length) {
