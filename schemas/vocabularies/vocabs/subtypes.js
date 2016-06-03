@@ -17,7 +17,6 @@ module.exports = function (generatedSchemas) {
       },
 
       CreativeWork: {
-        //adding type=Movie alias
         "movie": "movie",
       },
 
@@ -87,21 +86,9 @@ module.exports = function (generatedSchemas) {
         "piano bar": ["pianobar", "bar"],
 
 
-        //////////////////////
-        ///THIS IS WEIRD. LET'S NOT DO THIS. 
-        ///THE TERM 'ROMANTIC' IS NOT ENOUGH TO MAKE IT A BAR. 
-        ///IT *IS* FOR NYC.COM BUT THIS IS *NOT* GENERALLY APPLICABLE.
-        //These are just tagged as bar (in addition to added as genre)
-        // "upscale": "bar",
-        // "hot spot": "bar",
-        // "outdoor seating": "bar",
-        // "romantic": "bar",
-        // "singles": "bar",
       },
 
       FoodEstablishment: {
-
-        //TODO: map cuisines that we want
 
         //cuisine
         "indian/pakistani": ["indian", "pakistani"],
