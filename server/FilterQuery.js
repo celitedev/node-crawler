@@ -426,7 +426,6 @@ module.exports = function (command) {
           }
         });
 
-        console.log("ES", JSON.stringify(searchQuery, null, 2));
         return esClient.search(searchQuery);
       })
       .then(function (esResult) {
