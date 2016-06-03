@@ -169,7 +169,7 @@ module.exports = function (generatedSchemas) {
         },
         mapping: mappings.enum,
         enum: vocabs.subtypes,
-        enumKeepOriginal: true, //COmbine enum + raw
+        enumKeepOriginal: false, //subtypes are controlled
       },
 
       ratingValue: {
