@@ -11,6 +11,9 @@ module.exports = function (generatedSchemas) {
 
       Thing: {
         "event": "event",
+        "placewithopeninghours": "placewithopeninghours",
+        "creativework": "creativework",
+        "organizationandperson": "organizationandperson"
       },
 
       CreativeWork: {
@@ -98,12 +101,7 @@ module.exports = function (generatedSchemas) {
 
       FoodEstablishment: {
 
-
-        /////////////
-        //NYC.com
-
-        //!! NOTE: nyc.com cuisines are facts as well as subtypes.
-        //NOTE: LOTS OF RAW CUISINES HERE THAT WE DON'T MAP BUT PASSTHROUGH VERBATIM
+        //TODO: map cuisines that we want
 
         //cuisine
         "indian/pakistani": ["indian", "pakistani"],
@@ -130,14 +128,18 @@ module.exports = function (generatedSchemas) {
       /////////////////
       ///TYPE ALIASES
       "event": ["event", "happening"],
+      "placewithopeninghours": ["place", "venue", "local business", "business"],
+      "creativework": ["creativework", "creative work"],
+      "organizationandperson": ["organization", "person"],
 
+      //Place
       "movie": ["movie", "film"],
-      "restaurant": ["restaurant", "eatery", "diner"],
       "movietheater": ["movietheater", "movie theater"],
       "screeningevent": ["screeningevent", "movie screening"],
 
       ///////////////////
       ///restaurants
+      "restaurant": ["restaurant", "eatery", "diner"],
       "bistro": ['bistro'],
       "bar": ["bar"],
       "pub": "pub",
