@@ -62,20 +62,67 @@ var middleware = {
       //-> remove from keyword search
       //-> apply as rules are per above
 
+      var question = req.body.question.toLowerCase().trim();
+
+      //ngrams from large to small and from back to front. 
+      var ngrams = getNGramsInSizeOrder(question);
+      var nlpContexts = [];
+
+      var nlFilterContextProto,
+        matchingNgram;
+
+      //We try to match the ngram against all defined subtype aliases
+      //If ngram ends in an 'n' we assume it's plural and also try to match to naive singular 'ngram - s'
+      //the first match found is the one we're going with. 
+      //Based on ordening we favour large subtypes that sit at the end of the question
+      _.each(ngrams, function (ngram) {
+        _.each(subtypeToFilterQuery, function (subtypeFilterContext, subtypeAlias) {
+          if (nlFilterContextProto) return;
+          if (ngram === subtypeAlias) {
+            nlFilterContextProto = subtypeFilterContext;
+            matchingNgram = ngram;
+          }
+        });
+        if (nlFilterContextProto) return;
+      });
+
+
+
+      //If nlpFilterContext found -> create an extra row
+      if (nlFilterContextProto) {
+
+        //get the question without the matched nlp
+        //The reamining stuff is the keyword search
+        var questionExclNLPMatch = question.replace(matchingNgram, "");
+
+        var nlpFilterContext = {
+          filter: {},
+          wantUnique: false,
+        };
+
+        if (questionExclNLPMatch) {
+          nlpFilterContext.filter.name = questionExclNLPMatch;
+        }
+        _.merge(nlpFilterContext, nlFilterContextProto);
+
+        nlpContexts.push(nlpFilterContext);
+      }
+
+
+      //Let's add the default rows
       var rootsInOrder = filterQueryUtils.fixedTypesInOrder;
 
-      var filterContexts = _.map(rootsInOrder, function (root) {
-
+      var filterContexts = nlpContexts.concat(_.map(rootsInOrder, function (root) {
         var filterContext = _.defaults(filterContext || {}, {
           type: root,
           filter: {
-            name: req.body.question
+            name: question
           },
           wantUnique: false,
         });
 
         return filterContext;
-      });
+      }));
 
       req.body.filterContexts = filterContexts;
 
@@ -84,6 +131,55 @@ var middleware = {
     };
   }
 };
+
+
+function getNGramsInSizeOrder(text) {
+
+  var atLeast = 1; // Show results with at least .. occurrences
+  var numWords = 20; // Show statistics for one to .. words (20 should be enough)
+  var ignoreCase = true; // Case-sensitivity
+  var REallowedChars = /[^a-zA-Z'\-]+/g;
+
+
+  var i, j, k, textlen, len, s;
+  // Prepare key hash
+  var keys = [null]; //"keys[0] = null", a word boundary with length zero is empty
+  var results = [];
+  numWords++; //for human logic, we start counting at 1 instead of 0
+  for (i = 1; i <= numWords; i++) {
+    keys.push({});
+  }
+
+  // Remove all irrelevant characters
+  text = text.replace(REallowedChars, " ").replace(/^\s+/, "").replace(/\s+$/, "");
+
+  // Create a hash
+  if (ignoreCase) text = text.toLowerCase();
+  text = text.split(/\s+/);
+  for (i = 0, textlen = text.length; i < textlen; i++) {
+    s = text[i];
+    keys[1][s] = (keys[1][s] || 0) + 1;
+    for (j = 2; j <= numWords; j++) {
+      if (i + j <= textlen) {
+        s += " " + text[i + j - 1];
+        keys[j][s] = (keys[j][s] || 0) + 1;
+      } else break;
+    }
+  }
+
+  // Prepares results for advanced analysis
+  for (var k = 1; k <= numWords; k++) {
+    var key = keys[k];
+    for (var i in key) {
+      if (key[i] >= atLeast) {
+        results.push(i);
+      }
+    }
+  }
+
+  results.reverse();
+  return results;
+}
 
 
 module.exports = function (command) {

@@ -1,26 +1,25 @@
 //simply the most fantastic NLP stuff evarrr..
 var subtypeToFilterQuery = {
 
+  ///////////////
+  //TOP LEVEL
   //top level types
-  "creativework": {
-    type: "CreativeWork"
-  },
   "event": {
     type: "Event"
   },
   "place": {
     type: "PlaceWithOpeninghours"
   },
+  "creativework": {
+    type: "CreativeWork"
+  },
   "organizationandperson": {
     type: "OrganizationAndPerson"
   },
 
-  "movie": {
-    type: "CreativeWork",
-    filter: {
-      subtypes: "movie"
-    }
-  },
+
+  //////////////
+  //EVENT
 
   //movie showing
   "screeningevent": {
@@ -30,7 +29,15 @@ var subtypeToFilterQuery = {
     }
   },
 
-  //place
+  "concert": {
+    type: "Event",
+    filter: {
+      subtypes: "concert"
+    }
+  },
+
+  /////////////////
+  //PLACE
   restaurant: {
     type: "PlaceWithOpeninghours",
     filter: {
@@ -41,6 +48,12 @@ var subtypeToFilterQuery = {
     type: "PlaceWithOpeninghours",
     filter: {
       subtypes: "bar"
+    }
+  },
+  club: {
+    type: "PlaceWithOpeninghours",
+    filter: {
+      subtypes: "club"
     }
   },
   store: {
@@ -56,8 +69,19 @@ var subtypeToFilterQuery = {
     }
   },
 
-  //performer
-  "performer": {
+
+  ////////////
+  //CREATIVE WORK
+  "movie": {
+    type: "CreativeWork",
+    filter: {
+      subtypes: "movie"
+    }
+  },
+
+  /////////////////////////////
+  //ORGANIZATION AND PERSON
+  performer: {
     type: "OrganizationAndPerson",
     filter: {
       tag: "performer"
@@ -68,46 +92,23 @@ var subtypeToFilterQuery = {
 /////////////
 //synonyms //
 /////////////
-subtypeToFilterQuery.creativeworks = subtypeToFilterQuery.creativework;
-subtypeToFilterQuery.events = subtypeToFilterQuery.event;
-subtypeToFilterQuery.places = subtypeToFilterQuery.place;
-
-subtypeToFilterQuery.placewithopeninghours = subtypeToFilterQuery.place;
-subtypeToFilterQuery.placeswithopeninghours = subtypeToFilterQuery.place;
-subtypeToFilterQuery.localbusiness = subtypeToFilterQuery.place;
-subtypeToFilterQuery.localbusinesses = subtypeToFilterQuery.place;
 subtypeToFilterQuery["local businesses"] = subtypeToFilterQuery.place;
 subtypeToFilterQuery["local business"] = subtypeToFilterQuery.place;
 
-subtypeToFilterQuery.movies = subtypeToFilterQuery.movie;
-
-subtypeToFilterQuery.screeningevents = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery.movieshowing = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery.movieshowings = subtypeToFilterQuery.screeningevent;
 subtypeToFilterQuery["movie showing"] = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery["movie showings"] = subtypeToFilterQuery.screeningevent;
 subtypeToFilterQuery["movie screening"] = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery["movie screenings"] = subtypeToFilterQuery.screeningevent;
 subtypeToFilterQuery.moviescreening = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery.moviescreenings = subtypeToFilterQuery.screeningevent;
 
-subtypeToFilterQuery.restaurants = subtypeToFilterQuery.restaurant;
-
-subtypeToFilterQuery.movietheaters = subtypeToFilterQuery.movietheater;
-subtypeToFilterQuery["movie theaters"] = subtypeToFilterQuery.movietheater;
 subtypeToFilterQuery["movie theater"] = subtypeToFilterQuery.movietheater;
 subtypeToFilterQuery.theater = subtypeToFilterQuery.movietheater;
-subtypeToFilterQuery.theaters = subtypeToFilterQuery.movietheater;
 
 //person
 subtypeToFilterQuery.person = subtypeToFilterQuery.organizationandperson;
-subtypeToFilterQuery.persons = subtypeToFilterQuery.organizationandperson;
+subtypeToFilterQuery.organization = subtypeToFilterQuery.organizationandperson;
 
 //performer
-subtypeToFilterQuery.performers = subtypeToFilterQuery.performer;
 subtypeToFilterQuery.artist = subtypeToFilterQuery.performer;
-subtypeToFilterQuery.artists = subtypeToFilterQuery.performer;
-
+subtypeToFilterQuery.singer = subtypeToFilterQuery.performer;
 
 
 module.exports = {
