@@ -18,6 +18,9 @@ var middleware = {
 
     return function (req, res, next) {
 
+      //Let's add the default rows
+      var rootsInOrder = [].concat(filterQueryUtils.fixedTypesInOrder); //clone
+
       var err;
 
       //If body contains `type` we treat body as filterContext.
@@ -87,39 +90,92 @@ var middleware = {
       });
 
 
-
-      //If nlpFilterContext found -> create an extra row
       if (nlFilterContextProto) {
 
-        //get the question without the matched nlp
+        //Get the question without the matched nlp
         //The reamining stuff is the keyword search
-        var questionExclNLPMatch = question.replace(matchingNgram, "");
+        var questionWithoutType = question.replace(matchingNgram, "").trim();
 
         var nlpFilterContext = {
           filter: {},
           wantUnique: false,
         };
 
-        if (questionExclNLPMatch) {
-          nlpFilterContext.filter.name = questionExclNLPMatch;
+        //get subtype if exists or type otherwise to use in human feedback
+        var typeOrSubtype = nlFilterContextProto.filter.subtypes || nlFilterContextProto.filter.type;
+        typeOrSubtype = _.isArray(typeOrSubtype) ? typeOrSubtype[0] : typeOrSubtype;
+
+        if (questionWithoutType) {
+
+          nlpFilterContext.filter.name = questionWithoutType;
+
+          nlpFilterContext.humanContext = {
+            templateData: {
+              label: subtypeToFilterQuery[typeOrSubtype.toLowerCase()].label,
+              keyword: questionWithoutType
+            },
+            template: "Showing {{nrOfResults}} '{{keyword}}' {{label.pluralOrSingular}} {{label.sorted}}"
+          };
+
+        } else {
+
+          nlpFilterContext.humanContext = {
+            templateData: {
+              label: subtypeToFilterQuery[typeOrSubtype.toLowerCase()].label,
+            },
+            template: "Showing all {{nrOfResults}} {{label.pluralOrSingular}} {{label.sorted}}"
+          };
         }
+
+
         _.merge(nlpFilterContext, nlFilterContextProto);
 
         nlpContexts.push(nlpFilterContext);
+
+        // //no keyword besides root/subtype. -> user probably only wants root so don't show other rows
+        // if (!questionWithoutType) {
+        //   rootsInOrder = [];
+        // }
+
+        //Note: this affects the other rows, but special cases (e.g.: when remaining question is empty)
+        //are taken care of.
+        // question = questionWithoutType;
+
+        //A root was matched AND there's a keyword left to query -> 
+        //Remove fallback row for said root that we planned to show, bc. we're already showing it on top 
+        if (!nlFilterContextProto.subtypes && questionWithoutType) {
+          rootsInOrder.splice(rootsInOrder.indexOf(nlFilterContextProto.type), 1);
+        }
       }
 
-
-      //Let's add the default rows
-      var rootsInOrder = filterQueryUtils.fixedTypesInOrder;
-
       var filterContexts = nlpContexts.concat(_.map(rootsInOrder, function (root) {
-        var filterContext = _.defaults(filterContext || {}, {
+
+        var filterContext = {
           type: root,
-          filter: {
-            name: question
-          },
+          filter: {},
           wantUnique: false,
-        });
+        };
+
+        if (question) {
+          filterContext.filter.name = question;
+
+          filterContext.humanContext = {
+            templateData: {
+              label: subtypeToFilterQuery[root.toLowerCase()].label,
+              keyword: question
+            },
+            template: "Showing {{nrOfResults}} {{label.pluralOrSingular}} for '{{keyword}}' {{label.sorted}}"
+          };
+
+        } else {
+
+          filterContext.humanContext = {
+            templateData: {
+              label: subtypeToFilterQuery[root.toLowerCase()].label,
+            },
+            template: "Showing all {{nrOfResults}} {{label.pluralOrSingular}}  {{label.sorted}}"
+          };
+        }
 
         return filterContext;
       }));
@@ -194,27 +250,33 @@ module.exports = function (command) {
 
     var filterContexts = req.body.filterContexts || req.body;
 
-    var filterQueries = _.map(_.isArray(filterContexts) ? filterContexts : [filterContexts], function (fc) {
-      _.extend(fc, {
+    var promises = _.map(_.isArray(filterContexts) ? filterContexts : [filterContexts], function (filterContext) {
+
+      //extend filterContext
+      _.extend(filterContext, {
         includeCardFormatting: true,
         meta: {}
       });
-      return filterQueryUtils.createFilterQuery(fc);
+
+      var humanContext = filterContext.humanContext;
+      delete filterContext.humanContext;
+
+      //create FilterQuery from FilterContext
+      var filterQuery = filterQueryUtils.createFilterQuery(filterContext);
+
+      return Promise.resolve(filterQuery.performQuery())
+        .then(cardViewModel.createDTOS({
+          filterContext: filterQuery,
+          includeCardFormatting: true,
+          humanContext: humanContext
+        }));
     });
 
-    return Promise.map(filterQueries, function (filterQuery) {
-        return Promise.resolve(filterQuery.performQuery())
-          .then(cardViewModel.createDTOS({
-            filterContext: filterQuery,
-            includeCardFormatting: true
-          }));
-      })
+    return Promise.all(promises)
       .then(function (jsons) {
-
         res.json({
           results: jsons
         });
-
       })
       .catch(function (err) {
         err.filterQuery = req.filterQuery;

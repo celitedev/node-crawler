@@ -1,5 +1,6 @@
 var _ = require("lodash");
 var moment = require("moment");
+var hogan = require("hogan.js");
 
 var simpleCardFormatters = {
   placewithopeninghours: function (json, expand) {
@@ -176,17 +177,37 @@ function conditionalEnrichWithCardViewmodel(command, json) {
 }
 
 function createDTOS(command) {
+
+  var humanContext = command.humanContext;
+
   return function (json) {
 
     var filterContext = command.filterContext;
 
-    var humanAnswer = "TODO: human answer not set";
+    // hogan
+    var humanAnswer;
+
+    if (humanContext && humanContext.template) {
+
+      var nrOfResults = json.meta.elasticsearch.hits.total;
+
+      humanContext.templateData = _.merge(humanContext.templateData || {}, {
+        nrOfResults: nrOfResults,
+        label: {
+          pluralOrSingular: nrOfResults === 1 ? humanContext.templateData.label.singular : humanContext.templateData.label.plural
+        }
+      });
+      var template = hogan.compile(humanContext.template);
+      humanAnswer = template.render(humanContext.templateData) + " in NYC";
+    } else {
+      humanAnswer = "TODO: human answer not set. HumanContext available: " + !!humanContext;
+    }
 
     //TODO: for now we assume filter.name indicates we're processing a fallback rows
-    if (filterContext.filter.name) {
-      humanAnswer = "Found " + json.meta.elasticsearch.hits.total + " " +
-        filterContext.type + " matching '" + filterContext.filter.name + "'";
-    }
+    // if (filterContext.filter.name) {
+    //   humanAnswer = "Found " + json.meta.elasticsearch.hits.total + " " +
+    //     filterContext.type + " matching '" + filterContext.filter.name + "'";
+    // }
 
     return {
 
