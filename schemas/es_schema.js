@@ -169,7 +169,7 @@ module.exports = function (generatedSchemas) {
         },
         mapping: mappings.enum,
         enum: vocabs.subtypes,
-        enumKeepOriginal: false, //subtypes are controlled
+        enumKeepOriginal: true, //We want high recall for now so enable uncontrolled subtypes as well.
       },
 
       ratingValue: {
