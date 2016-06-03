@@ -114,7 +114,7 @@ var middleware = {
                 label: nlpFilterContextProto.label,
                 keyword: questionWithoutType
               },
-              template: "{{nrOfResults}} '{{keyword}}' {{label.pluralOrSingular}} {{label.sorted}}"
+              template: "<span class='accentColor'>{{nrOfResults}}</span> <i>'{{keyword}}'</i> {{label.pluralOrSingular}} {{label.sorted}}"
             };
 
           } else {
@@ -123,7 +123,7 @@ var middleware = {
               templateData: {
                 label: nlpFilterContextProto.label,
               },
-              template: "Showing all {{nrOfResults}} {{label.pluralOrSingular}} {{label.sorted}}"
+              template: "Showing all <span class='accentColor'>{{nrOfResults}}</span> {{label.pluralOrSingular}} {{label.sorted}}"
             };
           }
 
@@ -153,7 +153,7 @@ var middleware = {
               label: subtypeToFilterQuery[root.toLowerCase()].label,
               keyword: question
             },
-            template: "{{nrOfResults}} {{label.pluralOrSingular}} for '{{keyword}}' {{label.sorted}}"
+            template: "<span class='accentColor'>{{nrOfResults}}</span> {{label.pluralOrSingular}} for <i>'{{keyword}}'</i> {{label.sorted}}"
           };
 
         } else {
@@ -162,7 +162,7 @@ var middleware = {
             templateData: {
               label: subtypeToFilterQuery[root.toLowerCase()].label,
             },
-            template: "Showing all {{nrOfResults}} {{label.pluralOrSingular}}  {{label.sorted}}"
+            template: "Showing all <span class='accentColor'>{{nrOfResults}}</span> {{label.pluralOrSingular}}  {{label.sorted}}"
           };
         }
 
