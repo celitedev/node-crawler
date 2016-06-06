@@ -36,12 +36,31 @@ var redisClient = redis.createClient(config.redis);
 
 var express = require('express');
 var cors = require('cors');
-var app = express();
 var bodyParser = require('body-parser');
+var expressValidator = require('express-validator');
 var methodOverride = require('method-override');
+
+var app = express();
 
 app.use(cors());
 app.use(bodyParser());
+app.use(expressValidator({
+ customValidators: {
+    isContainedInArray: function(value, arr) {
+        return ~arr.indexOf(value);
+    },
+    isEmails: function(value) {
+      var allValid = true;
+      _.each(value.split(";"), function(email){
+        email = email.trim(); 
+        if(!(!email || expressValidator.validator.isEmail(email))){
+          allValid = false;
+        }
+      });
+      return allValid; 
+    }
+ }
+})); 
 app.use(methodOverride());
 
 
@@ -70,6 +89,7 @@ require("./routes/filterQueries")(command);
 require("./routes/search")(command);
 require("./routes/entities")(command);
 require("./routes/suggest")(command);
+require("./routes/share")(command);
 // require("./routes/reloadNLP")(command); //part of deprecated NLP
 
 
