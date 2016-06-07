@@ -192,7 +192,7 @@ module.exports = {
               locationName = doc.locationName,
               movieName = movie.movieName;
 
-            var id = (locationName + " -- " + movieName + " -- " + time);
+            var id = (movieName + " -- " + locationName + " -- " + time);
 
             showings.push({
               _sourceUrl: screeningEvent._sourceUrl, //doesn't always exist
