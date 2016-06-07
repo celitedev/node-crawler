@@ -197,7 +197,7 @@ module.exports = {
             showings.push({
               _sourceUrl: screeningEvent._sourceUrl, //doesn't always exist
               _sourceId: id,
-              name: id,
+              name: movieName + " @ " + locationName,
               startDate: screeningEvent.startDate,
               workPresented: movie.workPresented,
               location: doc.location
