@@ -184,8 +184,6 @@ module.exports = function (command) {
       if (this.temporal.open === "now") {
         date = moment();
       }
-      date = date.tz('America/New_York');
-
 
       var days = date.isoWeekday() - 1; //returns[1, 7] -> map to [0,6]
       var hours = date.hours();
