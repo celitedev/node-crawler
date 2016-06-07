@@ -1,4 +1,5 @@
 var _ = require("lodash");
+var dateUtils = require("./utils/dateUtils");
 
 //crawlSchema for: 
 //source: Eventful
@@ -175,15 +176,29 @@ module.exports = {
             performer: x("[itemprop=performer]", ["> a@href"]),
             startDate: "[itemprop=startDate]@content",
 
-            // image: x(".image-viewer li", [{
-            //   _ref: { //notice: _ref here.
-            //     contentUrl: "a@href",
-            //     url: "a@href",
-            //     caption: "@title",
-            //   }
-            // }]),
+            image: x(".image-viewer li", [{
+              _ref: { //notice: _ref here.
+                contentUrl: "a@href",
+                url: "a@href",
+                caption: "@title",
+              }
+            }]),
 
-            _genreHref: "#event-price + p > a@href",
+            //No way to get this with css, so let's do sone text munging
+            _genreHref: function (el, cb) {
+              var genreHref;
+              _.each(el(".section-block.description > p"), function(val){
+                
+                if(genreHref) return; 
+
+                var tag = el(val);
+                var txt = tag.text().trim();
+                if(!txt || txt.indexOf("Categories") !== 0) return;
+
+                genreHref = el(tag.find("> a")).attr("href");
+              });
+              cb(undefined, genreHref);
+            },
 
           }, undefined, detailObj)
         };
@@ -204,6 +219,33 @@ module.exports = {
           if (!performer) return undefined;
           return performer.length ? performer : undefined;
         },
+        "_detail.startDate": function(timeWithoutTimezone){
+
+          //Eventful incorrectly returns a *local time* as a UTC time. 
+          //This needs to be tansposed to the correct timezone. 
+          return dateUtils.transposeTimeToTimezone(timeWithoutTimezone, "America/New_York");
+          //out: "2016-06-10T14:00:00-04:00" || false
+        },
+        "_detail.image": function removeFallbackFromImage(val) {
+
+          if (!val) return val;
+          var imageArr = _.compact(_.map(val, function (imgObj) {
+
+            var url = imgObj._ref.contentUrl;
+
+            if (!url || ~url.indexOf("fallback")) {
+              return undefined;
+            }
+
+            return imgObj;
+          }));
+
+          if (!imageArr.length) {
+            return undefined;
+          }
+
+          return imageArr;
+        },
       },
 
       reducer: function (obj) {
@@ -219,6 +261,11 @@ module.exports = {
             name: "genre",
             val: [val] //needs to be array!
           });
+
+          //We also want to map eventful.event genres to be subtypes
+          //NOTE: subtypes can be freely assigned to as opposed to _type
+          obj.subtypes = [val];
+
         }
 
         if (factArr.length) {
@@ -226,6 +273,14 @@ module.exports = {
         }
         return obj;
       },
+      
+      pruner: function (result) {
+        if (!result._detail.startDate) {
+          return undefined;
+        }
+        return result;
+      }
+
     }
   }
 };

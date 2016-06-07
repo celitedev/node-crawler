@@ -1,6 +1,5 @@
 var _ = require("lodash");
-var moment = require("moment");
-require("moment-timezone");
+var dateUtils = require("./utils/dateUtils");
 
 module.exports = {
   _meta: {
@@ -171,21 +170,10 @@ module.exports = {
             sDate = sDate.substring(0, sDate.indexOf("&")).trim();
           }
 
-          var date =  moment(new Date(sDate));
-
-          if (!date.isValid()) {
-            console.log("invalid date", sDate);
-            return undefined;
-          }
-
-          var dateFormat =  date.format();
-
-          //remove added timezone of processing box. TZ always consists of 6 chars
-          dateFormat = dateFormat.substring(0, dateFormat.length -6);
-          return dateFormat; 
-
-          //RETURN DT WITHOUT TIMEZONE - I.E.: LOCALTIME
-          //out: "2016-06-10T14:00:00"
+          //Eventbrite incorrectly returns a *local time* as a UTC time. 
+          //This needs to be tansposed to the correct timezone. 
+          return dateUtils.transposeTimeToTimezone(sDate, "America/New_York");
+          //out: "2016-06-10T14:00:00-04:00" || false
         }
       },
 
