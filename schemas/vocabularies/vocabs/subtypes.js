@@ -21,7 +21,17 @@ module.exports = function (generatedSchemas) {
       },
 
       Event: {
-        "screeningevent": "screeningevent"
+        //fandango
+        "screeningevent": "screeningevent",
+
+        //seatgeek, et al
+        "comedyevent": "comedyevent",
+        "danceevent": "danceevent",
+        "literaryevent": "literaryevent",
+        "musicevent": "musicevent",
+        "sportsevent": "sportsevent",
+        "theaterevent": "theaterevent",
+        
       },
 
       PlaceWithOpeninghours: {
@@ -196,10 +206,15 @@ module.exports = function (generatedSchemas) {
 
       ///////////////
       ///events
+      "comedyevent": ["comedy"],
+      "danceevent":["music", "dance", "clubbing", "concert"],
+      "musicevent": ["music", "musicevent", "concert", "music event"],
+      "literaryevent": ["literary"],
+      "sportsevent": ["sports"],
+      "theaterevent": ["theater"],
+
       //adding for coverage in frontend (even if no entities yet)
-      "danceevent": ["dance", "clubbing", "concert"],
       "festival": ["festival", "concert"],
-      "musicevent": ["musicevent", "concert", "music event"],
 
     }
   };
