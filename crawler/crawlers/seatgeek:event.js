@@ -1,5 +1,6 @@
 var _ = require("lodash");
 var moment = require("moment");
+var dateUtils = require("./utils/dateUtils");
 
 module.exports = {
   _meta: {
@@ -134,7 +135,7 @@ module.exports = {
           _sourceUrl: ".event-listing-title@href",
           _sourceId:".event-listing-title@href",
           name: ".event-listing-title > span",
-          startDate: ".event-listing-time@datetime",
+          startDate: ".page-event-listing@timestamp",
           location: ".event-listing-venue-link@href",
           _subtype: "@itemtype"
         };
@@ -145,7 +146,12 @@ module.exports = {
           var subtype = obj._subtype; 
           subtype = subtype.substring(subtype.lastIndexOf("/") + 1);
           return [subtype];
-        }
+        }, 
+        startDate: function (timestampUnixEpochSeconds) {
+
+          //seatgeek uses timestamps. Let's translate these
+          return dateUtils.translateTimestampToTimezone(timestampUnixEpochSeconds, "America/New_York");
+        }, 
       },
 
       // reducer: function (obj) {
