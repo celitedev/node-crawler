@@ -1,6 +1,5 @@
 var _ = require("lodash");
 var moment = require("moment");
-require("moment-timezone");
 
 module.exports = {
   _meta: {
