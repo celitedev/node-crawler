@@ -21,7 +21,7 @@ var md5 = require('md5');
 var cacheUtils = {
   dirDepth: 5,
   charsPerDir: 2,
-  cachePrefixDir: "fileCache",
+  cachePrefixDir: "../_DATA/fileCache/",
   createHashPath: function (crawlerName, url) {
     var hash = md5(url);
     var path = "";
