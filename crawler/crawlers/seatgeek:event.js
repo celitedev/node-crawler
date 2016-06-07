@@ -149,8 +149,8 @@ module.exports = {
         }, 
         startDate: function (timestampUnixEpochSeconds) {
 
-          //seatgeek uses timestamps. Let's translate these
-          return dateUtils.translateTimestampToTimezone(timestampUnixEpochSeconds, "America/New_York");
+          //seatgeek uses timestamps. Let's translate these to UTC
+          return dateUtils.translateTimestampToTimezone(timestampUnixEpochSeconds);
         }, 
       },
 

@@ -171,9 +171,10 @@ module.exports = {
           }
 
           //Eventbrite incorrectly returns a *local time* as a UTC time. 
-          //This needs to be tansposed to the correct timezone. 
-          return dateUtils.transposeTimeToTimezone(sDate, "America/New_York");
-          //out: "2016-06-10T14:00:00-04:00" || false
+          //This needs to be tansposed to the correct timezone and then ported to UTC again
+          return dateUtils.transposeTimeToUTC(sDate, "America/New_York");
+
+          //out: "2016-06-10T14:00:00Z" || false
         }
       },
 
