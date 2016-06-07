@@ -135,7 +135,7 @@ module.exports = {
           _sourceUrl: ".event-listing-title@href",
           _sourceId:".event-listing-title@href",
           name: ".event-listing-title > span",
-          startDate: "@timestamp",
+          startDate: ".event-listing-time@datetime",
           location: ".event-listing-venue-link@href",
           _subtype: "@itemtype"
         };
@@ -146,20 +146,6 @@ module.exports = {
           var subtype = obj._subtype; 
           subtype = subtype.substring(subtype.lastIndexOf("/") + 1);
           return [subtype];
-        },
-        startDate: function(timestamp){
-
-          var date = moment.unix(timestamp);
-
-          if (!date.isValid()) {
-            console.log("invalid timestamp", timestamp);
-            return undefined;
-          }
-
-          var dtCurrentZone = date.format();
-          dtCurrentZone = dtCurrentZone.substring(0, dtCurrentZone.length - 6);
-          return moment.tz(dtCurrentZone, "America/New_York").format();
-
         }
       },
 
