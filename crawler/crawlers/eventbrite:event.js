@@ -165,27 +165,27 @@ module.exports = {
           sDate = sDate.substring(sDate.indexOf(",") + 1).trim();
           //sdate: Jun 4 10:00 PM
 
-          //NOTE/TODO: when we find a recurring event we only process the first. 
           //sdate: Jun 4 10:00 PM & 31 more
           if (~sDate.indexOf("&")) {
+            //NOTE/TODO: #275 - when we find a recurring event we only process the first. 
             sDate = sDate.substring(0, sDate.indexOf("&")).trim();
           }
 
-          // Convoluted way to get a date in NYC timezone
-          // Root cause in unsafe date construction not longer supported: 
-          // https://github.com/moment/moment/issues/1407
+          var date =  moment(new Date(sDate));
 
-          var date = moment(new Date(sDate));
           if (!date.isValid()) {
             console.log("invalid date", sDate);
             return undefined;
           }
 
-          var dtCurrentZone = date.format();
-          dtCurrentZone = dtCurrentZone.substring(0, dtCurrentZone.length - 6);
-          return moment.tz(dtCurrentZone, "America/New_York").format();
+          var dateFormat =  date.format();
 
-          //out: "2016-06-10T14:00:00-04:00"
+          //remove added timezone of processing box. TZ always consists of 6 chars
+          dateFormat = dateFormat.substring(0, dateFormat.length -6);
+          return dateFormat; 
+
+          //RETURN DT WITHOUT TIMEZONE - I.E.: LOCALTIME
+          //out: "2016-06-10T14:00:00"
         }
       },
 
@@ -211,6 +211,14 @@ module.exports = {
         }
         return obj;
       },
+
+      pruner: function (result) {
+        if (!result.startDate) {
+          return undefined;
+        }
+        return result;
+      }
+
     }
   }
 };
