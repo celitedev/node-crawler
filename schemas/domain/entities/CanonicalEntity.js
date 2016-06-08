@@ -173,7 +173,7 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
           val = _.isArray(val) ? val : [val];
 
           return fieldContents ? arr.concat(val) : arr;
-        }, props[propName] || []));
+        }, [])).concat(props[propName] || []);
 
       }
     });
@@ -591,9 +591,9 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
 
       //move in the originals
       if (erdMappingObj.enumKeepOriginal) {
-        v = v.concat(origv);
+        v = origv.concat(v); //originals first
       }
-
+      
       //clean up
       v = _.uniq(removeUndefined(v));
 
