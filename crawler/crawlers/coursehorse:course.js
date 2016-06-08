@@ -252,7 +252,7 @@ module.exports = {
           var indexOfClasses = urlParts.indexOf(specialCheckByType || "classes"); 
           if(~indexOfClasses){
             //[indexOfClasses+1, Math.min(length-1, indexOfClasses+3)]
-            var genres = arrByType.concat(_.map(urlParts.slice(indexOfClasses+1, Math.min(indexOfClasses+3, urlParts.length-1)), function(genre){
+            var genres = arrByType.concat(_.map(urlParts.slice(indexOfClasses+1, Math.min(indexOfClasses+3, urlParts.length)), function(genre){
               return "course_"+genre;
             }));
 
