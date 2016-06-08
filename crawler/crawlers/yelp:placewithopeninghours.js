@@ -1,6 +1,8 @@
 var _ = require("lodash");
 var URL = require("url");
 
+var nycObj = require("../../schemas/domain/_definitions/config").statics.NYC;
+
 //crawlSchema for: 
 //source: Eventful
 //type: events
@@ -179,6 +181,10 @@ module.exports = {
       //REMEMBER: obj._htmlDetail is always there for you should you need access to raw power.
       mapping: {
 
+        containedInPlace: function (val) {
+          return nycObj.sourceId; //always grab the sourceId not the id!
+        },
+         
         //fetch based on urlencoded json-stringified data-attrib
         "_detail.geo.latitude": [
           function (latitude, obj) {

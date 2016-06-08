@@ -4,6 +4,8 @@ var nycUtils = require("./utils/nycUtils")({
   DEBUG_OPENINGHOURS: false
 });
 
+var nycObj = require("../../schemas/domain/_definitions/config").statics.NYC;
+
 module.exports = {
   _meta: {
     name: "NYC Shopping",
@@ -134,6 +136,9 @@ module.exports = {
       //mapping allow function(entire obj) || strings or array of those
       //returning undefined removes them
       mapping: {
+        containedInPlace: function (val) {
+          return nycObj.sourceId; //always grab the sourceId not the id!
+        }, 
         _type: function (val) {
           return ["LocalBusiness", "Store"];
         },
