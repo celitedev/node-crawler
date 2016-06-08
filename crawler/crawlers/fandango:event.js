@@ -1,5 +1,6 @@
 var _ = require("lodash");
 var moment = require("moment");
+var dateUtils = require("./utils/dateUtils");
 
 //crawlSchema for: 
 //source: Eventful
@@ -185,11 +186,13 @@ module.exports = {
         _.each(doc.movie, function (movie) {
           _.each(movie.screeningEvent, function (screeningEvent) {
 
+            //Fandango correctly uses isoTime with correct tz -> translate to UTC
+            var time = dateUtils.transposeTimeToUTC(screeningEvent.startDate); 
+            
             //Id is required so make it up. 
             //NOTE: we can't use _sourceId = _sourceUrl, since _sourceUrl doesn't
             //always exist.
-            var time = screeningEvent.startDate,
-              locationName = doc.locationName,
+            var locationName = doc.locationName,
               movieName = movie.movieName;
 
             var id = (movieName + " -- " + locationName + " -- " + time);
@@ -198,7 +201,7 @@ module.exports = {
               _sourceUrl: screeningEvent._sourceUrl, //doesn't always exist
               _sourceId: id,
               name: movieName + " @ " + locationName,
-              startDate: screeningEvent.startDate,
+              startDate: time,
               workPresented: movie.workPresented,
               location: doc.location
             });
