@@ -1,5 +1,7 @@
 var _ = require("lodash");
 
+var nycObj = require("../../schemas/domain/_definitions/config").statics.NYC;
+
 //crawlSchema for: 
 //source: Eventful
 //type: events
@@ -197,6 +199,11 @@ module.exports = {
       //mapping allow function(entire obj) || strings or array of those
       //returning undefined removes them
       mapping: {
+        
+        containedInPlace: function (val) {
+          return nycObj.sourceId; //always grab the sourceId not the id!
+        },
+
         //Example of #115: "How to allow multi _types and subtypes in specific crawlers"
         _type: function (val) {
           return ["LocalBusiness"];
@@ -236,6 +243,8 @@ module.exports = {
 
           return imageArr;
         },
+
+       
 
       },
 

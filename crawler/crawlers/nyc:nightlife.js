@@ -4,6 +4,8 @@ var nycUtils = require("./utils/nycUtils")({
   DEBUG_OPENINGHOURS: false
 });
 
+var nycObj = require("../../schemas/domain/_definitions/config").statics.NYC;
+
 //crawlSchema for: 
 //source: Eventful
 //type: events
@@ -137,6 +139,10 @@ module.exports = {
       //mapping allow function(entire obj) || strings or array of those
       //returning undefined removes them
       mapping: {
+
+        containedInPlace: function (val) {
+          return nycObj.sourceId; //always grab the sourceId not the id!
+        }, 
         _type: function (val) {
           return ["LocalBusiness"];
         },

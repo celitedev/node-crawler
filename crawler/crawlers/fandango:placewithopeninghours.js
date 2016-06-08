@@ -1,6 +1,6 @@
 var _ = require("lodash");
 
-var nycObj = require("../schemas/domain/_definitions/config").statics.NYC;
+var nycObj = require("../../schemas/domain/_definitions/config").statics.NYC;
 
 //crawlSchema for: 
 //source: Eventful
