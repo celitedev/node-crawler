@@ -135,7 +135,8 @@ module.exports = {
           _sourceUrl: ".event-listing-title@href",
           _sourceId:".event-listing-title@href",
           name: ".event-listing-title > span",
-          startDate: ".page-event-listing@timestamp",
+          startDate: ".event-listing-time@datetime",
+          _startDate: ".event-listing-time",
           location: ".event-listing-venue-link@href",
           _subtype: "@itemtype"
         };
@@ -147,10 +148,12 @@ module.exports = {
           subtype = subtype.substring(subtype.lastIndexOf("/") + 1);
           return [subtype];
         }, 
-        startDate: function (timestampUnixEpochSeconds) {
+        startDate: function (startDateISO, obj) {
 
-          //seatgeek uses timestamps. Let's translate these to UTC
-          return dateUtils.translateTimestampToTimezone(timestampUnixEpochSeconds);
+          //seatgeek uses timestamps, but these appear to be in NYC local time WTF. 
+          //Therefore we fallback to isoTime in localtime since this is better human checkable. 
+          //
+          return dateUtils.transposeTimeToUTC(startDateISO, "America/New_York");
         }, 
       },
 

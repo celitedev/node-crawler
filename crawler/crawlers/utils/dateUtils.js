@@ -34,7 +34,7 @@ var utils = module.exports = {
 		//These isoDates are not correctly parsed using the else-flow below
 		//so we parse them separately. 
 		
-		var isoDT = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/gi;
+		var isoDT = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}/gi;
 		var isoUTC = /Z$/gi;
 		var isoTZ = /[-+][0-9]{2}:[0-9]{2}$/gi;
 		if(sDateTimeLocal.match(isoDT)){
@@ -66,21 +66,5 @@ var utils = module.exports = {
     // console.log(sDateTimeLocal, parseDateLocalTZ, dateUTC.format());
 
     return dateUTC.format();
-	}, 
-
-	transposeTimeWithTimezoneToUTC: function(sDateTimeWithTimezone){
-		var date =  moment(new Date(sDateTimeWithTimezone));
-    if (!date.isValid()) {
-      return false;
-    }
-    return date.utc().format();
-	},
-
-
-
-	translateTimestampToTimezone: function(timestamp, timezone){
-		var dt = moment.unix(timestamp);
-		if(!timezone) return dt.utc().format();
-		return utils.translateTimeToTimezone(dt, timezone);
 	}
 };
