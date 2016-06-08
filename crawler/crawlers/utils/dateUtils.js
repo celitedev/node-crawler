@@ -3,50 +3,67 @@ var moment = require("moment");
 require("moment-timezone");
 
 var utils = module.exports = {
-
-	//when time is meant to be in timezone but source forgot to add it
-	// transposeTimeToTimezone: function(sDateTime, timezone){
-	// 	var date =  moment(new Date(sDateTime));
-
- //    if (!date.isValid()) {
- //      return false;
- //    }
-
- //    var dtCurrentZone = date.format();
- //    dtCurrentZone = dtCurrentZone.substring(0, dtCurrentZone.length - 6);
- //    return moment.tz(dtCurrentZone, "America/New_York");
-	// }, 
-
-
+ 
 	//Sometimes a supplied datetime is in local time while it should be in a specified timezone
 	//NOTE: sDateTimeLocal should be a datetime WITHOUT timezone
 	transposeTimeToUTC: function(sDateTimeLocal, supposedTimezone){
 
-		var tzSuffix ="";
-		if(supposedTimezone){
-			//given 2016-06-07T16:12:38-04:00
-			//tzSuffix = -04:00
-			tzSuffix = moment().tz(supposedTimezone).format();
-			tzSuffix = tzSuffix.substring(tzSuffix.length-6);
+		if(!sDateTimeLocal){
+			//if date is unspecified return false
+			//NOTE: be sure the calling crawler defines a pruner
+			return false; 
 		}
 
-		//parseDateCurrentTZ: This always translates to timezone of pc, so strip out tz
-		//NOTE: when presented with a correct iso this will CHANGE the time based on current tz to UTC offset!
-		//BUT when parsing anotehr string (9-12-2016 9PM) it will NOT CHANGE the time!
-		var date =  moment(new Date(sDateTimeLocal));
-    if (!date.isValid()) {
-      return false;
-    }
-    var parseDateCurrentTZ = 	date.format(); 
+		//based on isoDT and supposedTimezone -> fetch suffix of timezone
+		//NOTE: we need an actual date instead of now, bc of daylight saving time shifts
+		function getTZSuffix(isoDT){
+			if(!supposedTimezone) return "";
+			var dateInTZ = moment(new Date(isoDT)).tz(supposedTimezone).format();
+			return dateInTZ.substring(dateInTZ.length-6);
+		}
 
-    //now based on some string magic, change to timezone as supplied or zero otherwise.
-    var parseDateLocalTZ = parseDateCurrentTZ.substring(parseDateCurrentTZ, parseDateCurrentTZ.length-6) + tzSuffix;
+		var dateUTC; 
+		var parseDateLocalTZ;
 
-   	//lastly, transform this date to utc
-    var dateUTC =  moment(new Date(parseDateLocalTZ)).utc();
+		//Check if sDateTimeLocal is a correct isoDateTime. 
+		//We check for 3 specific isotimes: 
+		// - without timezone - 2016-10-18T19:00:00
+		// - utc 							- 2016-06-09T15:00:00Z
+		// - with timezone 		- 2016-10-18T19:00:00-04:00
+		//
+		//These isoDates are not correctly parsed using the else-flow below
+		//so we parse them separately. 
+		
+		var isoDT = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}/gi;
+		var isoUTC = /Z$/gi;
+		var isoTZ = /[-+][0-9]{2}:[0-9]{2}$/gi;
+		if(sDateTimeLocal.match(isoDT)){
 
-    console.log("###############################################################");
-    console.log(sDateTimeLocal, parseDateLocalTZ, dateUTC.format());
+			parseDateLocalTZ = sDateTimeLocal;
+			if(!(sDateTimeLocal.match(isoUTC) || sDateTimeLocal.match(isoTZ))){
+				//parse with unspecified timezone  -> add tzSuffix
+				parseDateLocalTZ += getTZSuffix(parseDateLocalTZ);
+			}
+
+		}else{
+
+			//parseDateCurrentTZ: This always translates to timezone of pc, so strip out tz
+			var date =  moment(new Date(sDateTimeLocal));
+	    if (!date.isValid()) {
+	      return false;
+	    }
+	    var parseDateCurrentTZ = 	date.format(); 
+
+	    //now based on some string magic, change to timezone as supplied or zero otherwise.
+	    parseDateLocalTZ = parseDateCurrentTZ.substring(parseDateCurrentTZ, parseDateCurrentTZ.length-6) + getTZSuffix(parseDateCurrentTZ);
+
+		}
+
+		//lastly, transform this date to utc
+    dateUTC =  moment(new Date(parseDateLocalTZ)).utc();
+
+    // console.log("###############################################################");
+    // console.log(sDateTimeLocal, parseDateLocalTZ, dateUTC.format());
 
     return dateUTC.format();
 	}, 
