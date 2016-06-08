@@ -126,7 +126,7 @@ var simpleCardFormatters = {
     //if category not yet defined, simply use the fist (most specific) type
     formatted.category = formatted.category || raw.types[0];
 
-    formatted.databits2 = (formatted.databits2 || []).concat(raw.tagsFromFact);
+    formatted.databits2 = _.compact((formatted.databits2 || []).concat(raw.tagsFromFact));
 
     //if imagePrimaryURL not set explicitly, set it to the first element in the image-array
     if (!raw.imagePrimaryUrl && raw.image && raw.image.length) {
