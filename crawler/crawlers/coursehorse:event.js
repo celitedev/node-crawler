@@ -107,9 +107,60 @@ module.exports = {
 
       seedUrls: function () {
         var urls = [];
-        for (var i = 1; i < 10; i++) { //
+        
+        var i;
+
+        //art
+        for (i = 1; i < 400; i++) { 
           urls.push("https://coursehorse.com/nyc/classes/art?page=" + i);
         }
+
+        //acting
+        for (i = 1; i < 90; i++) { 
+          urls.push("https://coursehorse.com/nyc/classes/acting?page=" + i);
+        }
+        
+        //cooking
+        for (i = 1; i < 400; i++) { 
+          urls.push("https://coursehorse.com/nyc/classes/cooking?page=" + i);
+        }
+        
+        //dance
+        for (i = 1; i < 80; i++) { 
+          urls.push("https://coursehorse.com/nyc/classes/dance?page=" + i);
+        }
+        
+        //kids
+        for (i = 1; i < 220; i++) { 
+          urls.push("https://coursehorse.com/nyc/classes/kids?page=" + i);
+        }
+        
+        //life-skills
+        for (i = 1; i < 270; i++) { 
+          urls.push("https://coursehorse.com/nyc/classes/life-skills?page=" + i);
+        }
+        
+        //language
+        for (i = 1; i < 60; i++) { 
+          urls.push("https://coursehorse.com/nyc/classes/language?page=" + i);
+        }
+        
+        //music
+        for (i = 1; i < 50; i++) { 
+          urls.push("https://coursehorse.com/nyc/classes/music?page=" + i);
+        }
+
+        //professional
+        for (i = 1; i < 300; i++) { 
+          urls.push("https://coursehorse.com/nyc/classes/professional?page=" + i);
+        }
+        
+        //tech
+        for (i = 1; i < 330; i++) { 
+          urls.push("https://coursehorse.com/nyc/classes/tech?page=" + i);
+        }
+
+
         return urls;
       },
 
@@ -133,6 +184,7 @@ module.exports = {
         return {
 
           _courseName: ".title > span",
+          _sourceUrl: ".title@href", //see notes below
           location: ".school@href",
           workFeatured: ".title@href",
           _detail: x(".title@href", {
@@ -165,7 +217,12 @@ module.exports = {
 
           var item =  _.defaults({
             _sourceId: id, 
-            _sourceUrl: id, 
+
+            //NOTE: we leave this to be url to course instead of event. 
+            //This works out ok: 
+            //1. we create an ID per event which is in the end what matters for Kwhen internally. 
+            //2. at same time _sourceUrl will make sure we prune correctly for detail pages.
+            _sourceUrl: obj._sourceUrl, 
             name: obj._courseName,
             startDate: dateUtils.transposeTimeToUTC(educationEvent.startDate),
             endDate: dateUtils.transposeTimeToUTC(educationEvent.endDate)
