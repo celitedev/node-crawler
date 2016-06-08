@@ -249,6 +249,16 @@ module.exports = function (generatedSchemas) {
         "format": "yyyy-MM-dd"
       },
 
+      endDate: {
+        facet: {
+          label: "end at",
+          type: "dateTime" //? display as calendar? 
+        },
+        "type": "date",
+        "format": "yyyy-MM-dd"
+      },
+
+
       performer: {
         exclude: false,
         expand: {
