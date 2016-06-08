@@ -1,5 +1,6 @@
 var _ = require("lodash");
 var moment = require("moment");
+require("moment-timezone");
 var hogan = require("hogan.js");
 
 var simpleCardFormatters = {
@@ -49,6 +50,8 @@ var simpleCardFormatters = {
     var movie = expand[raw.workFeatured];
     var theater = expand[raw.location];
 
+    var headsUpTime =  moment.tz(raw.startDate, "America/New_York").format('MMMM Do YYYY, h:mm:ss a');
+
     _.defaults(json.formatted, {
       category: "movie screening", //overwrite 'screening event'
       identifiers1: movie.name,
@@ -56,7 +59,7 @@ var simpleCardFormatters = {
         theater.name,
         //"x min by foot" //TODO: based on user info. What if not supplied? 
       ],
-      headsup1: moment(raw.startDate).format('MMMM Do YYYY, h:mm:ss a'),
+      headsup1: headsUpTime,
       // headsup2: "Released: February 12, 2016", //if omitted space will be truncated in frontend.
       databits1: (function () {
         var databits;
@@ -91,9 +94,11 @@ var simpleCardFormatters = {
       json.formatted.identifiers2 = json.formatted.identifiers2 || location.name;
     }
 
+    var headsUpTime =  moment.tz(raw.startDate, "America/New_York").format('MMMM Do YYYY, h:mm:ss a');
+
     _.defaults(json.formatted, {
       category: raw.root,
-      headsup1: json.formatted.headsup1 || (raw.startDate ? moment(raw.startDate).format('MMMM Do YYYY, h:mm:ss a') : "start time not known"),
+      headsup1: json.formatted.headsup1 || (raw.startDate ? headsUpTime : "start time not known"),
       //default to name of event. Sometimes this is rather meaningless, so we might already set this in subtypes
       //which are processed earlier such as ScreeningEvent.
       identifiers1: raw.name
