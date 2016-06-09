@@ -23,12 +23,12 @@ module.exports = function (command) {
   var app = command.app;
 
   // var exampleBody = {
-  //   shareType: "email", 
+  //   shareType: "email",  //only 'email' is supported for now (later: social, etc.)
   //   type: "card", //card || collection
   //   id: "6ae76003-35f7-54ff-b045-25c3a9593654",
   //   fromName: "Geert-Jan Brits",
   //   to: "a@example.com; b@asdsa.com", //seperate multiple by ';'
-  //   msg: "Hey man check out this cool place!. Cheers Geert", 
+  //   msg: "Hey man check out this cool place!. Cheers Geert", //optional
   // };
   app.post('/share', function (req, res, next) {
 
@@ -50,9 +50,9 @@ module.exports = function (command) {
 
     function createUrl(type, id){
       if(type === "card"){
-        return "http://testing123.kwhen.com:9000/detail.html?id="  + id;
+        return "https://testing123.kwhen.com:7000/details/"  + id;
       }else{ //type === collection
-        return "http://testing123.kwhen.com:9000/detail.html?id="  + id; //TODO
+        return "https://testing123.kwhen.com:7000/TODO_LINK_TO_COLLECTION?id="  + id; //TODO
       }
     }
 
@@ -66,8 +66,6 @@ module.exports = function (command) {
         };
     });
 
-    console.log("URL", createUrl(req.body.type, req.body.id));
-
     //https://github.com/sparkpost/nodemailer-sparkpost-transport#usage
     transporter.sendMail({
       "recipients": emailObjs,
@@ -75,7 +73,7 @@ module.exports = function (command) {
         msg: req.body.msg, //optional
         sender: req.body.fromName, 
         itemUrl: createUrl(req.body.type, req.body.id),
-        itemTitle: "card name xyz" // the name of the card or title of the collection, sourced from id
+        itemTitle: req.body.type === "card" ? "card name xyz" : "collection name xyz"
       },
       content: { //Choose based on 'type'
         template_id: req.body.type === "card" ? "share-card" : "share-collection"
