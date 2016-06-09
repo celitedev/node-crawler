@@ -9,6 +9,14 @@ function formatDateHumanReadable(startDate){
 }
 
 var simpleCardFormatters = {
+  educationevent: function(json, expand){
+
+    _.defaults(json.formatted, {
+      category: "course event"
+    });
+
+  }, 
+
   placewithopeninghours: function (json, expand) {
 
     var raw = json.raw;
@@ -148,7 +156,7 @@ var simpleCardFormatters = {
  */
 function enrichViewModel(json, expand) {
 
-  var types = ["thing", json.raw.root.toLowerCase()].concat(json.raw.subtypes);
+  var types = ["thing", json.raw.root.toLowerCase()].concat(json.raw.subtypes_controlled);
   types.reverse(); //types from most specific to most generic.
 
   json.raw.types = types;
