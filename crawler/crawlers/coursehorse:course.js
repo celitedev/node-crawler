@@ -180,7 +180,6 @@ module.exports = {
       detailPageAware: true,
 
       schema: function (x, detailObj) { //schema for each individual result
-
         return {
 
           _sourceId: ".title@href", 
