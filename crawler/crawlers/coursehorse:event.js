@@ -4,7 +4,7 @@ var dateUtils = require("./utils/dateUtils");
 
 module.exports = {
   _meta: {
-    name: "Coursehorse Events",
+    name: "Coursehorse Event",
     description: "Distributed Crawler for Coursehorse.com Events"
   },
   source: {
@@ -68,7 +68,7 @@ module.exports = {
   },
   job: {
 
-    concurrentJobs: 1,
+    concurrentJobs: 2,
 
     //job-level retries before fail. 
     //This is completely seperate for urls that are individually retried by driver
@@ -180,7 +180,6 @@ module.exports = {
       detailPageAware: true,
 
       schema: function (x, detailObj) { //schema for each individual result
-
         return {
 
           _courseName: ".title > span",
@@ -193,8 +192,8 @@ module.exports = {
               endDate: "[itemprop=availabilityEnds]@content",
               _factPrice: "[itemprop=price]@content",
               _factPriceCurrency: "[itemprop=priceCurrency]@content",
-            }], undefined, detailObj),
-          }), 
+            }]),
+          }, undefined, detailObj), 
         };
       },
 
