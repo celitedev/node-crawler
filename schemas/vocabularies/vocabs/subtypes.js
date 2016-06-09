@@ -32,6 +32,8 @@ module.exports = function (generatedSchemas) {
         "sportsevent": "sportsevent",
         "theaterevent": "theaterevent",
         
+        //coursehorse
+        "educationevent": "educationevent",
       },
 
       PlaceWithOpeninghours: {
@@ -216,6 +218,8 @@ module.exports = function (generatedSchemas) {
       //adding for coverage in frontend (even if no entities yet)
       "festival": ["festival", "concert"],
 
+      //coursehores
+      "educationevent": ["education", "course"]
     }
   };
 
