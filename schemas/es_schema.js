@@ -501,30 +501,33 @@ module.exports = function (generatedSchemas) {
    * @return {[type]}     [description]
    */
   obj.cleanupEnumSynonymsInRethinkDTO = function (dto) {
-    dto = _.reduce(dto, function (agg, propVal, propName) {
 
-      var propDef = allProps[propName];
-      if (!propDef) return agg; //for id
+    return dto; 
 
-      ///////////////////////////////////////////
-      // Check for enum and dedupe enum values //
-      ///////////////////////////////////////////
-      var enumObj = propDef.enum;
-      if (!enumObj) return agg;
+    //BELOW CODE RESULTS IN BUG: #284
+    //COMMENTING OUT FOR NOW.
+    // dto = _.reduce(dto, function (agg, propVal, propName) {
 
-      var isSingleItemOrig = !_.isArray(propVal);
-      propVal = stripEnumSynonyms(enumObj, _.isArray(propVal) ? propVal : [propVal]);
+    //   var propDef = allProps[propName];
+    //   if (!propDef) return agg; //for id
 
-      if (isSingleItemOrig && !propVal.length) return agg;
+    //   ///////////////////////////////////////////
+    //   // Check for enum and dedupe enum values //
+    //   ///////////////////////////////////////////
+    //   var enumObj = propDef.enum;
+    //   if (!enumObj) return agg;
 
-      agg[propName] = isSingleItemOrig ? propVal[0] : propVal;
+    //   var isSingleItemOrig = !_.isArray(propVal);
+    //   propVal = stripEnumSynonyms(enumObj, _.isArray(propVal) ? propVal : [propVal]);
 
-      return agg;
-    }, dto);
+    //   if (isSingleItemOrig && !propVal.length) return agg;
 
+    //   agg[propName] = isSingleItemOrig ? propVal[0] : propVal;
 
+    //   return agg;
+    // }, dto);
 
-    return dto;
+    // return dto;
   };
 
   singleton = obj;
