@@ -235,9 +235,15 @@ module.exports = function (generatedSchemas) {
 
     var rootName = rootsOfType[rootsOfType.length - 1];
     var rootMap = exports.sourceMappings[rootName] = exports.sourceMappings[rootName] || {};
-    rootMap[typeName] = typeName;
+    rootMap[typeName] = [typeName];
+
+    //make array of existing vocab
+    if(exports.vocabulary[typeName]){
+      var existingVal = exports.vocabulary[typeName]; 
+      existingVal = _.isArray(existingVal) ? existingVal : [existingVal];
+      exports.vocabulary[typeName] = existingVal;
+    }
     exports.vocabulary[typeName] = _.uniq((exports.vocabulary[typeName] || []).concat([typeName]));
   });
-
   return exports;
 };
