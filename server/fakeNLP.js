@@ -41,7 +41,7 @@ var subtypeToFilterQuery = {
     type: "OrganizationAndPerson",
     label: {
       plural: "organizations or persons",
-      singular: "ogranization or person"
+      singular: "organization or person"
     }
   },
 

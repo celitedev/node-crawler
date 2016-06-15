@@ -3,68 +3,110 @@ var moment = require("moment");
 require("moment-timezone");
 var hogan = require("hogan.js");
 
+//TODO: DRY (defined elsewhere as well)
+var OPENINGHOURS_RESOLUTION = 5;
 
 function formatDateHumanReadable(startDate){
   return moment(startDate).tz("America/New_York").calendar();  
 }
 
-var simpleCardFormatters = {
-  educationevent: function(json, expand){
+function fromMomentToOpenHoursSpecNr(date){
+  var days = date.isoWeekday() - 1; //returns[1, 7] -> map to [0,6]
+  var hours = date.hours();
+  var minutes = date.minutes();
+  return ((24 * days + hours) * 60 / OPENINGHOURS_RESOLUTION) + Math.round(minutes / OPENINGHOURS_RESOLUTION);
+}
 
+function fromDateIntToDate(dateAsInt){
+
+  //date in minutes
+  var dateInMinutes = dateAsInt * OPENINGHOURS_RESOLUTION; 
+
+  var dayMultiplier = 24 * 60;
+  var hourMultiplier = 60;
+
+  var daysIsoWeekday = Math.floor(dateInMinutes / dayMultiplier) +1; 
+  dateInMinutes = dateInMinutes % dayMultiplier;
+
+  var hours = Math.floor(dateInMinutes / hourMultiplier); 
+  var minutes = (dateInMinutes % hourMultiplier) * OPENINGHOURS_RESOLUTION;
+
+  return moment().tz("America/New_York").days(daysIsoWeekday).hours(hours).minutes(minutes).seconds(0).milliseconds(0);
+}
+
+function getOpenhourHumandReadable(date, specArr){
+
+  var dateAsInt = fromMomentToOpenHoursSpecNr(date);
+  var foundOpen = false; 
+  var foundNext = false; 
+  var foundNextOpen = 10000000; 
+  _.each(specArr, function(openClose){
+    if(foundOpen) return;
+    if(dateAsInt >= openClose.opens && dateAsInt <= openClose.closes){
+      foundOpen = openClose; 
+    }else if(dateAsInt < openClose.opens && openClose.opens < foundNextOpen){
+      //find the open-dt that's closest to dateAsInt
+        foundNext = openClose;
+        foundNextOpen = openClose.opens;
+    }
+  });
+
+
+  var dateFuture = date.clone();
+  var deltaInMinutes;
+  if(foundOpen){
+    //present closing DT
+    var closeDate = fromDateIntToDate(foundOpen.closes);
+    deltaInMinutes = (foundOpen.closes - dateAsInt) * OPENINGHOURS_RESOLUTION;
+    
+    if(deltaInMinutes <= 180){ //close within 3 hours: use relative time
+      return [true, dateFuture.add(deltaInMinutes, 'minutes').fromNow()];
+    }else{
+      return [true, closeDate.calendar() + " - " + foundOpen.closes];
+    }
+  }else if(foundNext){
+
+    //present opening DT
+    var openDate = fromDateIntToDate(foundNext.opens);
+    deltaInMinutes = (foundNext.opens - dateAsInt) * OPENINGHOURS_RESOLUTION;
+    
+    if(deltaInMinutes <= 180){ //close within 3 hours: use relative time
+      return [false, dateFuture.add(deltaInMinutes, 'minutes').fromNow()];
+    }else{
+      return [false, openDate.calendar()];
+    }
+
+  }else{
+    //does this ever happen? 
+    return null;
+  }
+}
+
+var simpleCardFormatters = {
+ 
+
+  // ///////////
+  // //EVENTS //
+  // ///////////
+
+  educationevent: function(json, expand){
     _.defaults(json.formatted, {
       category: "course event"
     });
-
   }, 
 
-  placewithopeninghours: function (json, expand) {
-
-    var raw = json.raw;
-
-    _.defaults(json.formatted, {
-      identifiers1: raw.name,
-      identifiers2: _.compact([
-        raw.address.streetAddress,
-        raw.address.addressLocality,
-        raw.address.postalCode,
-        raw.address.Region
-        //"x min by foot" //TODO: based on user info. What if not supplied? 
-      ]),
-      // headsup2: _.compact([json.contentRating].concat(json.genre)), //if omitted space will be truncated in frontend.
-      // databits2: _.compact([movie.contentRating].concat(movie.genre)), //if omitted space will be truncated in frontend.
-      // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
-    });
-  },
-  movie: function (json, expand) {
-
-    var raw = json.raw;
-
-    _.defaults(json.formatted, {
-      identifiers1: raw.name,
-      headsup1: (function () {
-        if (raw.aggregateRating.ratingValue) {
-          return "Rating: " + (Math.round(raw.aggregateRating.ratingValue * 10) / 10) + "/5 (" + raw.aggregateRating.ratingCount + ")";
-        } else {
-          return "No Reviews yet";
-        }
-      }()),
-      headsup2: _.compact([raw.contentRating].concat(raw.genre)), //if omitted space will be truncated in frontend.
-      databits2: _.compact([json.contentRating].concat(json.genre)), //if omitted space will be truncated in frontend.
-      // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
-    });
-
-  },
   screeningevent: function (json, expand) {
 
     //TODO: what to do if movie || theater not defined? This is possible....
 
     var raw = json.raw;
+    var formatted = json.formatted;
 
     var movie = expand[raw.workFeatured];
     var theater = expand[raw.location];
 
-    _.defaults(json.formatted, {
-      category: "movie screening", //overwrite 'screening event'
+    _.defaults(formatted, {
+      // category: "movie screening", //overwrite 'screening event'
       identifiers1: movie.name,
       identifiers2: [
         theater.name,
@@ -79,12 +121,12 @@ var simpleCardFormatters = {
         } else {
           databits = "No Reviews yet";
         }
-        databits += ", ****"; //TODO: HORRIBLE. NEEDS TO BE IN THIS FORMAT FOR FRONTEND. 
       }()),
       databits2: _.compact([movie.contentRating].concat(movie.genre)),
       // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
     });
   },
+
   event: function (json, expand) {
 
     var raw = json.raw;
@@ -99,43 +141,146 @@ var simpleCardFormatters = {
     //set geo of event based on location if event doesn't have geo set yet
     var location = expand[raw.location];
     if (location) {
-
       raw.geo = raw.geo || location.geo;
-
       json.formatted.identifiers2 = json.formatted.identifiers2 || location.name;
     }
 
     _.defaults(json.formatted, {
-      category: raw.root,
-      headsup1: json.formatted.headsup1 || (raw.startDate ? formatDateHumanReadable(raw.startDate) : "start time not known"),
-      //default to name of event. Sometimes this is rather meaningless, so we might already set this in subtypes
-      //which are processed earlier such as ScreeningEvent.
-      identifiers1: raw.name
+      headsup1: raw.startDate ? formatDateHumanReadable(raw.startDate) : "start time not known",
     });
   },
 
-  organizationandperson: function (json, expand) {
-    var raw = json.raw,
-      formatted = json.formatted;
+  // //////////////////
+  // //Creative Work //
+  // //////////////////
 
+
+  movie: function (json, expand) {
+
+    var raw = json.raw;
+    var formatted = json.formatted;
+
+    _.defaults(formatted, {
+      headsup1: (function () {
+        if (raw.aggregateRating.ratingValue) {
+          return "Rating: " + (Math.round(raw.aggregateRating.ratingValue * 10) / 10) + "/5 (" + raw.aggregateRating.ratingCount + ")";
+        } else {
+          return "No Reviews yet";
+        }
+      }())
+    });
+
+  },
+
+
+  creativework: function (json, expand) {
+
+    var raw = json.raw;
+    var formatted = json.formatted;
+
+    //temporary stuff until we add 'course' as subtype_controlled
+    var category; 
+    if(~raw.subtypes.indexOf("course")){
+      category = "course"; 
+    }
+
+    _.defaults(json.formatted, {
+      category: category
+    });
+  },
+
+
+
+  // //////////////////////////
+  // //placewithopeninghours //
+  // //////////////////////////
+  placewithopeninghours: function (json, expand) {
+
+    var raw = json.raw;
+    var formatted = json.formatted;
+
+    if(raw.openingHoursSpecification){
+
+      var nowDate = moment().tz("America/New_York");
+      var openingHoursArr = getOpenhourHumandReadable(nowDate, raw.openingHoursSpecification);
+      if(openingHoursArr){
+        if(openingHoursArr[0]){ // if true -> open
+           _.defaults(formatted, {
+              headsup1: "Open Now", 
+              headsup2: "Closes "  + openingHoursArr[1]
+           });
+        }else{ // if true -> closed
+           _.defaults(formatted, {
+              headsup1: "Closed", 
+              headsup2: "Opens "  + openingHoursArr[1]
+           });
+        }
+      }
+    }
+
+
+    _.defaults(formatted, {
+
+      //address
+      identifiers2: _.compact([
+        raw.address.streetAddress,
+        raw.address.addressLocality,
+        raw.address.postalCode,
+        raw.address.Region
+        //"x min by foot" //TODO: based on user info. What if not supplied? 
+      ]),
+
+      // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
+    });
+  },
+
+ 
+
+  //////////////////////////
+  //organizationandperson //
+  //////////////////////////
+  organizationandperson: function (json, expand) {
+    
+    var raw = json.raw;
+    var formatted = json.formatted;
+
+    _.defaults(formatted, {
+      //...
+    });
+  },
+
+
+  //////////
+  //THING //
+  //////////
+  thing: function (json, expand) {
+
+    var raw = json.raw;
+    var formatted = json.formatted;
+    
     //if genre is defined
-    var genreFact = _.find(raw.fact, {
+    var genreFacts = _.filter(raw.fact, {
       name: "genre"
     });
 
-    formatted.category = formatted.category || (genreFact ? genreFact.val[0] : raw.tagsFromFact[0]);
-    formatted.identifiers1 = raw.name;
-  },
+    var genresAsDatabits = _.reduce(genreFacts, function(arr, genre){
+      return arr.concat(genre.val);
+    }, []);
 
-  thing: function (json, expand) {
+    _.defaults(formatted, {
 
-    var raw = json.raw,
-      formatted = json.formatted;
+      //default to category with some specifics
+      category:   genreFacts.length ? genreFacts[0].val[0] : (raw.subtypes_controlled.length ? raw.subtypes_controlled[raw.subtypes_controlled.length - 1] : null),
 
-    //if category not yet defined, simply use the fist (most specific) type
-    formatted.category = formatted.category || raw.types[0];
+      //default to name
+      identifiers1: raw.name, 
 
-    formatted.databits2 = _.compact((formatted.databits2 || []).concat(raw.tagsFromFact));
+      //all facts independent of fact type
+      databits2: genresAsDatabits.length ? genresAsDatabits: raw.tagsFromFact
+    });
+
+    formatted.databits2 = formatted.databits2 || []; 
+
 
     //if imagePrimaryURL not set explicitly, set it to the first element in the image-array
     if (!raw.imagePrimaryUrl && raw.image && raw.image.length) {

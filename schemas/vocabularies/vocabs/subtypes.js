@@ -219,7 +219,7 @@ module.exports = function (generatedSchemas) {
       "festival": ["festival", "concert"],
 
       //coursehores
-      "educationevent": ["education", "course"]
+      "educationevent": ["education event", "course event"]
     }
   };
 
