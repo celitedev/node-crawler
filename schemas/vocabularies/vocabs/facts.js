@@ -51,6 +51,12 @@ module.exports = function (generatedSchemas) {
         "sushi bars": "sushi",
         "soup &amp; salad": "soupsalad",
       },
+
+      CreativeWork: {
+        //Courshorse courses
+        
+        
+      }
     },
     vocabulary: {
       //cuisine
