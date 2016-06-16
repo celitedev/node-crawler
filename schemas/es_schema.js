@@ -39,16 +39,14 @@ module.exports = function (generatedSchemas) {
     refExpandWithFields: [
 
       //thing
-      "name",
+      "name", "genre", "subtypes", "tagsFromFact",
 
       //place
       "address", "geo", "containedInPlace",
 
       //creative work
-      "aggregateRating", "genre",
+      "aggregateRating"
 
-      //organizationAndPerson
-      "tag"
     ],
 
     //general index mapping
@@ -102,17 +100,6 @@ module.exports = function (generatedSchemas) {
           },
         },
         enum: vocabs.genre
-      },
-
-      tag: {
-        facet: {
-          type: "enum",
-          label: function (root, type) {
-            if (root === type) return "tags"; //if we query for artist -> return tag
-            return capitalizeFirstLetter(facetLabelForType(type)) + " tags"; //if we query for events -> return 'person tags'
-          },
-        },
-        enum: vocabs.tag //TODO, need to provide this. For now it's undefined thus pass-all
       },
 
       openingHoursSpecification: {
@@ -234,7 +221,7 @@ module.exports = function (generatedSchemas) {
       location: {
         exclude: false,
         expand: {
-          fields: ["name", "geo", "containedInPlace", "containedInPlace--name"],
+          fields: ["name", "geo", "containedInPlace", "containedInPlace--name",  "genre", "subtypes", "tagsFromFact"],
           // postPruneFields: ["containedInPlace"], //used to create containedInPlace--name
           includeId: false,
         }
@@ -262,14 +249,13 @@ module.exports = function (generatedSchemas) {
       performer: {
         exclude: false,
         expand: {
-          fields: ["name"]
+          fields: ["name", "genre", "subtypes", "tagsFromFact"]
         }
       },
 
       workFeatured: {
         expand: {
-          fields: ["name", "aggregateRating", "genre", "subtypes", "all_tags"],
-          // postPruneFields: ["genre", "subtypes"] //there are used to create `all_tags`
+          fields: ["name", "aggregateRating", "genre", "subtypes", "tagsFromFact"],
         }
       },
     },

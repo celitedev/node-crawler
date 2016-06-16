@@ -5,9 +5,6 @@ var roots = require("../../schemas/domain/_definitions/config").domain.roots;
 var redisClient;
 
 var cachePropertyMap = {
-  all: {
-    esField: "all_tags",
-  },
   tags: {
     esField: "tagsFromFact"
   },

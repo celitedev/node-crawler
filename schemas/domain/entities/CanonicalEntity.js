@@ -479,7 +479,7 @@ module.exports = function (generatedSchemas, AbstractEntity, r) {
         objExpanded = _.pick(objExpanded, expandObj.fields);
 
         //Now optionally we prune some more fields. 
-        //This allows for keeping a calculated field (say all_tags) which is based on 
+        //This allows for keeping a calculated field which is based on 
         //a field that we now want to prune
         objExpanded = _.omit(objExpanded, expandObj.postPruneFields || []);
 
