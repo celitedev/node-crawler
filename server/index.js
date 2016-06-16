@@ -81,6 +81,8 @@ var command = {
 
 command.filterQueryUtils = require("./filterQueryUtils")(command);
 
+app.internalRoutes = {}; 
+
 
 ///////////////
 //add routes //

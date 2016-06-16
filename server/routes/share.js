@@ -18,6 +18,8 @@ var transporter = nodemailer.createTransport(sparkPostTransport({
   },     
 }));
 
+
+
 module.exports = function (command) {
 
   var app = command.app;
@@ -37,7 +39,7 @@ module.exports = function (command) {
     req.checkBody('id', "required").notEmpty();
     req.checkBody('fromName', "required").notEmpty();
     req.checkBody('to', "required").notEmpty();
-    
+    req.checkBody('itemName', "required").notEmpty();
     req.checkBody('shareType', "should equal 'email'").equals("email");
     req.checkBody('type', "should equal 'card' or 'collection").isContainedInArray(["card", "collection"]);
     req.checkBody('to', "should be ';' seperated list of correct email-addresses").isEmails();
@@ -52,7 +54,7 @@ module.exports = function (command) {
       if(type === "card"){
         return "https://testing123.kwhen.com:7000/details/"  + id;
       }else{ //type === collection
-        return "https://testing123.kwhen.com:7000/TODO_LINK_TO_COLLECTION?id="  + id; //TODO
+        return "https://testing123.kwhen.com:7000/collections/"  + id; //TODO
       }
     }
 
@@ -66,27 +68,61 @@ module.exports = function (command) {
         };
     });
 
-    //https://github.com/sparkpost/nodemailer-sparkpost-transport#usage
-    transporter.sendMail({
-      "recipients": emailObjs,
-      substitution_data: {
-        msg: req.body.msg, //optional
-        sender: req.body.fromName, 
-        itemUrl: createUrl(req.body.type, req.body.id),
-        itemTitle: req.body.type === "card" ? "card name xyz" : "collection name xyz"
-      },
-      content: { //Choose based on 'type'
-        template_id: req.body.type === "card" ? "share-card" : "share-collection"
-      }
-    }, function(err, info) {
-      if (err) {
-        res.status(500).json({
-          err: err
-        });
-      } else {
-        res.json(info);
-      }
-    });
+    Promise.resolve()
+    .then(function(){
 
+      // if(req.body.type === "card"){
+      //   return Promise.resolve()
+      //     .then(function(){
+      //       return app.internalRoutes.getEntity(req.body.id);
+      //     })
+      //     .then(function(card){
+      //       return card.raw.name;
+      //     });
+      // }else{
+      //   return Promise.resolve()
+      //     .then(function(){
+      //       return app.internalRoutes.getEntity(req.body.id);
+      //     })
+      //     .then(function(card){
+      //       return card.raw.name;
+      //     });
+      // }
+    
+      return req.body.itemName;
+    })
+    .then(function(itemName){
+
+      return new Promise(function(resolve, reject){
+
+         //https://github.com/sparkpost/nodemailer-sparkpost-transport#usage
+        transporter.sendMail({
+          "recipients": emailObjs,
+          substitution_data: {
+            msg: req.body.msg, //optional
+            sender: req.body.fromName, 
+            itemUrl: createUrl(req.body.type, req.body.id),
+            itemTitle: itemName
+          },
+          content: { //Choose based on 'type'
+            template_id: req.body.type === "card" ? "share-card" : "share-collection"
+          }
+        }, function(err, info) {
+          if (err) {
+            return reject(err);
+          }
+          return resolve(info);
+        });
+      });
+    })
+    .catch(function(err){
+      res.status(err.status || 500).json({
+        err: err
+      });
+    })
+    .then(function(info){
+      res.json(info);
+    });
+    
   });
 };
