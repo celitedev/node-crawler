@@ -21,19 +21,43 @@ module.exports = function (generatedSchemas) {
       },
 
       Event: {
+        ////////////////
         //fandango
-        "screeningevent": "screeningevent",
+        "screeningevent": ["event", "screeningevent"],
 
+        //////////////
         //seatgeek, et al
-        "comedyevent": "comedyevent",
-        "danceevent": "danceevent",
-        "literaryevent": "literaryevent",
-        "musicevent": "musicevent",
-        "sportsevent": "sportsevent",
-        "theaterevent": "theaterevent",
+        "comedyevent": ["event","comedyevent"],
+        "danceevent": ["event","danceevent"],
+        "literaryevent": ["event","literaryevent"],
+        "musicevent": ["event","musicevent"],
+        "sportsevent": ["event","sportsevent"],
+        "theaterevent": ["event","theaterevent"],
         
+        ////////////////
         //coursehorse
-        "educationevent": "educationevent",
+        "educationevent": ["event","educationevent"],
+
+        ///////////////////
+        //eventful events
+        
+        //TBD: animals, art, attractions, clubs_associations, community
+        //food, fundraisers, holiday, other, outdoors_recreation
+        //politics_activism, religion_spirituality
+        //sales, schools_alumni, science, singles_social, support, technology
+        "art": ["event", "exhibitionevent"],
+        "books": ["event","literaryevent"],
+        "comedy": ["event","comedyevent"],
+        "business": ["event","businessevent"],
+        "conference": ["event","businessevent", "conference"],
+        "family_fun_kids": ["event", "funevent", "childrensevent", "familyevent"],
+        "festivals_parades": ["event", "festival", "parade"],
+        "learning_education": ["event","educationevent"],
+        "movies_film": ["event", "screeningevent"],
+        "music": ["event", "musicevent"],
+        "performing_arts": ["event","theaterevent"], 
+        "sports": ["event", "sportsevent"],
+        "food": ["event", "foodevent"],
       },
 
       PlaceWithOpeninghours: {
@@ -68,7 +92,7 @@ module.exports = function (generatedSchemas) {
         "botanical gardens": "botanicalgarden",
 
         //skipped since not denoting subtype
-        //parades & festivals, tv show tapings, kid friendly, dance
+        //tv show tapings, kid friendly, dance
 
 
         ////////////////////////
@@ -213,13 +237,21 @@ module.exports = function (generatedSchemas) {
       "musicevent": ["music", "musicevent", "concert", "music event"],
       "literaryevent": ["literary"],
       "sportsevent": ["sports"],
-      "theaterevent": ["theater"],
-
-      //adding for coverage in frontend (even if no entities yet)
-      "festival": ["festival", "concert"],
+      "theaterevent": ["theater", "perfoming arts"],
 
       //coursehores
-      "educationevent": ["education event", "course event"]
+      "educationevent": ["education event", "course event"],
+
+      //eventful
+      "exhibitionevent": ["exhibition", 'art'],
+      "businessevent": ["businessevent", "business event", "business"],
+      "conference": ["conference"],
+      "funevent": ["fun"],
+      "childrensevent": ["childrensevent", "children", "kids"], //official schema.org
+      "familyevent": ["family"],
+      "festival": ["festival"],
+      "parade": ["parade"], 
+      "foodevent": ["food event", "foodevent", "food"]
     }
   };
 
