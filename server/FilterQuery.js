@@ -430,7 +430,7 @@ module.exports = function (command) {
           }
         });
 
-        console.log(JSON.stringify(searchQuery, null,2)); 
+        // console.log(JSON.stringify(searchQuery, null,2)); 
 
         return esClient.search(searchQuery);
       })

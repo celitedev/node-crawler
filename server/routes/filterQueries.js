@@ -72,7 +72,7 @@ var middleware = {
       //We try to match the ngram against all defined subtype aliases
       //If ngram ends in an 'n' we assume it's plural and also try to match to naive singular 'ngram - s'
       //the first match found is the one we're going with. 
-      //Based on ordening we favour large subtypes that sit at the end of the question
+      //Based on ordening we favour (1) large subtypes that (2) sit at the end of the question
       _.each(ngrams, function (ngram) {
         var ngramSingular = ngram[ngram.length - 1] = 's' && ngram.substring(0, ngram.length - 1);
         _.each(subtypeToFilterQuery, function (subtypeFilterContext, subtypeAlias) {
@@ -85,16 +85,27 @@ var middleware = {
         if (nlpFilterContextProtos) return;
       });
 
+      //Get the question without the matched nlp. The reamining stuff is the keyword search
+      //This is used for queries that filter on actual subtype
+      var questionWithPossiblyRemovedType = matchingNgram ? question.replace(matchingNgram, "").trim() : question;
+
+      //DEPRECATE: BETTER TEST ENTIRELY DIFFERENT SETUP CROSS_FIELDS
+      // For all fallback questions we use: 
+      // 1. the questionWithPossiblyRemovedType as well. This makes more sense in most cases, since we don't want to show matches
+      // that match on a subtype as heavily as on an adverb i.e.: cocktail in cocktail bar
+      // However, this will give problems when searching for 'all bars' which would then result in searching for 'all' 
+      // which is clearly not wanted
+      // question = questionWithPossiblyRemovedType ? questionWithPossiblyRemovedType : question;
+
+
+      var reorderFallbackTypes = []; 
 
       if (nlpFilterContextProtos) {
 
+        //can be array! E.g.: for movies, which would show movies as well as movie events
         nlpFilterContextProtos = _.isArray(nlpFilterContextProtos) ? nlpFilterContextProtos : [nlpFilterContextProtos];
 
         _.each(nlpFilterContextProtos, function (nlpFilterContextProto) {
-
-          //Get the question without the matched nlp
-          //The reamining stuff is the keyword search
-          var questionWithoutType = question.replace(matchingNgram, "").trim();
 
           var nlpFilterContext = {
             filter: {},
@@ -105,16 +116,16 @@ var middleware = {
           var typeOrSubtype = nlpFilterContextProto.filter.subtypes || nlpFilterContextProto.filter.type;
           typeOrSubtype = _.isArray(typeOrSubtype) ? typeOrSubtype[0] : typeOrSubtype;
 
-          if (questionWithoutType) {
+          if (questionWithPossiblyRemovedType) { //if there's still a keyword left...
 
-            nlpFilterContext.filter.name = questionWithoutType;
+            nlpFilterContext.filter.name = questionWithPossiblyRemovedType;
 
             nlpFilterContext.humanContext = {
               templateData: {
                 label: nlpFilterContextProto.label,
-                keyword: questionWithoutType
+                keyword: questionWithPossiblyRemovedType
               },
-              template: "<span class='accentColor'>{{nrOfResults}}</span> <i>'{{keyword}}'</i> {{label.pluralOrSingular}} {{label.sorted}}"
+              template: "<span class='accentColor'>{{nrOfResults}}</span> <i>'{{keyword}}'</i>&nbsp;{{label.pluralOrSingular}} {{label.sorted}}"
             };
 
           } else {
@@ -129,16 +140,19 @@ var middleware = {
 
           nlpContexts.push(_.merge({}, nlpFilterContext, nlpFilterContextProto));
 
-          //A root was matched AND there's a keyword left to query -> 
-          //Remove fallback row for said root that we planned to show, bc. we're already showing it on top 
-          if (!nlpFilterContextProto.subtypes) {
-            rootsInOrder.splice(rootsInOrder.indexOf(nlpFilterContextProto.type), 1);
+          //Get the fallback type that matches the nlpFilterContextProto
+          //1. if nlpFilterContextProto DOES NOT contain a subtype (and thus matches a root) we'll remove the fallback
+          //2. if nlpFilterContextProto DOES contain a subtype, we'll be sure to move the fallback row up in the order.
+          var fallbackOfSameType = rootsInOrder.splice(rootsInOrder.indexOf(nlpFilterContextProto.type), 1)[0];
+        
+          if(nlpFilterContextProto.filter.subtypes){
+            reorderFallbackTypes.push(fallbackOfSameType);
           }
         });
       }
 
       //The ordinary/fallback rows
-      var filterContexts = nlpContexts.concat(_.map(rootsInOrder, function (root) {
+      var filterContexts = nlpContexts.concat(_.map(reorderFallbackTypes.concat(rootsInOrder), function (root) {
 
         var filterContext = _.merge({
           filter: {},
