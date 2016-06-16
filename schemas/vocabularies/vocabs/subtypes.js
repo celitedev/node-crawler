@@ -58,6 +58,7 @@ module.exports = function (generatedSchemas) {
         "performing_arts": ["event","theaterevent"], 
         "sports": ["event", "sportsevent"],
         "food": ["event", "foodevent"],
+        "sales": ["event", "salevent"]
       },
 
       PlaceWithOpeninghours: {
@@ -251,7 +252,8 @@ module.exports = function (generatedSchemas) {
       "familyevent": ["family"],
       "festival": ["festival"],
       "parade": ["parade"], 
-      "foodevent": ["food event", "foodevent", "food"]
+      "foodevent": ["food event", "foodevent", "food"],
+      "salevent": ["salevent", "sale", "sales", "sale event"]
     }
   };
 
