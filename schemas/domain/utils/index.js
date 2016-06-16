@@ -5,7 +5,16 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
   mappings: {
     enum: {
       type: "string",
-      analyzer: "enum"
+      analyzer: "enum",
+
+      //https://www.elastic.co/guide/en/elasticsearch/guide/2.x/most-fields.html#_multifield_mapping
+      //English analyzer performs stemming
+      "fields": {
+          "english":   { 
+              "type":     "string",
+              "analyzer": "standard"
+          }
+      }
     },
     notAnalyzed: {
       "type": "string",
