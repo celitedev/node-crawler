@@ -10,12 +10,11 @@ module.exports = function (command) {
   var sourceEntityTable = command.sourceEntityTable;
   var filterQueryUtils = command.filterQueryUtils;
 
-  //Single Item
-  app.get("/entities/:id", function (req, res, next) {
 
-    Promise.resolve()
+  app.internalRoutes.getEntity = function(id){
+    return Promise.resolve()
       .then(function () {
-        return erdEntityTable.get(req.params.id);
+        return erdEntityTable.get(id);
       })
       .then(function (entity) {
 
@@ -74,6 +73,15 @@ module.exports = function (command) {
           .then(function () {
             return entity;
           });
+      });
+  };
+
+  //Single Item
+  app.get("/entities/:id", function (req, res, next) {
+
+    Promise.resolve()
+      .then(function(){
+        return app.internalRoutes.getEntity(req.params.id);
       })
       .then(function (entity) {
         res.json(entity);
