@@ -290,31 +290,28 @@ module.exports = function (command) {
 
     var query = {
       query: {
-        bool: {}
-      }
+        bool: {
+          must: [], 
+          filter: []
+        }
+      },
     };
 
     //All types except events are filtered if no image exists. 
     //Events often get their image transplanted from either location / performer / 
     //workFeatured, (out of bound info at this moment) so we won't filter on this for events.
     if (this.type !== "Event") {
-      query.filter = {
+      query.query.bool.filter.push({
         "exists": {
           "field": "image"
         }
-      };
+      });
     }
 
 
     if (!this.filter) {
       return query;
     }
-
-
-    //For now we only support AND
-    //TODO: Should support arbitary nested AND / OR, 
-    //which should already be encoded as a nested structure in supplied filter object
-    var mustObj = query.query.bool.must = [];
 
     var root = this.getRoot();
 
@@ -375,8 +372,17 @@ module.exports = function (command) {
           };
           break;
         case "FreeText":
-          var isFuzzy = true;
-          propFilter = filterQueryUtils.performTextQuery(v, path, isFuzzy);
+
+          //Probably some improvements to be made: 
+          //1. better scoring: shingles on name to take ordering into account
+          //2. better recall: stemming of subtypes, genres, tagsFromFact
+          propFilter ={
+              "multi_match": {
+                  "query":  v,
+                  "type":   "most_fields", 
+                  "fields": [ "name^10", "subtypes^3", "genres^2", "tagsFromFact" ]
+              }
+          };
           break;
 
         case "Text":
@@ -390,7 +396,7 @@ module.exports = function (command) {
 
 
       //add filter to AND
-      mustObj.push(propFilter);
+      query.query.bool.must.push(propFilter);
     });
 
 
@@ -423,6 +429,8 @@ module.exports = function (command) {
             return a.concat(b);
           }
         });
+
+        console.log(JSON.stringify(searchQuery, null,2)); 
 
         return esClient.search(searchQuery);
       })
