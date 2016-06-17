@@ -34,6 +34,10 @@ module.exports = function (command) {
   // };
   app.post('/share', function (req, res, next) {
 
+    if(!req.body.msg){ //from empty string -> undefined
+      req.body.msg = undefined;
+    }
+
     req.checkBody('shareType', "required").notEmpty();
     req.checkBody('type', "required").notEmpty();
     req.checkBody('id', "required").notEmpty();
@@ -111,6 +115,7 @@ module.exports = function (command) {
           if (err) {
             return reject(err);
           }
+
           return resolve(info);
         });
       });
