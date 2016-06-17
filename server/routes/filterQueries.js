@@ -278,6 +278,18 @@ module.exports = function (command) {
 
     return Promise.all(promises)
       .then(function (jsons) {
+
+        jsons = _.filter(jsons, function(json){
+          return json.totalResults; //not 0
+        });
+
+        if(!jsons.length){
+          //no results
+          return res.json({
+            warningHuman: "Nothing quite matched your search for <i>\'"  + req.body.question + "\'</i>" +
+            "&nbsp; We're working on it." 
+          });
+        }
         res.json({
           results: jsons
         });
