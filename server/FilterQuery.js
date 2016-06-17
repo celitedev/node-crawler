@@ -373,9 +373,11 @@ module.exports = function (command) {
           break;
         case "FreeText":
 
+
           //Probably some improvements to be made: 
           //1. better scoring: shingles on name to take ordering into account
           //2. better recall: stemming of subtypes, genres, tagsFromFact
+          //Also see ES Guide starting at: https://www.elastic.co/guide/en/elasticsearch/guide/2.x/most-fields.html
           propFilter ={
               "multi_match": {
                   "query":  v,
