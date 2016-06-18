@@ -105,6 +105,10 @@ var simpleCardFormatters = {
     var movie = expand[raw.workFeatured];
     var theater = expand[raw.location];
 
+    if(!movie || !theater){
+      console.log("movie of theater not found for screeningevent", json.raw.id);
+      return;
+    }
     _.defaults(formatted, {
       // category: "movie screening", //overwrite 'screening event'
       identifiers1: movie.name,
