@@ -72,10 +72,10 @@ var config = {
 
   	//IF REMOVED, NOT INITIALIZED. 
   	//THIS ONLY WORKS FOR API; CRAWLER STILL NEEDS REDIS
-    // redis: {
-    //   host: "localhost",
-    //   port: 6379
-    // },
+    redis: {
+      host: "localhost",
+      port: 6379
+    },
 
     //https://www.elastic.co/guide/en/elasticsearch/client/javascript-api/current/configuration.html
     elasticsearch: {
