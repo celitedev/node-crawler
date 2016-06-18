@@ -27,7 +27,13 @@ var r = require('rethinkdbdash')(config.rethinkdb);
 var esClient = new elasticsearch.Client(config.elasticsearch);
 
 //Redis
-var redisClient = redis.createClient(config.redis);
+var redisClient;
+
+//TODO: move to separate out backend from crawler. 
+//backend/api doesn't need redis 
+if(config.redis){
+  redisClient = redis.createClient(config.redis);
+}
 
 
 /////////////

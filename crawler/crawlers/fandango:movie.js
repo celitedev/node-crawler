@@ -86,7 +86,7 @@ module.exports = {
       "Accept-Encoding": 'gzip, deflate'
     },
 
-    doCache: true
+    doCache: false
   },
   schema: {
     version: "0.1", //version of this schema
