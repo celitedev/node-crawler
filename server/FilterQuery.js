@@ -93,6 +93,7 @@ module.exports = function (command) {
           esSort._geo_distance = {
 
             unit: s.options.unit || "mi", //default 
+            "ignore_unmapped" : true,
             order: s.asc === undefined ? "asc" : (s.asc ? "asc" : "desc"), //default to asc
             "distance_type": "plane" //quicker and accurate enough on small distances.
           };
@@ -112,6 +113,7 @@ module.exports = function (command) {
             //filter by doc order
             //This is the most efficient.
             esSort._doc = {
+              "ignore_unmapped" : true,
               order: s.asc === undefined ? "asc" : (s.asc ? "asc" : "desc")
             };
             break;
@@ -119,6 +121,7 @@ module.exports = function (command) {
           case "score":
             //filter on score
             esSort._score = {
+              "ignore_unmapped" : true,
               order: s.asc === undefined ? "desc" : (s.asc ? "asc" : "desc") //default desc sort order
             };
             break;
@@ -129,6 +132,7 @@ module.exports = function (command) {
               throw new Error("sort of type='field' should have 'field' defined");
             }
             esSort[s.field] = {
+              "ignore_unmapped" : true,
               order: s.asc === undefined ? "asc" : (s.asc ? "asc" : "desc")
             };
             break;
