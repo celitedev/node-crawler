@@ -96,7 +96,7 @@ var config = {
       discovery: false,
       db: "kwhen", //default databse if non is mentioned
       servers: [{
-        host: '127.0.0.1',
+        host: 'ec2-52-87-199-237.compute-1.amazonaws.com',
         port: 28015
       }],
       buffer: 50,
