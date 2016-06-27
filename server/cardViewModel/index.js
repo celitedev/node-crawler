@@ -349,15 +349,18 @@ function createDTOS(command) {
 
     // hogan
     var humanAnswer;
+    var typeHuman; 
 
     if (humanContext && humanContext.template) {
+
+      typeHuman = nrOfResults === 1 ? humanContext.templateData.label.singular : humanContext.templateData.label.plural;
 
       var nrOfResults = json.meta.elasticsearch.hits.total;
 
       humanContext.templateData = _.merge(humanContext.templateData || {}, {
         nrOfResults: nrOfResults,
         label: {
-          pluralOrSingular: nrOfResults === 1 ? humanContext.templateData.label.singular : humanContext.templateData.label.plural
+          pluralOrSingular: typeHuman
         }
       });
       var template = hogan.compile(humanContext.template);
@@ -378,7 +381,7 @@ function createDTOS(command) {
         //TODO: what is this used for?
       },
       answerNLP: humanAnswer,
-
+      typeHuman: typeHuman,
       filterContext: filterContext,
 
       //conditionally enrich results with cardViewModel
