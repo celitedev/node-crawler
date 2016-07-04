@@ -56,9 +56,9 @@ module.exports = function (command) {
 
     function createUrl(type, id) {
       if (type === "card") {
-        return "https://www.kwhen.com:7000/details/" + id;
+        return "https://www.kwhen.com/details/" + id;
       } else { //type === collection
-        return "https://www.kwhen.com:7000/collections/" + id; //TODO
+        return "https://www.kwhen.com/collections/" + id; //TODO
       }
     }
 
