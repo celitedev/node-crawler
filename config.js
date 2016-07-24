@@ -12,9 +12,11 @@ var config = {
 
     //https://www.elastic.co/guide/en/elasticsearch/client/javascript-api/current/configuration.html
     elasticsearch: {
-      host: 'http://ec2-52-91-153-20.compute-1.amazonaws.com:9200',
+      host: 'http://127.0.0.1:9201',
+      apiVersion: "2.2"
+      //host: 'http://ec2-52-91-153-20.compute-1.amazonaws.com:9200',
       // log: 'trace',
-      apiVersion: "2.1",
+      //apiVersion: "2.1",
       // maxSockets: 10, //default
       // defer: function() { //overwrite how ES makes promises
       //  return Promise.defer();
