@@ -1,5 +1,8 @@
 node_modules
+rethinkdb_data
 npm-debug.log
 nohup.out
 corenlp
+dump.rdb
+.DS_store
 *.log
