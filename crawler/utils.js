@@ -79,7 +79,8 @@ var utils = module.exports = {
         jobId: uuid.v4(), //id of this specific mini batch
         source: crawlConfig.source.name,
         type: crawlConfig.entity.type,
-        url: url,
+        url: url.url,
+        dataType: url.dataType,
         created: new Date().toISOString(),
         title: crawlConfig.name + "--" + url
       })

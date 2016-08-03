@@ -118,7 +118,7 @@ module.exports = {
       seedUrls: function () {
         var urls = [];
         for (var i = 1; i < 1000; i++) { //array to kickstart the lot
-          urls.push("http://newyorkcity.eventful.com/events/categories?page_number=" + i);
+          urls.push({url:"http://newyorkcity.eventful.com/events/categories?page_number=" + i, dataType:'html'});
         }
         return urls;
       },

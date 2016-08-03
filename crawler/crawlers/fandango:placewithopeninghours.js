@@ -99,11 +99,11 @@ module.exports = {
       disable: false, //for testing. Disabled nextUrl() call
 
       seedUrls: [
-        "http://www.fandango.com/manhattan_+ny_movietimes?pn=1",
-        "http://www.fandango.com/brooklyn_+ny_movietimes?pn=1",
-        "http://www.fandango.com/queens_+ny_movietimes?pn=1",
-        "http://www.fandango.com/bronx_+ny_movietimes?pn=1",
-        "http://www.fandango.com/staten+island_+ny_movietimes?pn=1"
+        {url:"http://www.fandango.com/manhattan_+ny_movietimes?pn=1", dataType:'html'},
+        {url:"http://www.fandango.com/brooklyn_+ny_movietimes?pn=1", dataType:'html'},
+        {url:"http://www.fandango.com/queens_+ny_movietimes?pn=1", dataType:'html'},
+        {url:"http://www.fandango.com/bronx_+ny_movietimes?pn=1", dataType:'html'},
+        {url:"http://www.fandango.com/staten+island_+ny_movietimes?pn=1", dataType:'html'}
       ],
 
       nextUrlFN: function (el) {
