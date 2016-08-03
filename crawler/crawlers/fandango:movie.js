@@ -119,7 +119,7 @@ module.exports = {
 
         var urls = _.reduce(districts, function (agg, url) {
           _.each(dates, function (date) {
-            agg.push(url + "&date=" + date);
+            agg.push({url:url + "&date=" + date, dataType:'html'});
           });
           return agg;
         }, []);

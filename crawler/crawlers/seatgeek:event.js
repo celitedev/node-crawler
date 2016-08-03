@@ -108,7 +108,7 @@ module.exports = {
       seedUrls: function () {
         var urls = [];
         for (var i = 1; i < 700; i++) { //
-          urls.push("https://seatgeek.com/search?search=new+york&page=" + i);
+          urls.push({url:"https://seatgeek.com/search?search=new+york&page=" + i, dataType:'html'});
         }
         return urls;
       },

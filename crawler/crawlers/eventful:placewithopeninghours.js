@@ -116,7 +116,7 @@ module.exports = {
         //are still available. Since we filter out the rest, downloading them 
         //would be moot.
         for (var i = 1; i < 200; i++) {
-          urls.push("http://newyorkcity.eventful.com/venues?page_number=" + i);
+          urls.push({url:"http://newyorkcity.eventful.com/venues?page_number=" + i, dataType:'html'});
         }
         return urls;
       },

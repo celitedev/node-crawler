@@ -110,7 +110,7 @@ module.exports = {
       seedUrls: function () {
         var urls = [];
         for (var i = 1; i < 1650; i++) {
-          urls.push("http://eventful.com/performers?page_number=" + i);
+          urls.push({url:"http://eventful.com/performers?page_number=" + i, dataType:'html'});
         }
         return urls;
       },
