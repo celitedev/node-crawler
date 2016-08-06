@@ -285,18 +285,6 @@ function processJob(job, done) {
     prunedDetailUrls: []
   }, data);
 
-  var crawlResultSchema = _.extend({
-      //add _htmlDetail for transormers to use. See #30
-      _htmlDetail: function (el, cb) {
-        cb(undefined, el.html());
-      },
-      calcPageDone: function (el, cb) {
-        crawlerResource.stats.total.nrDetailPages++;
-        cb();
-      }
-    },
-    crawlConfig.schema.results.schema(x, detailData));
-
   var promise = Promise.resolve()
     .then(function getLatestBatchId() {
       //get latest batchId from redis
@@ -317,7 +305,6 @@ function processJob(job, done) {
               outdated: true
             });
           }
-
           resolve();
         });
       });
@@ -329,6 +316,17 @@ function processJob(job, done) {
         switch(data.dataType){
           case "html":
             debug("PROCESSING as HTML");
+            var crawlResultSchema = _.extend({
+                //add _htmlDetail for transormers to use. See #30
+                _htmlDetail: function (el, cb) {
+                  cb(undefined, el.html());
+                },
+                calcPageDone: function (el, cb) {
+                  crawlerResource.stats.total.nrDetailPages++;
+                  cb();
+                }
+              },
+              crawlConfig.schema.results.schema(x, detailData));
             x(data.url, "html", {
 
               //pagination
@@ -378,8 +376,8 @@ function processJob(job, done) {
                     case "zeroResults":
                       //no results found -> stopCriteriaFound = true
                       var filterFN = stop.selectorPostFilter || function (results) {
-                            return true;
-                          };
+                          return true;
+                        };
                       if (!_.filter(el.find(crawlSchema.results.selector), filterFN)) {
                         stopCriteriaFound = true;
                       }
