@@ -95,7 +95,7 @@ module.exports = {
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
 
-      seedUrls: "http://www.yelp.com/search?find_loc=New+York,+NY,+USA&cflt=restaurants&start=0",
+      seedUrls: [{url:"http://www.yelp.com/search?find_loc=New+York,+NY,+USA&cflt=restaurants&start=0", dataType:'html'}],
 
       nextUrlFN: function (el) {
         return el.find(".prev-next.next").attr("href");
