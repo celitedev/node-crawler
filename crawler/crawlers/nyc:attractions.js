@@ -69,7 +69,7 @@ module.exports = {
       seedUrls: function () {
         var urls = [];
         for (var i = 0; i < 40; i++) { //manual check: ~800 results -> 800 / 20 (result per page) -> 40 pages
-          urls.push("http://www.nyc.com/search/find.aspx?secid=2&pagefrom=" + (i * 20 + 1));
+          urls.push({url:"http://www.nyc.com/search/find.aspx?secid=2&pagefrom=" + (i * 20 + 1), dataType:'html'});
         }
         return urls;
       },
