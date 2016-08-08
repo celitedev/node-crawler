@@ -59,7 +59,7 @@ module.exports = {
     },
 
     //cache to simple fileCache. This doesn't do any TTL or whatever. 
-    doCache: true
+    doCache: false
   },
   schema: {
     version: "0.1", //version of this schema
