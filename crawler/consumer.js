@@ -328,7 +328,6 @@ function processJob(job, done) {
               },
               crawlConfig.schema.results.schema(x, detailData));
             x(data.url, "html", {
-
               //pagination
               paginate: function distributedPaginate(el, cb) {
 
@@ -469,7 +468,7 @@ function processJob(job, done) {
       }
       return result;
     })
-    .then(doFieldMappings("mapping", crawlConfig))
+    .then(doFieldMappings("mapping", crawlConfig, detailData))
     .then(function callCustomReducer(results) {
       if (!crawlConfig.schema.results.reducer) {
         return results;
@@ -837,7 +836,7 @@ function manageCrawlerLifecycle(resource) {
 
 
 
-function doFieldMappings(mappingName, crawlConfig) {
+function doFieldMappings(mappingName, crawlConfig, detailData) {
   return function (results) {
 
     //transform results using declarative `mappings`
@@ -860,7 +859,7 @@ function doFieldMappings(mappingName, crawlConfig) {
           if (!stageFn) {
             throw "canned transformer not available: '" + stage + "'. You should choose from '" + _.keys(functionLib).join(",") + "'";
           }
-          return stageFn(val, result);
+          return stageFn(val, result, detailData);
         }, parent[childKey]);
 
       });
