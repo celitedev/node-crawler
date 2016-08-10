@@ -5,7 +5,7 @@ var dateUtils = require("./utils/dateUtils");
 module.exports = {
   _meta: {
     name: "1Ioata.com Events",
-    description: "Distributed Crawler for 1Ioata.com Events"
+    description: "Distributed Crawler for 1Iota.com Events"
   },
   source: {
     name: "1Ioata"
@@ -120,7 +120,7 @@ module.exports = {
           return {
             _type: ['Event'],
             _sourceId: value.id,
-            _sourceUrl: `http:${value.url}`,
+            _sourceUrl: value.url,
             name: value.title,
             description: value.description,
             startDate: value.startDateUTC,
@@ -143,6 +143,13 @@ module.exports = {
         "description": function(value){
           if (value) return value;
           return "";
+        },
+        _sourceUrl: function(value){ //inconsistent formatting of the URLs returned, appears to be only two variations but worth spot checking in the future
+          if (value.substring(0,2) == "//") {
+            return `http:${value}`;
+          } else {
+            return `http://1iota.com${value}`;
+          }
         }
       }
     }
