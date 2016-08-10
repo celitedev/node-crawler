@@ -64,7 +64,7 @@ module.exports = {
     //
     //#6: distribute concurrency per <source,type> or <source>
     //for more controlled throttling.
-    concurrentJobs: 10,
+    concurrentJobs: 1,
     retries: 5,
 
     // fail job if not complete in 100 seconds. This is used because a consumer/box can fail/crash
