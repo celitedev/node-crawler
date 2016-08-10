@@ -461,7 +461,7 @@ module.exports = function (command) {
 
     //default sort
     command.sort = command.sort || {
-      type: "doc"
+      type: "score"
     };
 
     //sort is an array
