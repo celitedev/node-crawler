@@ -3,6 +3,44 @@
 The Kwhen Crawler is a distributed crawler used to fetch data from 3rd party websites and APIs. 
 Crawlers are defined declaratively with JSON schema validated config-files. 
 
+##Installation and Setup
+
+Node Version: 6.0.0
+
+###We need 4 things to be installed to run Crawler locally:
+
+- [RethinkDB](https://www.rethinkdb.com/)
+- [Redis Server](http://redis.io/) 
+- [Elasticsearch](https://www.elastic.co/downloads/elasticsearch) 
+- [Docker](https://www.docker.com/products/docker) to use TORS Proxy 
+
+####Installation Steps:
+Install [Homebrew](http://brew.sh/) first to install RethinkDB and Redis with a single command.
+
+1. **RethinkDb:** `$ brew update && brew install rethinkdb`
+
+2. **Redis Server:** `$ brew install redis` 
+
+3. **Elasticsearch:** 
+a. Download and unzip Elasticsearch distribution. 
+b. Run `./bin/elasticsearch -d` _note, this is configured by default to point to :9201 so as to avoid conflict with default ES server, you may need to edit your elasticsearch config or the dev config for this project if you are not running muliple ES instances_
+                                _note, to rebuild the index:_ `node tools/populateERD --reset`
+c. Test with: `curl -X GET http://localhost:9201/`
+
+4. **Docker and TORS Proxy:**
+TORS Proxy is been setup to run inside Docker directly.
+a. Download and Install Docker.
+b. Pull the kwhen-rotating-proxy repo: `docker pull jimedelstein/kwhen-rotating-proxy`
+c. Run `docker run -d -p 5566:5566 -p 1936:1936 --env tors=25 jimedelstein/kwhen-rotating-proxy`
+d. Test kwhen-rotating-proxy with `curl --proxy 127.0.0.1:5566 http://echoip.com`. This should return different ip-adresses each time you run. 
+
+
+##Run crawltest in local(dev mode)
+By default the config(crawltest/config.js) will set the environment as "dev". 
+So, running `node server` is equivalent to `NODE_ENV=dev node server`.
+
+Though in most of the documentation example is like: `NODE_ENV=prod node tools/createReferences`, it is strongly recommended to run it as `node tools/createReferences` or `NODE_ENV=dev node tools/createReferences`.
+
 ## Supported features
 
 - highly distributed in nature.
