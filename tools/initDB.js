@@ -4,7 +4,7 @@ var Promise = require("bluebird");
 var config = require("../config");
 var r = require('rethinkdb');
 var domainUtils = require("../schemas/domain/utils");
-var conn
+var conn;
 
 function createDB(){
   console.log(`Creating DB: ${config.rethinkdb.db}`);
@@ -51,7 +51,8 @@ function createIndices(){
 return Promise.resolve()
   .then(() => {
     return new Promise((resolve, reject) => {
-      r.connect(config.rethinkdb, (err, connection) => {
+      console.log("Connecting to RethinkDB at: ", config.rethinkdb);
+      r.connect({host: config.rethinkdb.servers[0].host, port: config.rethinkdb.servers[0].port, db: config.rethinkdb.db}, (err, connection) => {
         if(err) return reject(err); 
         conn = connection;
         return resolve();
@@ -75,6 +76,7 @@ return Promise.resolve()
     })
   })
   .catch((err) => {
+    console.error(err);
     throw err;
   })
   .finally(() => {

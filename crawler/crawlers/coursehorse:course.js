@@ -240,7 +240,7 @@ module.exports = {
           }
         },
         "_detail._ratingSum._rating4": function (val) {
-          if(val) {
+          if(val=='icon active') {
             ratingVal++;
           }
         },

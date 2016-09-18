@@ -5,7 +5,6 @@ var domainConfig = require("../_definitions/config");
 var utilsForSchemaGeneration = require("../utils/utilsForSchemaGeneration");
 
 module.exports = function (generatedSchemas, r) {
-
   var entityUtils = require("./utils")(generatedSchemas);
 
   var roots = domainConfig.domain.roots;
@@ -40,6 +39,7 @@ module.exports = function (generatedSchemas, r) {
 		}
 	 */
   function AbstractEntity(state, bootstrapObj, options) {
+    //console.log("Abstract Entity state: ", state);
 
     if (!this._kind) {
       throw new Error("AbstractEntity should be called by subtype");
@@ -69,11 +69,28 @@ module.exports = function (generatedSchemas, r) {
     (function temporaryCheck() {
       var roots = _.uniq(_.map(state.type, function (typeNameSingle) {
         var type = generatedSchemas.types[typeNameSingle];
-        return type.rootName;
+        //console.log("Found type of: " + typeNameSingle + " to be: ", type.rootName );
+        return {
+          rootName: type.rootName,
+          superTypes: type.supertypes
+        }
       }));
       if (roots.length > 1) {
-        throw new Error("TEMPORARY CONSTRAINT: we require all types " +
-          "of single DomainObject to belong to save root. Not the case here: " + roots.join(","));
+        var types = _.uniq(_.map(roots, function(roots) {return roots.rootName}));
+        var error = false;
+        if (types.length > 1) {
+          var unmatched_types = types.length;
+          _.each(roots, function(root){
+            var superTypes = _.compact(_.uniq(_.flatten(_.map(_.filter(roots, root), function(r) {return r.superTypes}))));
+            if (_.intersection(superTypes, root.superTypes).length > 0) unmatched_types -= 1;
+          });
+          if (unmatched_types > 0) error = true;
+        } else {
+          error = true;
+        }
+        if (error) {
+          throw new Error("We require all types of single DomainObject to belong to same root or have the same supertype. Not the case here: " + types.join(","));
+        }
       }
     }());
 
@@ -324,3 +341,4 @@ module.exports = function (generatedSchemas, r) {
   return AbstractEntity;
 
 };
+

@@ -51,7 +51,7 @@ module.exports = {
     timeoutMS: 35 * 1000,
 
     //local proxy, e.g.: TOR
-    proxy: "http://ec2-54-205-40-27.compute-1.amazonaws.com:5566",
+    proxy: "http://ec2-52-45-105-133.compute-1.amazonaws.com:5566",
 
     //Default Headers for all requests
     headers: {
