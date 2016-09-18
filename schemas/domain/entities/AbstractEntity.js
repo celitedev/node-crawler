@@ -67,7 +67,7 @@ module.exports = function (generatedSchemas, r) {
 
     //TEMPORARY: check that multiple types are in same root: #101
     (function temporaryCheck() {
-      var roots = _.uniqBy(_.map(state.type, function (typeNameSingle) {
+      var roots = _.uniq(_.map(state.type, function (typeNameSingle) {
         var type = generatedSchemas.types[typeNameSingle];
         console.log("Found type of: " + typeNameSingle + " to be: ", type.rootName );
         return {
