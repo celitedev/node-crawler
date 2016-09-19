@@ -39,7 +39,7 @@ module.exports = function (generatedSchemas, r) {
 		}
 	 */
   function AbstractEntity(state, bootstrapObj, options) {
-    //console.log("Abstract Entity state: ", state);
+    console.log("Abstract Entity state: ", state);
 
     if (!this._kind) {
       throw new Error("AbstractEntity should be called by subtype");
@@ -69,13 +69,13 @@ module.exports = function (generatedSchemas, r) {
     (function temporaryCheck() {
       var roots = _.uniq(_.map(state.type, function (typeNameSingle) {
         var type = generatedSchemas.types[typeNameSingle];
-        //console.log("Found type of: " + typeNameSingle + " to be: ", type.rootName );
+        console.log("Found type of: " + typeNameSingle + " to be: ", type.rootName );
         return {
           rootName: type.rootName,
           superTypes: type.supertypes
         }
       }), function(obj){return obj.rootName+","+obj.superTypes.join()});
-      //console.log("Roots are: ", roots);
+      console.log("Roots are: ", roots);
       if (roots.length > 1) {
         var types = _.uniq(_.map(roots, function(roots) {return roots.rootName}));
         var error = false;
