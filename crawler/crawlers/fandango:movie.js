@@ -64,7 +64,7 @@ module.exports = {
     //
     //#6: distribute concurrency per <source,type> or <source>
     //for more controlled throttling.
-    concurrentJobs: 10,
+    concurrentJobs: 1,
     retries: 5,
 
     // fail job if not complete in 100 seconds. This is used because a consumer/box can fail/crash
@@ -79,7 +79,7 @@ module.exports = {
     timeoutMS: 40 * 1000, //40 sec
 
     //local proxy, e.g.: TOR
-    proxy: "http://localhost:5566",
+    proxy: "http://ec2-54-205-40-27.compute-1.amazonaws.com:5566",
 
     //Default Headers for all requests
     headers: {
@@ -119,7 +119,7 @@ module.exports = {
 
         var urls = _.reduce(districts, function (agg, url) {
           _.each(dates, function (date) {
-            agg.push(url + "&date=" + date);
+            agg.push({url:url + "&date=" + date, dataType:'html'});
           });
           return agg;
         }, []);

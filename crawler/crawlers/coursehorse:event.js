@@ -68,7 +68,7 @@ module.exports = {
   },
   job: {
 
-    concurrentJobs: 2,
+    concurrentJobs: 1,
 
     //job-level retries before fail. 
     //This is completely seperate for urls that are individually retried by driver
@@ -96,7 +96,7 @@ module.exports = {
 
     //cache to simple fileCache. 
     //NOT FIT FOR PRODUCTION SINCE This doesn't do any TTL or whatever  
-    doCache: true
+    doCache: false
   },
   schema: {
     version: "0.1", //version of this schema
@@ -112,52 +112,52 @@ module.exports = {
 
         //art
         for (i = 1; i < 400; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/art?page=" + i);
+          urls.push({url:"https://coursehorse.com/nyc/classes/art?page=" + i, dataType:'html'});
         }
 
         //acting
         for (i = 1; i < 90; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/acting?page=" + i);
+          urls.push({url:"https://coursehorse.com/nyc/classes/acting?page=" + i, dataType:'html'});
         }
         
         //cooking
         for (i = 1; i < 400; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/cooking?page=" + i);
+          urls.push({url:"https://coursehorse.com/nyc/classes/cooking?page=" + i, dataType:'html'});
         }
         
         //dance
         for (i = 1; i < 80; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/dance?page=" + i);
+          urls.push({url:"https://coursehorse.com/nyc/classes/dance?page=" + i, dataType:'html'});
         }
         
         //kids
         for (i = 1; i < 220; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/kids?page=" + i);
+          urls.push({url:"https://coursehorse.com/nyc/classes/kids?page=" + i, dataType:'html'});
         }
         
         //life-skills
         for (i = 1; i < 270; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/life-skills?page=" + i);
+          urls.push({url:"https://coursehorse.com/nyc/classes/life-skills?page=" + i, dataType:'html'});
         }
         
         //language
         for (i = 1; i < 60; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/language?page=" + i);
+          urls.push({url:"https://coursehorse.com/nyc/classes/language?page=" + i, dataType:'html'});
         }
         
         //music
         for (i = 1; i < 50; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/music?page=" + i);
+          urls.push({url:"https://coursehorse.com/nyc/classes/music?page=" + i, dataType:'html'});
         }
 
         //professional
         for (i = 1; i < 300; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/professional?page=" + i);
+          urls.push({url:"https://coursehorse.com/nyc/classes/professional?page=" + i, dataType:'html'});
         }
         
         //tech
         for (i = 1; i < 330; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/tech?page=" + i);
+          urls.push({url:"https://coursehorse.com/nyc/classes/tech?page=" + i, dataType:'html'});
         }
 
 

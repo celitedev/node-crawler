@@ -1,13 +1,14 @@
 var _ = require("lodash");
+var moment = require("moment");
 var dateUtils = require("./utils/dateUtils");
 
 module.exports = {
   _meta: {
-    name: "Eventbrite Events",
-    description: "Distributed Crawler for Eventbrite.com Events"
+    name: "1Ioata.com Events",
+    description: "Distributed Crawler for 1Iota.com Events"
   },
   source: {
-    name: "Eventbrite"
+    name: "1Ioata"
   },
   entity: {
     type: "Event",
@@ -67,10 +68,6 @@ module.exports = {
   },
   job: {
 
-    //Can't use proxy (see below)
-    //Also hitting 429: Too many requests, while crawling from single ip. 
-    //Therefore concurrentJobs = 1; 
-    //TODO: revisit with payed rotating proxies that support https + redirects
     concurrentJobs: 1,
 
     //job-level retries before fail. 
@@ -90,8 +87,7 @@ module.exports = {
     timeoutMS: 50 * 1000,
 
     //local proxy, e.g.: TOR
-    //Eventbrite has redirects over https which don't seem to be supported through tor proxy
-    proxy: null,
+    // proxy: "http://localhost:5566",
 
     //Default Headers for all requests
     headers: {
@@ -108,106 +104,54 @@ module.exports = {
     requiresJS: false, //If true, use PhantomJS
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
-
-      //Eventbrite caps to 500 list pages
-      seedUrls: function () {
-        var urls = [];
-        for (var i = 1; i < 500; i++) { //
-          urls.push({url:"https://www.eventbrite.com/d/ny--new-york/events/?page=" + i, dataType:'html'});
-        }
-        return urls;
-      },
-
+      seedUrls: [{url:'http://api.1iota.com/api/events',dataType:'json'}],
       stop: [{
         name: "zeroResults", //zeroResults
       }]
     },
     results: {
-      //WEIRD: selector: ".search-results > li[itemscope]" produces 9 instead of 10 results
-      //We use the more wide selector and are able to correcty do a generic post filter on 'id' exists.
-      selector: ".list-card-v2", //selector for results
 
-      //does detailPage pruning. For this to work: 
-      //- _sourceUrl should exist and should equal detail page visisted
-      //- 'detail page visited' is the page on which the detailObj is attached.
       detailPageAware: true,
 
-      schema: function (x, detailObj) { //schema for each individual result
+      parseJSON: function(jsonData) {
+        results = JSON.parse(jsonData).list.filter(function(value){
+          if(value.where==='New York, NY') return true;
+        }).map(function(value){
+          return {
+            _type: ['Event'],
+            _sourceId: value.id,
+            _sourceUrl: value.url,
+            name: value.title,
+            description: value.description,
+            startDate: value.startDateUTC,
+            subtypes: [value.eventTypeDisplay],
+            image: {
+              _ref: { //notice: _ref here.
+                contentUrl: value.imageUrl,
+                url: value.imageUrl
+              }
+            }
+          }
+        });
 
         return {
-
-          _sourceUrl: "a.list-card__main@href",
-          _sourceId: "a.list-card__main@href",
-
-          name: ".list-card__title",
-          startDate: ".list-card__date",
-          // location: ".list-card__venue", //only has a name instead of link so can't hook up reliably
-
-          _genre: [".list-card__tags > a"],
-
-          image: x(".list-card__image", [{
-            _ref: { //notice: _ref here.
-              contentUrl: "img@src",
-              url: "img@src",
-            }
-          }]),
+          results: results
         };
       },
 
-      mapping: {
-        startDate: function (sDate) {
-
-          //start: Sat, Jun 4 10:00 PM
-
-          if (!sDate) return undefined;
-
-          sDate = sDate.substring(sDate.indexOf(",") + 1).trim();
-          //sdate: Jun 4 10:00 PM
-
-          //sdate: Jun 4 10:00 PM & 31 more
-          if (~sDate.indexOf("&")) {
-            //NOTE/TODO: #275 - when we find a recurring event we only process the first. 
-            sDate = sDate.substring(0, sDate.indexOf("&")).trim();
+       mapping: {
+        "description": function(value){
+          if (value) return value;
+          return "";
+        },
+        _sourceUrl: function(value){ //inconsistent formatting of the URLs returned, appears to be only two variations but worth spot checking in the future
+          if (value.substring(0,2) == "//") {
+            return `http:${value}`;
+          } else {
+            return `http://1iota.com${value}`;
           }
-
-          //Eventbrite incorrectly returns a *local time* as a UTC time. 
-          //This needs to be tansposed to the correct timezone and then ported to UTC again
-          return dateUtils.transposeTimeToUTC(sDate, "America/New_York");
-
-          //out: "2016-06-10T14:00:00Z" || false
         }
-      },
-
-      reducer: function (obj) {
-
-        var factArr = [];
-
-        //based on url we infer genre, e.g.: music, singles_social
-        if (obj._genre.length) {
-
-          var genres = _.map(obj._genre, function (genre) {
-            return genre.substring(1);
-          });
-
-          factArr.push({
-            name: "genre",
-            val: genres
-          });
-        }
-
-        if (factArr.length) {
-          obj.fact = (obj.fact || []).concat(factArr);
-        }
-        return obj;
-      },
-
-      pruner: function (result) {
-        if (!result.startDate) {
-          return undefined;
-        }
-        return result;
       }
-
     }
   }
 };

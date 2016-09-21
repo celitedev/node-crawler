@@ -69,7 +69,7 @@ module.exports = {
     //
     //#6: distribute concurrency per <source,type> or <source>
     //for more controlled throttling.
-    concurrentJobs: 20,
+    concurrentJobs: 1,
 
 
     //job-level retries before fail. 
@@ -88,7 +88,7 @@ module.exports = {
     timeoutMS: 50 * 1000,
 
     //local proxy, e.g.: TOR
-    proxy: "http://localhost:5566",
+    proxy: "http://ec2-52-45-105-133.compute-1.amazonaws.com:5566",
 
     //Default Headers for all requests
     headers: {
@@ -97,7 +97,7 @@ module.exports = {
 
     //cache to simple fileCache. 
     //NOT FIT FOR PRODUCTION SINCE This doesn't do any TTL or whatever  
-    doCache: true
+    doCache: false
   },
   schema: {
     version: "0.1", //version of this schema
@@ -110,7 +110,7 @@ module.exports = {
       seedUrls: function () {
         var urls = [];
         for (var i = 1; i < 1650; i++) {
-          urls.push("http://eventful.com/performers?page_number=" + i);
+          urls.push({url:"http://eventful.com/performers?page_number=" + i, dataType:'html'});
         }
         return urls;
       },

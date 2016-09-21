@@ -105,7 +105,7 @@ function getToWork(err, config) {
 
     var promises = _.map(urls, function (url) {
       return new Promise(function (resolve, reject) {
-        utils.addCrawlJob(queue, batchId, crawlConfig, url, function (err) {
+        utils.addCrawlJob(queue, batchId, crawlConfig, url,  function (err) {
           if (err) {
             return reject(err);
           }
