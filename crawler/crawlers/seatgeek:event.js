@@ -68,7 +68,7 @@ module.exports = {
   },
   job: {
 
-    concurrentJobs: 2,
+    concurrentJobs: 1,
 
     //job-level retries before fail. 
     //This is completely seperate for urls that are individually retried by driver
@@ -96,7 +96,7 @@ module.exports = {
 
     //cache to simple fileCache. 
     //NOT FIT FOR PRODUCTION SINCE This doesn't do any TTL or whatever  
-    doCache: true
+    doCache: false
   },
   schema: {
     version: "0.1", //version of this schema
@@ -108,7 +108,7 @@ module.exports = {
       seedUrls: function () {
         var urls = [];
         for (var i = 1; i < 700; i++) { //
-          urls.push("https://seatgeek.com/search?search=new+york&page=" + i);
+          urls.push({url:"https://seatgeek.com/search?search=new+york&page=" + i, dataType:'html'});
         }
         return urls;
       },

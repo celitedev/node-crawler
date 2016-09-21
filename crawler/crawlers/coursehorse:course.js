@@ -1,6 +1,7 @@
 var _ = require("lodash");
 var moment = require("moment");
 var dateUtils = require("./utils/dateUtils");
+var ratingVal = 0;
 
 module.exports = {
   _meta: {
@@ -68,7 +69,7 @@ module.exports = {
   },
   job: {
 
-    concurrentJobs: 2,
+    concurrentJobs: 1,
 
     //job-level retries before fail. 
     //This is completely seperate for urls that are individually retried by driver
@@ -96,7 +97,7 @@ module.exports = {
 
     //cache to simple fileCache. 
     //NOT FIT FOR PRODUCTION SINCE This doesn't do any TTL or whatever  
-    doCache: true
+    doCache: false
   },
   schema: {
     version: "0.1", //version of this schema
@@ -111,53 +112,53 @@ module.exports = {
         var i;
 
         //art
-        for (i = 1; i < 400; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/art?page=" + i);
+        for (i = 1; i < 400; i++) {
+          urls.push({url:"https://coursehorse.com/nyc/classes/art/browse?page=" + i, dataType:'html'});
         }
 
         //acting
-        for (i = 1; i < 90; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/acting?page=" + i);
+        for (i = 1; i < 90; i++) {
+          urls.push({url:"https://coursehorse.com/nyc/classes/acting/browse?page=" + i, dataType:'html'});
         }
-        
+
         //cooking
-        for (i = 1; i < 400; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/cooking?page=" + i);
+        for (i = 1; i < 400; i++) {
+          urls.push({url:"https://coursehorse.com/nyc/classes/cooking/browse?page=" + i, dataType:'html'});
         }
-        
+
         //dance
-        for (i = 1; i < 80; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/dance?page=" + i);
+        for (i = 1; i < 80; i++) {
+          urls.push({url:"https://coursehorse.com/nyc/classes/dance/browse?page=" + i, dataType:'html'});
         }
-        
+
         //kids
-        for (i = 1; i < 220; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/kids?page=" + i);
+        for (i = 1; i < 220; i++) {
+          urls.push({url:"https://coursehorse.com/nyc/classes/kids/browse?page=" + i, dataType:'html'});
         }
-        
+
         //life-skills
-        for (i = 1; i < 270; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/life-skills?page=" + i);
+        for (i = 1; i < 270; i++) {
+          urls.push({url:"https://coursehorse.com/nyc/classes/life-skills/browse?page=" + i, dataType:'html'});
         }
-        
+
         //language
-        for (i = 1; i < 60; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/language?page=" + i);
+        for (i = 1; i < 60; i++) {
+          urls.push({url:"https://coursehorse.com/nyc/classes/language/browse?page=" + i, dataType:'html'});
         }
-        
+
         //music
-        for (i = 1; i < 50; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/music?page=" + i);
+        for (i = 1; i < 50; i++) {
+          urls.push({url:"https://coursehorse.com/nyc/classes/music/browse?page=" + i, dataType:'html'});
         }
 
         //professional
-        for (i = 1; i < 300; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/professional?page=" + i);
+        for (i = 1; i < 300; i++) {
+          urls.push({url:"https://coursehorse.com/nyc/classes/professional/browse?page=" + i, dataType:'html'});
         }
-        
+
         //tech
-        for (i = 1; i < 330; i++) { 
-          urls.push("https://coursehorse.com/nyc/classes/tech?page=" + i);
+        for (i = 1; i < 330; i++) {
+          urls.push({url:"https://coursehorse.com/nyc/classes/tech/browse?page=" + i, dataType:'html'});
         }
 
 
@@ -175,27 +176,34 @@ module.exports = {
       }]
     },
     results: {
-      selector: ".article-block", //selector for results
+      selector: "#filter-results >div >div", //selector for results
 
       detailPageAware: true,
 
       schema: function (x, detailObj) { //schema for each individual result
         return {
 
-          _sourceId: ".title@href", 
-          _sourceUrl: ".title@href", 
-          name: ".title > span",
+          _sourceId: ".title a@href",
+          _sourceUrl: ".title a@href",
+          name: ".title a > span",
 
-          _detail: x(".title@href", {
-            description: "[itemprop=description]",
-            aggregateRating: {
-              ratingValue: "[itemprop=ratingValue]@content",
-              ratingCount: "[itemprop=ratingCount]",
+          _detail: x("div.body.eleven.wide.column > div", {
+            description: "p.description",
+            _ratingSum: {
+              _rating1: "div> div > span > span > i:nth-child(1)@class",
+              _rating2: "div> div > span > span > i:nth-child(2)@class",
+              _rating3: "div> div > span > span > i:nth-child(3)@class",
+              _rating4: "div> div > span > span > i:nth-child(4)@class",
+              _rating5: "div> div > span > span > i:nth-child(5)@class",
             },
-            _tag: ["#sidebar h2[data-ga-action] > a@href"] 
+            aggregateRating: {
+              ratingValue: 0,
+              ratingCount: "div div.course-review.five.wide.column.right.aligned span:nth-child(2)",
+            },
+            _tag: ["div  div.course-level.five.wide.column.center.aligned a@href"]
           }, undefined, detailObj),
 
-          image: x(".photo-block", [{
+          image: x(".image-wrapper a img", [{
             _ref: { //notice: _ref here.
               contentUrl: ".photo-block-img@data-src",
               url: ".photo-block-img@data-src",
@@ -214,6 +222,37 @@ module.exports = {
         "_detail.aggregateRating.ratingCount": function (val) {
           if (val === undefined) return val;
           return +val;
+        },
+
+        "_detail._ratingSum._rating1": function (val) {
+          if(val == 'icon active') {
+            ratingVal++;
+          }
+        },
+        "_detail._ratingSum._rating2": function (val) {
+          if(val == 'icon active') {
+            ratingVal++;
+          }
+        },
+        "_detail._ratingSum._rating3": function (val) {
+          if(val=='icon active') {
+            ratingVal++;
+          }
+        },
+        "_detail._ratingSum._rating4": function (val) {
+          if(val=='icon active') {
+            ratingVal++;
+          }
+        },
+        "_detail._ratingSum._rating5": function (val) {
+          if(val == 'icon active') {
+            ratingVal++;
+          }
+        },
+        "_detail.aggregateRating.ratingValue": function (val) {
+          var finalRating = ratingVal;
+          ratingVal = 0;
+          return finalRating.toString();
         },
       },
 

@@ -21,7 +21,7 @@ module.exports = function (command) {
     //A known root. This should be calculated out-of-band 
     type: t.String,
 
-    //do we want a unique result or a list of results?
+    //do we want a unique result or a list of results?  TODO this is not implemented
     wantUnique: t.Boolean,
 
     //How should we filter the returned results
@@ -65,103 +65,121 @@ module.exports = function (command) {
     //- sort by nested: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-sort.html#nested-sorting
     //- sort by script: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-sort.html#_script_based_sorting
     //- track scores: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-request-sort.html#_track_scores
-    return {
-      sort: _.map(this.sort, function (s) {
+      //sort: _.map(this.sort, function (s) {
+    var esFunctions = [];
+    _.each(this.sort, function(s) {
 
-        var esSort = {};
+      function sortOnDistance() {
+        //filter on geo
 
-        function sortOnDistance() {
-          //filter on geo
+        //example
+        // "sort": {
+        //  "type": "distance",
+        //  "path": "location",
+        //  "geo": [-73.9764,
+        //    40.7434
+        //  ],
+        //  "options": {
+        //    unit: "km" //default = mi
+        //  }
+        // },
 
-          //example
-          // "sort": {
-          //  "type": "distance",
-          //  "path": "location",
-          //  "geo": [-73.9764,
-          //    40.7434
-          //  ],
-          //  "options": {
-          //    unit: "km" //default = mi
-          //  }
-          // },
+        if (!s.geo) {
+          throw new Error("'geo'-attrib not defined on sort with type=distance||distanceUnser");
+        }
+        s.options = s.options || {};
 
-          if (!s.geo) {
-            throw new Error("'geo'-attrib not defined on sort with type=distance||distanceUnser");
+        esSort._geo_distance = {
+
+          unit: s.options.unit || "mi", //default
+          "ignore_unmapped" : true,
+          order: s.asc === undefined ? "asc" : (s.asc ? "asc" : "desc"), //default to asc
+          "distance_type": "plane" //quicker and accurate enough on small distances.
+        };
+
+        //e.g.: path = 'location' -> location.geo for event
+        var path = s.path ? s.path + ".geo" : "geo";
+
+        //e.g location.geo ->
+        path = filterQueryUtils.getPathForCompoundKey(self.getRoot(), path.split("."), true);
+
+        esSort._geo_distance[path] = s.geo;
+      }
+
+      switch (s.type) {
+
+        case "score":
+          //no function required for default scoring
+          break;
+
+        case "field":
+          //filter on field
+          if (!s.field) {
+            throw new Error("sort of type='field' should have 'field' defined");
           }
-          s.options = s.options || {};
 
-          esSort._geo_distance = {
-
-            unit: s.options.unit || "mi", //default 
-            "ignore_unmapped" : true,
-            order: s.asc === undefined ? "asc" : (s.asc ? "asc" : "desc"), //default to asc
-            "distance_type": "plane" //quicker and accurate enough on small distances.
+          var fieldValueFactor = {
+            "field_value_factor" : {
+              "field": s.field,
+              "missing": 0.1
+            }
           };
+          esFunctions.push(fieldValueFactor);
+          break;
 
-          //e.g.: path = 'location' -> location.geo for event
-          var path = s.path ? s.path + ".geo" : "geo";
+        case "distance":
 
-          //e.g location.geo ->
-          path = filterQueryUtils.getPathForCompoundKey(self.getRoot(), path.split("."), true);
+          //filter on distance
+          sortOnDistance(); // todo this is not utilized at all right now, and is not compatible with function_query (see #328)
+          break;
 
-          esSort._geo_distance[path] = s.geo;
-        }
+        case "distanceUser":
 
-        switch (s.type) {
+          //filter on distance to user
+          if (!self.meta || !self.meta.user || !self.meta.user.geo) {
+            throw new Error("meta.user.geo needs to be defined for sort with type='distanceUser'");
+          }
 
-          case "doc":
-            //filter by doc order
-            //This is the most efficient.
-            esSort._doc = {
-              "ignore_unmapped" : true,
-              order: s.asc === undefined ? "asc" : (s.asc ? "asc" : "desc")
-            };
-            break;
+          s.geo = self.meta.user.geo;
 
-          case "score":
-            //filter on score
-            esSort._score = {
-              "ignore_unmapped" : true,
-              order: s.asc === undefined ? "desc" : (s.asc ? "asc" : "desc") //default desc sort order
-            };
-            break;
+          sortOnDistance(); // todo this is not utilized at all right now, and is not compatible with function_query (see #328)
+          break;
 
-          case "field":
-            //filter on field
-            if (!s.field) {
-              throw new Error("sort of type='field' should have 'field' defined");
+        case "date":
+          var dateSort = {
+            gauss: {
+              startDate: {"scale":"12h"} //todo move to sort config
+            },
+            weight: 100 //todo move to sort config
+          };
+          esFunctions.push(dateSort);
+          break;
+        case "keyword":
+          _.each(self.filter, function (v, compoundKey) {
+            if (compoundKey !== "name") {
+              throw new Error("keyword sort only supports name sorting at this time!");
             }
-            esSort[s.field] = {
-              "ignore_unmapped" : true,
-              order: s.asc === undefined ? "asc" : (s.asc ? "asc" : "desc")
+            var filter = {
+              filter: {
+                bool: {
+                  must: {
+                    match_phrase: {}
+                  }
+                }
+              },
+              weight: 1000
             };
-            break;
+            filter.filter.bool.must.match_phrase[compoundKey] = v;
+            esFunctions.push(filter)
+          });
+          break;
+        default:
+          throw new Error("sort needs `type`-value of (score,field,distance, distanceUser, keyword, and date) but was: " + s.type);
+      }
+    });
 
-
-          case "distance":
-
-            //filter on distance
-            sortOnDistance();
-            break;
-
-          case "distanceUser":
-
-            //filter on distance to user
-            if (!self.meta || !self.meta.user || !self.meta.user.geo) {
-              throw new Error("meta.user.geo needs to be defined for sort with type='distanceUser'");
-            }
-
-            s.geo = self.meta.user.geo;
-
-            sortOnDistance();
-            break;
-
-          default:
-            throw new Error("sort needs `type`-value of (doc,score,field,distance, distanceUser) but was: " + s.type);
-        }
-
-        return esSort;
-      })
+    return {
+      functions: esFunctions
     };
 
   };
@@ -295,7 +313,7 @@ module.exports = function (command) {
     var query = {
       query: {
         bool: {
-          must: [], 
+          must: [],
           filter: []
         }
       },
@@ -304,13 +322,13 @@ module.exports = function (command) {
     //All types except events are filtered if no image exists. 
     //Events often get their image transplanted from either location / performer / 
     //workFeatured, (out of bound info at this moment) so we won't filter on this for events.
-    if (this.type !== "Event") {
-      query.query.bool.filter.push({
-        "exists": {
-          "field": "image"
-        }
-      });
-    }
+    // if (this.type !== "Event") {
+    //   query.query.bool.filter.push({
+    //     "exists": {
+    //       "field": "image"
+    //     }
+    //   });
+    // }
 
 
     if (!this.filter) {
@@ -424,19 +442,28 @@ module.exports = function (command) {
         var searchQuery = {
           index: self.getESIndex(),
           type: 'type1',
-          body: {}
+          body: {
+            query: {}
+          }
         };
 
-        //getFilter exends body. Can set: 
-        //- query
-        //- filter
-        _.merge(searchQuery.body, self.getPage(), self.getFilter(), self.getTemporal(), self.getSpatial(), self.getSort(), function (a, b) {
-          if (_.isArray(a)) {
-            return a.concat(b);
-          }
-        });
 
-        // console.log(JSON.stringify(searchQuery, null,2)); 
+
+        var functionScore = {};
+
+        _.merge(functionScore, self.getFilter(), self.getTemporal(), self.getSpatial(), self.getSort(), function (a, b) {
+            if (_.isArray(a)) {
+              return a.concat(b);
+            }
+          });
+
+        functionScore.score_mode = "multiply";
+        functionScore.boost_mode = "multiply";
+
+        searchQuery.body.query.function_score = functionScore;
+        _.merge(searchQuery.body, self.getPage());
+
+        //console.log(JSON.stringify(searchQuery, null,2)); //DEBUG
 
         return esClient.search(searchQuery);
       })

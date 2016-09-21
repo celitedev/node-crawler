@@ -71,7 +71,7 @@ module.exports = {
     //
     //#6: distribute concurrency per <source,type> or <source>
     //for more controlled throttling.
-    concurrentJobs: 10,
+    concurrentJobs: 1,
 
 
     //job-level retries before fail. 
@@ -90,7 +90,7 @@ module.exports = {
     timeoutMS: 50 * 1000,
 
     //local proxy, e.g.: TOR
-    proxy: "http://localhost:5566",
+    proxy: "http://ec2-52-45-105-133.compute-1.amazonaws.com:5566",
 
     //Default Headers for all requests
     headers: {
@@ -99,7 +99,7 @@ module.exports = {
 
     //cache to simple fileCache. 
     //NOT FIT FOR PRODUCTION SINCE This doesn't do any TTL or whatever  
-    doCache: true
+    doCache: false
   },
   schema: {
     version: "0.1", //version of this schema
@@ -116,7 +116,7 @@ module.exports = {
         //are still available. Since we filter out the rest, downloading them 
         //would be moot.
         for (var i = 1; i < 200; i++) {
-          urls.push("http://newyorkcity.eventful.com/venues?page_number=" + i);
+          urls.push({url:"http://newyorkcity.eventful.com/venues?page_number=" + i, dataType:'html'});
         }
         return urls;
       },

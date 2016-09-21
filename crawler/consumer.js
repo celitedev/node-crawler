@@ -22,6 +22,7 @@ var moment = require("moment");
 
 var utils = require("./utils");
 var proxyDriver = require("./drivers/proxyDriver");
+var request = require("request");
 
 var generatedSchemas = require("../schemas/domain/createDomainSchemas.js")({
   checkSoundness: true,
@@ -284,18 +285,6 @@ function processJob(job, done) {
     prunedDetailUrls: []
   }, data);
 
-  var crawlResultSchema = _.extend({
-      //add _htmlDetail for transormers to use. See #30
-      _htmlDetail: function (el, cb) {
-        cb(undefined, el.html());
-      },
-      calcPageDone: function (el, cb) {
-        crawlerResource.stats.total.nrDetailPages++;
-        cb();
-      }
-    },
-    crawlConfig.schema.results.schema(x, detailData));
-
   var promise = Promise.resolve()
     .then(function getLatestBatchId() {
       //get latest batchId from redis
@@ -316,126 +305,150 @@ function processJob(job, done) {
               outdated: true
             });
           }
-
           resolve();
         });
       });
     })
     .then(function () {
       return new Promise(function (resolve, reject) {
+        console.log("all data", data);
         debug("PROCESSING url", data.url);
-        x(data.url, "html", {
-
-          //pagination
-          paginate: function distributedPaginate(el, cb) {
-
-            var paginateConfig = crawlSchema.seed;
-
-            //if no nextUrlFN function -> skip
-            if (!paginateConfig.nextUrlFN) {
-              return cb();
-            }
-
-            //disable pagination (used for testing)
-            if (paginateConfig.disable) {
-              return cb();
-            }
-
-            var nextUrl = paginateConfig.nextUrlFN(el);
-            debugUrls("PROCESSED url", data.url);
-
-
-            //sometimes the next url just isn't there anymore. 
-            //That's an easy and strong signal to stop bothering
-            if (!validUrl.isUri(nextUrl)) {
-              return cb();
-            }
-
-            //check if nextUrl is the same as currentUrl. 
-            //If so -> quit
-            if (nextUrl === data.url) {
-              return cb();
-            }
-
-            //... otherwise there might be more domain specific ways in which to pick up signal that we're done
-            var stopCriteriaFound = false;
-
-            stopArr = paginateConfig.stop || [];
-            stopArr = _.isArray(stopArr) ? stopArr : [stopArr];
-
-            _.each(stopArr, function (stop) {
-              if (_.isString(stop)) {
-                stop = {
-                  name: stop
-                };
-              }
-              switch (stop.name) {
-                case "zeroResults":
-                  //no results found -> stopCriteriaFound = true
-                  var filterFN = stop.selectorPostFilter || function (results) {
-                    return true;
-                  };
-                  if (!_.filter(el.find(crawlSchema.results.selector), filterFN)) {
-                    stopCriteriaFound = true;
-                  }
-                  break;
-
-                default:
-                  console.log("stop-criteria not supported (and ignored)", stop.name);
-              }
-            });
-
-            if (stopCriteriaFound) {
-              return cb();
-            }
-
-
-            var sortedSetname = utils.addedUrlsSortedSet(crawlerName);
-
-            //get the last time (batchId) nextUrl was added to queue
-            redisClient.zscore(sortedSetname, nextUrl, function (err, score) {
-              if (err) {
-                return cb(err);
-              }
-
-              //skip if: 
-              //- nextUrl was added to queue once (score !== null)
-              //- nextUrl was added to queue as part of current batch (+score === +data.batchId)
-              //- and we don't want to skip this check
-              if (score !== null && +score === +data.batchId && !argv.skipCacheCheck) {
-                debug("SKIPPING bc url already on queue  or processed for current batchid", nextUrl);
-                //should only happen : 
-                //1. on restart of batch, but only for a short burst. 
-                //   Generally at most N where N is nr of parallel workers
-                //2. #117: if we've seeing more, we're seeing a problem in crawling OR 
-                //   some anti-crawl algo pointing to same url over and over again.
-                //3. if current job is processed multiple times because of error
-                return cb(); //let's skip since we've already processed this url
-              }
-
-              //upload next url to queue
-              utils.addCrawlJob(queue, data.batchId, crawlConfig, nextUrl, function (err) {
-                if (err) {
-                  return cb(err);
+        switch(data.dataType){
+          case "html":
+            debug("PROCESSING as HTML");
+            var crawlResultSchema = _.extend({
+                //add _htmlDetail for transormers to use. See #30
+                _htmlDetail: function (el, cb) {
+                  cb(undefined, el.html());
+                },
+                calcPageDone: function (el, cb) {
+                  crawlerResource.stats.total.nrDetailPages++;
+                  cb();
                 }
-                debugUrls("ADDING nexturl", nextUrl);
+              },
+              crawlConfig.schema.results.schema(x, detailData));
+            x(data.url, "html", {
+              //pagination
+              paginate: function distributedPaginate(el, cb) {
 
-                //update score to data.batchId 
-                redisClient.zadd(sortedSetname, data.batchId, nextUrl, cb);
-              });
+                var paginateConfig = crawlSchema.seed;
+
+                //if no nextUrlFN function -> skip
+                if (!paginateConfig.nextUrlFN) {
+                  return cb();
+                }
+
+                //disable pagination (used for testing)
+                if (paginateConfig.disable) {
+                  return cb();
+                }
+
+                var nextUrl = paginateConfig.nextUrlFN(el);
+                debugUrls("PROCESSED url", data.url);
+
+
+                //sometimes the next url just isn't there anymore.
+                //That's an easy and strong signal to stop bothering
+                if (!validUrl.isUri(nextUrl)) {
+                  return cb();
+                }
+
+                //check if nextUrl is the same as currentUrl.
+                //If so -> quit
+                if (nextUrl === data.url) {
+                  return cb();
+                }
+
+                //... otherwise there might be more domain specific ways in which to pick up signal that we're done
+                var stopCriteriaFound = false;
+
+                stopArr = paginateConfig.stop || [];
+                stopArr = _.isArray(stopArr) ? stopArr : [stopArr];
+
+                _.each(stopArr, function (stop) {
+                  if (_.isString(stop)) {
+                    stop = {
+                      name: stop
+                    };
+                  }
+                  switch (stop.name) {
+                    case "zeroResults":
+                      //no results found -> stopCriteriaFound = true
+                      var filterFN = stop.selectorPostFilter || function (results) {
+                          return true;
+                        };
+                      if (!_.filter(el.find(crawlSchema.results.selector), filterFN)) {
+                        stopCriteriaFound = true;
+                      }
+                      break;
+
+                    default:
+                      console.log("stop-criteria not supported (and ignored)", stop.name);
+                  }
+                });
+
+                if (stopCriteriaFound) {
+                  return cb();
+                }
+
+
+                var sortedSetname = utils.addedUrlsSortedSet(crawlerName);
+
+                //get the last time (batchId) nextUrl was added to queue
+                redisClient.zscore(sortedSetname, nextUrl, function (err, score) {
+                  if (err) {
+                    return cb(err);
+                  }
+
+                  //skip if:
+                  //- nextUrl was added to queue once (score !== null)
+                  //- nextUrl was added to queue as part of current batch (+score === +data.batchId)
+                  //- and we don't want to skip this check
+                  if (score !== null && +score === +data.batchId && !argv.skipCacheCheck) {
+                    debug("SKIPPING bc url already on queue  or processed for current batchid", nextUrl);
+                    //should only happen :
+                    //1. on restart of batch, but only for a short burst.
+                    //   Generally at most N where N is nr of parallel workers
+                    //2. #117: if we've seeing more, we're seeing a problem in crawling OR
+                    //   some anti-crawl algo pointing to same url over and over again.
+                    //3. if current job is processed multiple times because of error
+                    return cb(); //let's skip since we've already processed this url
+                  }
+
+                  //upload next url to queue
+                  utils.addCrawlJob(queue, data.batchId, crawlConfig, nextUrl, function (err) {
+                    if (err) {
+                      return cb(err);
+                    }
+                    debugUrls("ADDING nexturl", nextUrl);
+
+                    //update score to data.batchId
+                    redisClient.zadd(sortedSetname, data.batchId, nextUrl, cb);
+                  });
+                });
+              },
+
+              //results crawling
+              results: x(crawlSchema.results.selector, [crawlResultSchema])
+            }, {
+              name: crawlerName
+            })(function (err, obj) {
+              if (err) {
+                return reject(err);
+              }
+              return resolve(obj);
             });
-          },
-
-          //results crawling
-          results: x(crawlSchema.results.selector, [crawlResultSchema])
-        }, {
-          name: crawlerName
-        })(function (err, obj) {
-          if (err) {
-            return reject(err);
-          }
-          resolve(obj);
-        });
+            break;
+          case "json":
+            debug("PROCESSING as JSON");
+            request(data.url, function(error, response, body){
+              if (error) {
+                return reject(err);
+              }
+              return resolve(crawlSchema.results.parseJSON(body));
+            });
+            break;
+        }
       });
     })
     .then(function trimWhiteSpaceRecursively(obj) {
@@ -455,7 +468,7 @@ function processJob(job, done) {
       }
       return result;
     })
-    .then(doFieldMappings("mapping", crawlConfig))
+    .then(doFieldMappings("mapping", crawlConfig, detailData))
     .then(function callCustomReducer(results) {
       if (!crawlConfig.schema.results.reducer) {
         return results;
@@ -823,7 +836,7 @@ function manageCrawlerLifecycle(resource) {
 
 
 
-function doFieldMappings(mappingName, crawlConfig) {
+function doFieldMappings(mappingName, crawlConfig, detailData) {
   return function (results) {
 
     //transform results using declarative `mappings`
@@ -846,7 +859,7 @@ function doFieldMappings(mappingName, crawlConfig) {
           if (!stageFn) {
             throw "canned transformer not available: '" + stage + "'. You should choose from '" + _.keys(functionLib).join(",") + "'";
           }
-          return stageFn(val, result);
+          return stageFn(val, result, detailData);
         }, parent[childKey]);
 
       });

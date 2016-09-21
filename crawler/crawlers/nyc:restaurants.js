@@ -51,7 +51,7 @@ module.exports = {
     timeoutMS: 35 * 1000,
 
     //local proxy, e.g.: TOR
-    proxy: "http://localhost:5566",
+    proxy: "http://ec2-52-45-105-133.compute-1.amazonaws.com:5566",
 
     //Default Headers for all requests
     headers: {
@@ -60,7 +60,7 @@ module.exports = {
 
 
     //cache to simple fileCache. This doesn't do any TTL or whatever. 
-    doCache: true
+    doCache: false
   },
   schema: {
     version: "0.1", //version of this schema
@@ -73,7 +73,7 @@ module.exports = {
       seedUrls: function () {
         var urls = [];
         for (var i = 0; i < 280; i++) { //manual check: ~5600 results -> 5600 / 20 (result per page) -> 280 pages
-          urls.push("http://www.nyc.com/search/find.aspx?secid=6&pagefrom=" + (i * 20 + 1));
+          urls.push({url:"http://www.nyc.com/search/find.aspx?secid=6&pagefrom=" + (i * 20 + 1), dataType:'html'});
         }
         return urls;
       },

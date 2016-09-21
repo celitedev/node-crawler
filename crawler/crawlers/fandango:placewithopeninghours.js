@@ -65,7 +65,7 @@ module.exports = {
     //
     //#6: distribute concurrency per <source,type> or <source>
     //for more controlled throttling.
-    concurrentJobs: 10,
+    concurrentJobs: 1,
     retries: 5,
 
     // fail job if not complete in 100 seconds. This is used because a consumer/box can fail/crash
@@ -80,7 +80,7 @@ module.exports = {
     timeoutMS: 40000,
 
     //local proxy, e.g.: TOR
-    proxy: "http://localhost:5566",
+    proxy: "http://ec2-52-45-105-133.compute-1.amazonaws.com:5566",
 
     //Default Headers for all requests
     headers: {
@@ -89,7 +89,7 @@ module.exports = {
 
     //cache to simple fileCache. 
     //NOT FIT FOR PRODUCTION SINCE This doesn't do any TTL or whatever  
-    doCache: true
+    doCache: false
   },
   schema: {
     version: "0.1", //version of this schema
@@ -99,11 +99,11 @@ module.exports = {
       disable: false, //for testing. Disabled nextUrl() call
 
       seedUrls: [
-        "http://www.fandango.com/manhattan_+ny_movietimes?pn=1",
-        "http://www.fandango.com/brooklyn_+ny_movietimes?pn=1",
-        "http://www.fandango.com/queens_+ny_movietimes?pn=1",
-        "http://www.fandango.com/bronx_+ny_movietimes?pn=1",
-        "http://www.fandango.com/staten+island_+ny_movietimes?pn=1"
+        {url:"http://www.fandango.com/manhattan_+ny_movietimes?pn=1", dataType:'html'},
+        {url:"http://www.fandango.com/brooklyn_+ny_movietimes?pn=1", dataType:'html'},
+        {url:"http://www.fandango.com/queens_+ny_movietimes?pn=1", dataType:'html'},
+        {url:"http://www.fandango.com/bronx_+ny_movietimes?pn=1", dataType:'html'},
+        {url:"http://www.fandango.com/staten+island_+ny_movietimes?pn=1", dataType:'html'}
       ],
 
       nextUrlFN: function (el) {
