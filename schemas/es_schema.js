@@ -203,6 +203,7 @@ module.exports = function (generatedSchemas) {
         },
         mapping: {
           type: "string",
+          analyzer: "snowball"
           //uses 'standard analyzer'
           //https://www.elastic.co/guide/en/elasticsearch/guide/current/analysis-intro.html
         },
