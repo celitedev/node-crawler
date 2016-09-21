@@ -185,7 +185,7 @@ var middleware = {
 
       req.body.filterContexts = filterContexts;
 
-      // console.log(JSON.stringify(filterContexts, null, 2));
+      //console.log(JSON.stringify(filterContexts, null, 2)); //DEBUG
       next();
 
     };

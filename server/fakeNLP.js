@@ -12,15 +12,14 @@ var subtypeToFilterQuery = {
     "temporal": {
       "gte": "now"
     },
-    "sort": {
-      "type": "field",
-      "field": "startDate",
-      "asc": true
-    },
+    "sort": [
+      {"type": "keyword"},
+      {"type": "date"}
+    ],
     label: {
       plural: "events",
-      singular: "event",
-      sorted: "(soonest first)"
+      singular: "event"//,
+      //sorted: "(soonest first)" todo re #328 no longer true
     }
   },
   "placewithopeninghours": {
@@ -59,9 +58,7 @@ var subtypeToFilterQuery = {
       "gte": "now"
     },
     "sort": {
-      "type": "field",
-      "field": "startDate",
-      "asc": true
+      "type": "date"
     },
     label: {
       plural: "movie screenings",
@@ -79,9 +76,7 @@ var subtypeToFilterQuery = {
       "gte": "now"
     },
     "sort": {
-      "type": "field",
-      "field": "startDate",
-      "asc": true
+      "type": "date"
     },
     label: {
       plural: "concerts",
@@ -169,9 +164,7 @@ var subtypeToFilterQuery = {
       "gte": "now"
     },
     "sort": {
-      "type": "field",
-      "field": "startDate",
-      "asc": true
+      "type": "date"
     },
     label: {
       plural: "movie screenings",
@@ -185,8 +178,7 @@ var subtypeToFilterQuery = {
     },
     "sort": {
       "type": "field",
-      "field": "aggregateRating.ratingValue",
-      "asc": false
+      "field": "aggregateRating.ratingValue"
     },
     label: {
       plural: "movies",
