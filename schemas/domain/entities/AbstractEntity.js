@@ -39,7 +39,7 @@ module.exports = function (generatedSchemas, r) {
 		}
 	 */
   function AbstractEntity(state, bootstrapObj, options) {
-    //console.log("Abstract Entity state: ", state); 
+    //console.log("Abstract Entity state: ", state);
 
     if (!this._kind) {
       throw new Error("AbstractEntity should be called by subtype");
