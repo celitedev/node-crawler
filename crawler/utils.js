@@ -79,10 +79,10 @@ var utils = module.exports = {
         jobId: uuid.v4(), //id of this specific mini batch
         source: crawlConfig.source.name,
         type: crawlConfig.entity.type,
-        url: url.url,
-        dataType: url.dataType,
+        url: url.url ? url.url : url,
+        dataType: url.dataType ? url.dataType: 'html',
         created: new Date().toISOString(),
-        title: crawlConfig.name + "--" + url
+        title: crawlConfig.name + "--" + (url.url ? url.url : url)
       })
       .ttl(crawlConfig.job.ttl)
       //fail means retry: return to queue to be picked up later. Allows us to mimic 'at-least-once'-semantics
