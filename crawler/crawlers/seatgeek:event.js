@@ -138,23 +138,22 @@ module.exports = {
           startDate: ".event-listing-time@datetime",
           _startDate: ".event-listing-time",
           location: ".event-listing-venue-link@href",
-          _subtype: "@itemtype"
+          _subtype: "script"
         };
       },
 
       mapping: {
-       _type: function (val, obj) {
-          var subtype = obj._subtype; 
-          subtype = subtype.substring(subtype.lastIndexOf("/") + 1);
+        _type: function (val, obj) {
+          var subtype = JSON.parse(obj._subtype)['@type'];
           return [subtype];
-        }, 
+        },
         startDate: function (startDateISO, obj) {
 
           //seatgeek uses timestamps, but these appear to be in NYC local time WTF. 
           //Therefore we fallback to isoTime in localtime since this is better human checkable. 
           //
           return dateUtils.transposeTimeToUTC(startDateISO, "America/New_York");
-        }, 
+        },
       },
 
       // reducer: function (obj) {
@@ -164,7 +163,7 @@ module.exports = {
       //   }
       //   return obj;
       // },
-      
+
       pruner: function (result) {
         if (!result.startDate) {
           return undefined;
