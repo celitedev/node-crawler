@@ -1,4 +1,5 @@
 var _ = require("lodash");
+var config = require("../../config");
 
 var nycUtils = require("./utils/nycUtils")({
   DEBUG_OPENINGHOURS: false
@@ -20,11 +21,11 @@ module.exports = {
   scheduler: {
     runEveryXSeconds: 24 * 60 * 60 //each day
   },
-  //General logic/behavior for this crawler 
+  //General logic/behavior for this crawler
   semantics: {
 
-    //prune ENTITY URL if already processed 
-    //options: 
+    //prune ENTITY URL if already processed
+    //options:
     //- false: never prune
     //- true: prune if url already processed
     //- batch: prune if url already processed for this batch
@@ -36,19 +37,19 @@ module.exports = {
     retries: 10,
 
     // fail job if not complete in 100 seconds. This is used because a consumer/box can fail/crash
-    // In that case the job would get stuck indefinitely in 'active' state. 
+    // In that case the job would get stuck indefinitely in 'active' state.
     // With this solution, the job is placed back on the queue, and retried according to 'retries'-policy
     // This should be WAY larger then driver.timeoutMS
     ttl: 100 * 1000, //this does need to be longer then driver timeout right?
   },
   driver: {
 
-    //timeout on individual request. 
+    //timeout on individual request.
     //Result: fail job and put back in queue as oer config.job.retries
     timeoutMS: 35 * 1000,
 
     //local proxy, e.g.: TOR
-    proxy: "http://ec2-52-45-105-133.compute-1.amazonaws.com:5566",
+    proxy: 'http://' + config.proxy.host + ':' + config.proxy.port,
 
     //Default Headers for all requests
     headers: {
