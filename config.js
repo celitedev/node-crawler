@@ -75,6 +75,11 @@ var config = {
       }],
       buffer: 50,
       max: 1000
+    },
+    
+    search_query_parser: {
+      host: "localhost",
+      port: 9000
     }
   },
   prod_remote: {
