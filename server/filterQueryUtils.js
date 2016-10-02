@@ -435,14 +435,21 @@ module.exports = function (command) {
     return wrapWithNestedQueryIfNeeed(rangeQuery, k);
   }
 
-  function performTemporalQuery(v, k) {
+  function performTemporalQuery(dateFilters) {
 
-    var rangeQuery = {
-      range: {}
-    };
-    rangeQuery.range[k] = v;
-
-    return wrapWithNestedQueryIfNeeed(rangeQuery, k);
+    var rangeQueries = [];
+    _.each(dateFilters, function(v, k){
+      var rangeQuery = {
+        range: {}
+      };
+      rangeQuery.range[k] = v;
+      rangeQueries.push(wrapWithNestedQueryIfNeeed(rangeQuery, k));
+    });
+    if (rangeQueries.length === 1) {
+      return rangeQueries[0];
+    } else {
+      return rangeQueries;
+    }
   }
 
   function createFilterQuery(command) {
