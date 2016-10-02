@@ -447,15 +447,17 @@ module.exports = function (command) {
     });
     if (rangeQueries.length === 1) {
       return rangeQueries[0];
+      // todo jim create or range query
     } else {
       return rangeQueries;
+
     }
   }
 
   function createFilterQuery(command) {
 
     if (!command.type) {
-      throw new Error("command.type shoud be defined");
+      throw new Error("command.type should be defined");
     }
 
     //auto load expand-map

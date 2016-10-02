@@ -39,7 +39,7 @@ var config = {
     },
 
     search_query_parser: {
-      host: "localhost",
+      host: "ec2-23-22-187-201.compute-1.amazonaws.com",
       port: 9000
     }
   },
@@ -76,7 +76,7 @@ var config = {
       buffer: 50,
       max: 1000
     },
-    
+
     search_query_parser: {
       host: "localhost",
       port: 9000
