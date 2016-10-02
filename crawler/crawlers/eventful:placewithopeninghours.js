@@ -1,8 +1,8 @@
 var _ = require("lodash");
-
+var config = require("../../config");
 var nycObj = require("../../schemas/domain/_definitions/config").statics.NYC;
 
-//crawlSchema for: 
+//crawlSchema for:
 //source: Eventful
 //type: events
 module.exports = {
@@ -19,45 +19,45 @@ module.exports = {
   scheduler: {
     runEveryXSeconds: 24 * 60 * 60 //each day
   },
-  //General logic/behavior for this crawler 
+  //General logic/behavior for this crawler
   semantics: {
 
-    //prune ENTITY URL if already processed 
-    //options: 
+    //prune ENTITY URL if already processed
+    //options:
     //- false: never prune
     //- true: prune if url already processed
     //- batch: prune if url already processed for this batch
     pruneEntity: "batch",
 
     //How to check entity is updated since last processed
-    // - string (templated functions) 
+    // - string (templated functions)
     // - custom function. Signature: function(el, cb)
     //
-    //template options: 
+    //template options:
     //- hash: hash of detail contents
     //- headers: based on cache headers
     dirtyCheckEntity: "hash",
 
 
-    //Examples: 
+    //Examples:
     //
-    //pruneList = batch + pruntEntity = true -> 
-    //Each batch run prunes lists pages when done within the same batch. 
+    //pruneList = batch + pruntEntity = true ->
+    //Each batch run prunes lists pages when done within the same batch.
     //However, the next batch run lists aren't pruned to stay up-to-date with changed contents (new entities?)
-    //of these list pages. 
-    //Regardless, due to pruneEntity=true, the crawler will not recheck entities if they're already processed. 
-    //This is the default (and fastest) mode, based on the rationale that entities do not change often if at all. 
-    //I.e.: a Place-page on Eventful will rarely update it's contents. 
+    //of these list pages.
+    //Regardless, due to pruneEntity=true, the crawler will not recheck entities if they're already processed.
+    //This is the default (and fastest) mode, based on the rationale that entities do not change often if at all.
+    //I.e.: a Place-page on Eventful will rarely update it's contents.
     //
-    //Prunelist = batch + pruneEntity = batch -> 
+    //Prunelist = batch + pruneEntity = batch ->
     //recheck already processed entities for each new batch.
     //
-    //A good setting may be: 
-    //- EACH HOUR: Run pruneList = batch + pruntEntity = true 
-    //- EACH DAY: Run pruneList = batch + pruntEntity = batch   
+    //A good setting may be:
+    //- EACH HOUR: Run pruneList = batch + pruntEntity = true
+    //- EACH DAY: Run pruneList = batch + pruntEntity = batch
     //
     ///////////////////////////////////////////////////////////////////
-    //NOTE: PRUNELIST IS KEPT IN REDIS. BE SURE TO CLEAN THIS UP IF WE CLEAN RETHINKDB. 
+    //NOTE: PRUNELIST IS KEPT IN REDIS. BE SURE TO CLEAN THIS UP IF WE CLEAN RETHINKDB.
     //OTHERWISE PRUNE=TRUE WILL PRUNE EVEN IF WE DON'T HAVE THE ENTITY IN DB ANYMORE.
     //THIS IS ONLY AN ISSUE DURING DEV
     //////////////////////////////////////////////////////////////////////
@@ -65,32 +65,32 @@ module.exports = {
   job: {
     //x concurrent kue jobs
     //
-    //NOTE: depending on the type of crawl this can be a master page, which 
-    //within that job will set off concurrent detail-page fetches. 
-    //In that case total concurrency is higher than specified here. 
+    //NOTE: depending on the type of crawl this can be a master page, which
+    //within that job will set off concurrent detail-page fetches.
+    //In that case total concurrency is higher than specified here.
     //
     //#6: distribute concurrency per <source,type> or <source>
     //for more controlled throttling.
     concurrentJobs: 1,
 
 
-    //job-level retries before fail. 
+    //job-level retries before fail.
     //This is completely seperate for urls that are individually retried by driver
     retries: 5,
 
     // fail job if not complete in 40 seconds. This is used because a consumer/box can fail/crash
-    // In that case the job would get stuck indefinitely in 'active' state. 
+    // In that case the job would get stuck indefinitely in 'active' state.
     // With this solution, the job is placed back on the queue, and retried according to 'retries'-policy
     ttl: 100 * 1000,
   },
   driver: {
 
-    //timeout on individual request. 
+    //timeout on individual request.
     //Result: fail job and put back in queue as oer config.job.retries
     timeoutMS: 50 * 1000,
 
     //local proxy, e.g.: TOR
-    proxy: "http://ec2-52-45-105-133.compute-1.amazonaws.com:5566",
+    proxy: 'http://' + config.proxy.host + ':' + config.proxy.port,
 
     //Default Headers for all requests
     headers: {
@@ -199,7 +199,7 @@ module.exports = {
       //mapping allow function(entire obj) || strings or array of those
       //returning undefined removes them
       mapping: {
-        
+
         containedInPlace: function (val) {
           return nycObj.sourceId; //always grab the sourceId not the id!
         },
@@ -244,7 +244,7 @@ module.exports = {
           return imageArr;
         },
 
-       
+
 
       },
 

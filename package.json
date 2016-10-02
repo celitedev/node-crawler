@@ -51,6 +51,7 @@
     "pos-chunker": "^1.3.3",
     "pure-uuid": "^1.1.0",
     "redis": "^2.4.2",
+    "request": "^2.75.0",
     "rethinkdbdash": "^2.3.19",
     "schema-org": "^0.2.1",
     "stanford-corenlp": "git+https://github.com/jimedelstein/node-stanford-corenlp.git",

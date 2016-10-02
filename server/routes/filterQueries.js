@@ -4,6 +4,7 @@ var Promise = require("bluebird");
 var cardViewModel = require("../cardViewModel");
 
 var subtypeToFilterQuery = require("../fakeNLP").subtypeToFilterQuery;
+var searchQueryParser = require('../search_query_parser');
 
 
 /**
@@ -16,39 +17,46 @@ var middleware = {
 
     var filterQueryUtils = command.filterQueryUtils;
 
-    return function (req, res, next) {
+    var question;
+    var parsedQuestion;
+
+    //todo jim: abstract these out of the routes and into utils or something, once I'm done tearing them up
+    var ensureQuestion = function(query, next){
+      if (query.filterContexts || query.type) {
+        if (query.filterContexts && query.type) {
+          var err = new Error("body contains both 'type' and 'filterContexts'. These attributes are mutually exclusive");
+          err.status = 400;
+          return next(err);
+        }
+        return next();
+      }
+      if (query.question === undefined) {
+        var err = new Error("body should either contain 'type', 'question' or 'filterContexts");
+        err.status = 400;
+        return next(err);
+      }
+    };
+
+    var getDateFilter = function(){
+      if ( parsedQuestion
+        && parsedQuestion.sentences
+        && parsedQuestion.sentences.length > 0
+        && parsedQuestion.sentences[0].temporal_query_info
+        && parsedQuestion.sentences[0].temporal_query_info.length > 0)
+      {
+        return parsedQuestion.sentences[0].temporal_query_info[0];
+      }
+    };
+
+    var createFilterContexts = function(){
 
       //Let's add the default rows
       var rootsInOrder = [].concat(filterQueryUtils.fixedTypesInOrder); //clone
 
-      var err;
-
-      //If body contains `type` we treat body as filterContext.
-      //Optionally we might want to calculate closeby filterContexts. 
-      // 
-      //Alternatively, if body contains `filterContexts`
-      if (req.body.filterContexts || req.body.type) {
-        if (req.body.filterContexts && req.body.type) {
-          err = new Error("body contains both 'type' and 'filterContexts'. These attributes are mutually exclusive");
-          err.status = 400;
-          return next(err);
-        }
-
-        //TODO: if req.type + req.calculateNearbyFilterContexts -> calculate nearby FC. 
-
-        return next();
-      }
-
-      if (req.body.question === undefined) {
-        err = new Error("body should either contain 'type', 'question' or 'filterContexts");
-        err.status = 400;
-        return next(err);
-      }
-
-      //PRE: Based on question we generate multiple FilterContexts. 
-      //Strategy is as follows: 
+      //PRE: Based on question we generate multiple FilterContexts.
+      //Strategy is as follows:
       //
-      // 1. we ALWAYS show 4 keyword-search based rows, 
+      // 1. we ALWAYS show 4 keyword-search based rows,
       //for type= Event, PlaceWithOpeninghours, CreativeWork, OrganizationAndPerson in this order.
       //
       // 2. If the question contains one of the 4 above roots (or an alias) =>
@@ -57,13 +65,14 @@ var middleware = {
       // 3. If the question contains a subtype (or an alias) =>
       //Show an ADDITIONAL row on top of the 4 rows, filtered on subtype.
       //
-      // 4. If the question contains a subtype + a date/duration=>
-      //TODO: Show an ADDITIONAL row on top of the 4 rows + the row shown based on point 3 above, filtered on subtype + date/duration
+      // 4. Parse the data from search_query_parser, which at the moment only contains data information,
+      // and add it to each of the filter contexts so it can be utilized in the query down the line
 
-      var question = req.body.question.toLowerCase().trim();
 
-      //ngrams from large to small and from back to front. 
+      //ngrams from large to small and from back to front.
+
       var ngrams = getNGramsInSizeOrder(question);
+      var dateFilter = getDateFilter();
       var nlpContexts = [];
 
       var nlpFilterContextProtos,
@@ -71,7 +80,7 @@ var middleware = {
 
       //We try to match the ngram against all defined subtype aliases
       //If ngram ends in an 'n' we assume it's plural and also try to match to naive singular 'ngram - s'
-      //the first match found is the one we're going with. 
+      //the first match found is the one we're going with.
       //Based on ordening we favour (1) large subtypes that (2) sit at the end of the question
       _.each(ngrams, function (ngram) {
         var ngramSingular = ngram[ngram.length - 1] = 's' && ngram.substring(0, ngram.length - 1);
@@ -89,16 +98,7 @@ var middleware = {
       //This is used for queries that filter on actual subtype
       var questionWithPossiblyRemovedType = matchingNgram ? question.replace(matchingNgram, "").trim() : question;
 
-      //DEPRECATE: BETTER TEST ENTIRELY DIFFERENT SETUP CROSS_FIELDS
-      // For all fallback questions we use: 
-      // 1. the questionWithPossiblyRemovedType as well. This makes more sense in most cases, since we don't want to show matches
-      // that match on a subtype as heavily as on an adverb i.e.: cocktail in cocktail bar
-      // However, this will give problems when searching for 'all bars' which would then result in searching for 'all' 
-      // which is clearly not wanted
-      // question = questionWithPossiblyRemovedType ? questionWithPossiblyRemovedType : question;
-
-
-      var reorderFallbackTypes = []; 
+      var reorderFallbackTypes = [];
 
       if (nlpFilterContextProtos) {
 
@@ -138,21 +138,28 @@ var middleware = {
             };
           }
 
+          if (dateFilter && nlpFilterContextProto.temporal) nlpFilterContextProto.temporal = dateFilter;
+
           nlpContexts.push(_.merge({}, nlpFilterContext, nlpFilterContextProto));
 
           //Get the fallback type that matches the nlpFilterContextProto
           //1. if nlpFilterContextProto DOES NOT contain a subtype (and thus matches a root) we'll remove the fallback
           //2. if nlpFilterContextProto DOES contain a subtype, we'll be sure to move the fallback row up in the order.
           var fallbackOfSameType = rootsInOrder.splice(rootsInOrder.indexOf(nlpFilterContextProto.type), 1)[0];
-        
+
           if(nlpFilterContextProto.filter.subtypes){
             reorderFallbackTypes.push(fallbackOfSameType);
           }
         });
       }
 
+      //todo jim left off here, the plan is:
+      // look for temporal query info, add to filter context (will require changing the filter context structure most likely
+      // if temporal query info, replace label.sorted with entity mention text, ask taylor for possible types
+      // don't worry about removing the ner mentions yet, taylor will handle that
+
       //The ordinary/fallback rows
-      var filterContexts = nlpContexts.concat(_.map(reorderFallbackTypes.concat(rootsInOrder), function (root) {
+      return nlpContexts.concat(_.map(reorderFallbackTypes.concat(rootsInOrder), function (root) {
 
         var filterContext = _.merge({
           filter: {},
@@ -180,18 +187,30 @@ var middleware = {
           };
         }
 
+        if (dateFilter && filterContext.temporal) filterContext.temporal = dateFilter;
+
         return filterContext;
       }));
 
-      req.body.filterContexts = filterContexts;
+    };
 
-      //console.log(JSON.stringify(filterContexts, null, 2)); //DEBUG
-      next();
-
+    return function (req, res, next) {
+      question = req.body.question.toLowerCase().trim();
+      ensureQuestion(req.body, next); //check that we have a question or a type / filtercontext - if we have a type but no question, we move on from here and skip the rest of this
+      searchQueryParser.parseQuestion(question)
+        .then(function(result){
+          parsedQuestion = JSON.parse(result);
+          console.log("question: ", parsedQuestion); // DEBUG
+          req.body.filterContexts = createFilterContexts();
+          //console.log(JSON.stringify(req.body.filterContexts, null, 2)); //DEBUG
+          next();
+        })
+        .catch(function(err){
+          next(err);
+        });
     };
   }
 };
-
 
 function getNGramsInSizeOrder(text) {
 

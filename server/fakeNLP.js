@@ -10,7 +10,9 @@ var subtypeToFilterQuery = {
   "event": {
     type: "Event",
     "temporal": {
-      "gte": "now"
+      "startDate": {
+        "gte": "now"
+      }
     },
     "sort": [
       {"type": "keyword"},
@@ -55,7 +57,9 @@ var subtypeToFilterQuery = {
       subtypes: "screeningevent"
     },
     "temporal": {
-      "gte": "now"
+      "startDate": {
+        "gte": "now"
+      }
     },
     "sort": {
       "type": "date"
@@ -73,7 +77,9 @@ var subtypeToFilterQuery = {
       subtypes: "concert"
     },
     "temporal": {
-      "gte": "now"
+      "startDate": {
+        "gte": "now"
+      }
     },
     "sort": {
       "type": "date"
@@ -161,7 +167,9 @@ var subtypeToFilterQuery = {
       subtypes: "screeningevent"
     },
     "temporal": {
-      "gte": "now"
+      "startDate": {
+        "gte": "now"
+      }
     },
     "sort": {
       "type": "date"
