@@ -200,7 +200,7 @@ var middleware = {
       searchQueryParser.parseQuestion(question)
         .then(function(result){
           parsedQuestion = JSON.parse(result);
-          console.log("question: ", parsedQuestion); // DEBUG
+          //console.log("question: ", parsedQuestion); // DEBUG
           req.body.filterContexts = createFilterContexts();
           //console.log(JSON.stringify(req.body.filterContexts, null, 2)); //DEBUG
           next();
