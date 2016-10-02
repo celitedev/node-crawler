@@ -461,7 +461,7 @@ module.exports = function (command) {
         searchQuery.body.query.function_score = functionScore;
         _.merge(searchQuery.body, self.getPage());
 
-        console.log(JSON.stringify(searchQuery, null,2)); //DEBUG
+        //console.log(JSON.stringify(searchQuery, null,2)); //DEBUG
 
         return esClient.search(searchQuery);
       })
