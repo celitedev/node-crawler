@@ -10,6 +10,11 @@ var config = {
       port: 6379
     },
 
+    proxy: {
+      host: "localhost",
+      port: 5566
+    },
+
     //https://www.elastic.co/guide/en/elasticsearch/client/javascript-api/current/configuration.html
     elasticsearch: {
       host: 'http://127.0.0.1:9201',
@@ -25,7 +30,7 @@ var config = {
 
     rethinkdb: {
       pool: true, //default = true
-      //true is interesting:  When true, the driver will regularly pull data from the table server_status 
+      //true is interesting:  When true, the driver will regularly pull data from the table server_status
       //to keep a list of updated hosts, default false
       //TBD: check if useul to put to true.
       discovery: false,
@@ -36,12 +41,22 @@ var config = {
       }],
       buffer: 50,
       max: 1000
+    },
+
+    search_query_parser: {
+      host: "ec2-23-22-187-201.compute-1.amazonaws.com",
+      port: 9000
     }
   },
   staging: {
     redis: {
       host: "localhost",
       port: 6379
+    },
+
+    proxy: {
+      host: "ec2-54-159-157-231.compute-1.amazonaws.com",
+      port: 5566
     },
 
     //https://www.elastic.co/guide/en/elasticsearch/client/javascript-api/current/configuration.html
@@ -70,12 +85,22 @@ var config = {
       }],
       buffer: 50,
       max: 1000
+    },
+
+    search_query_parser: {
+      host: "localhost",
+      port: 9000
     }
   },
   prod_remote: {
     redis: {
       host: "localhost",
       port: 6379
+    },
+
+    proxy: {
+      host: "ec2-54-159-157-231.compute-1.amazonaws.com",
+      port: 5566
     },
 
     //https://www.elastic.co/guide/en/elasticsearch/client/javascript-api/current/configuration.html
@@ -91,7 +116,7 @@ var config = {
 
     rethinkdb: {
       pool: true, //default = true
-      //true is interesting:  When true, the driver will regularly pull data from the table server_status 
+      //true is interesting:  When true, the driver will regularly pull data from the table server_status
       //to keep a list of updated hosts, default false
       //TBD: check if useul to put to true.
       discovery: false,
@@ -108,6 +133,11 @@ var config = {
     redis: {
       host: "ec2-50-16-27-104.compute-1.amazonaws.com",
       port: 6379
+    },
+
+    proxy: {
+      host: "ec2-54-159-157-231.compute-1.amazonaws.com",
+      port: 5566
     },
 
     //https://www.elastic.co/guide/en/elasticsearch/client/javascript-api/current/configuration.html
