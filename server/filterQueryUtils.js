@@ -435,20 +435,29 @@ module.exports = function (command) {
     return wrapWithNestedQueryIfNeeed(rangeQuery, k);
   }
 
-  function performTemporalQuery(v, k) {
+  function performTemporalQuery(dateFilters) {
 
-    var rangeQuery = {
-      range: {}
-    };
-    rangeQuery.range[k] = v;
+    var rangeQueries = [];
+    _.each(dateFilters, function(v, k){
+      var rangeQuery = {
+        range: {}
+      };
+      rangeQuery.range[k] = v;
+      rangeQueries.push(wrapWithNestedQueryIfNeeed(rangeQuery, k));
+    });
+    if (rangeQueries.length === 1) {
+      return rangeQueries[0];
+      // todo jim create or range query
+    } else {
+      return rangeQueries;
 
-    return wrapWithNestedQueryIfNeeed(rangeQuery, k);
+    }
   }
 
   function createFilterQuery(command) {
 
     if (!command.type) {
-      throw new Error("command.type shoud be defined");
+      throw new Error("command.type should be defined");
     }
 
     //auto load expand-map
