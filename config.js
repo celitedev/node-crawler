@@ -55,7 +55,7 @@ var config = {
     },
 
     proxy: {
-      host: "ec2-54-159-157-231.compute-1.amazonaws.com",
+      host: "ec2-52-45-105-133.compute-1.amazonaws.com",
       port: 5566
     },
 
@@ -99,7 +99,7 @@ var config = {
     },
 
     proxy: {
-      host: "ec2-54-159-157-231.compute-1.amazonaws.com",
+      host: "ec2-52-45-105-133.compute-1.amazonaws.com",
       port: 5566
     },
 
@@ -136,7 +136,7 @@ var config = {
     },
 
     proxy: {
-      host: "ec2-54-159-157-231.compute-1.amazonaws.com",
+      host: "ec2-52-45-105-133.compute-1.amazonaws.com",
       port: 5566
     },
 
