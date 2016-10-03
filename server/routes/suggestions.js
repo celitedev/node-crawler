@@ -28,7 +28,6 @@ module.exports = function (command) {
           err.status = 404;
           throw err;
         }
-        console.log('Entity = ', entity);
         var entity = entity;
         var type = entity.root;
         filter.type = type;
@@ -47,14 +46,11 @@ module.exports = function (command) {
           });
       })
       .then(function (queries) {
-        console.log('suggestion Queries=  ', queries);
         return Promise.all(_.map(queries, function (query) {
           return query.performQuery();
         }));
       })
       .then(function (results) {
-        console.log('suggestion results = ', results);
-
         return _.map(results, function(suggestion){
 
           if (suggestion.hits.length > 0)
@@ -64,16 +60,10 @@ module.exports = function (command) {
             var expand = {};
 
             filterQueryUtils.recurseReferencesToExpand(suggestion, root, fieldsToExpand, expand);
-
             suggestion.expand = expand;
-
-            var newSuggestions =  cardViewModel.conditionalEnrichWithCardViewmodel({
+            return cardViewModel.conditionalEnrichWithCardViewmodel({
               includeCardFormatting: true
             }, suggestion);
-
-            console.log("New suggestions: ", newSuggestions);
-
-            return newSuggestions;
           } else
               return suggestion;
         });
