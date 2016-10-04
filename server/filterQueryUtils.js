@@ -501,9 +501,6 @@ module.exports = function (command) {
               wantUnique: true,
               sort: {
                 type: 'date'
-              },
-              temporal: {
-                gte: 'now'
               }
             })),
             createFilterQuery(_.extend({}, command, {
@@ -511,10 +508,7 @@ module.exports = function (command) {
               subtype: _.last(entity.subtypes_raw),
               sort: [{
                 type: 'date'
-              }],
-              temporal: {
-                gte: 'now'
-              }
+              }]
             }))];
             break;
       case '‌PlaceWithOpeninghours':
