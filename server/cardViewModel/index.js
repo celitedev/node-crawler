@@ -140,7 +140,7 @@ var simpleCardFormatters = {
 
 
     if (!json.formatted.details) json.formatted.details = [];
-    json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Reviews", detail: formatted.databits1 }).value(), 'title');
+    if (formatted.databits1) json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Reviews", detail: formatted.databits1 }).value(), 'title');
 
   },
 
@@ -169,7 +169,7 @@ var simpleCardFormatters = {
 
     //detail code
     if (!json.formatted.details) json.formatted.details = [];
-    json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Description", detail: raw.description }).value(), 'title');
+    if (raw.description) json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Description", detail: raw.description }).value(), 'title');
 
   },
 
@@ -195,7 +195,7 @@ var simpleCardFormatters = {
 
     //detail code
     if (!json.formatted.details) json.formatted.details = [];
-    json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Description", detail: raw.description }).value(), 'title');
+    if (raw.description) json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Description", detail: raw.description }).value(), 'title');
 
   },
 
@@ -217,7 +217,7 @@ var simpleCardFormatters = {
 
     //detail code
     if (!json.formatted.details) json.formatted.details = [];
-    json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Description", detail: raw.description }).value(), 'title');
+    if (raw.description) json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Description", detail: raw.description }).value(), 'title');
 
   },
 
