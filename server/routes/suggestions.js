@@ -47,25 +47,27 @@ module.exports = function (command) {
       })
       .then(function (queries) {
         return Promise.all(_.map(queries, function (query) {
-          return query.performQuery();
-        }));
+          return Promise.props({
+            title: query.title,
+            result: query.query.performQuery()
+          })
+        }))
       })
       .then(function (results) {
         return _.map(results, function(suggestion){
-
-          if (suggestion.hits.length > 0)
-          {
-            var root = suggestion.hits[0].root;
+          if (suggestion.result.hits.length > 0) {
+            var root = suggestion.result.hits[0].root;
             var fieldsToExpand = filterQueryUtils.expandMap[root];
             var expand = {};
 
-            filterQueryUtils.recurseReferencesToExpand(suggestion, root, fieldsToExpand, expand);
-            suggestion.expand = expand;
-            return cardViewModel.conditionalEnrichWithCardViewmodel({
+            filterQueryUtils.recurseReferencesToExpand(suggestion.result, root, fieldsToExpand, expand);
+            suggestion.result.expand = expand;
+            suggestion.result = cardViewModel.conditionalEnrichWithCardViewmodel({
               includeCardFormatting: true
-            }, suggestion);
-          } else
-              return suggestion;
+            }, suggestion.result);
+          }
+          return suggestion;
+
         });
       });
   };
