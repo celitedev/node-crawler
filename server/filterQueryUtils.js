@@ -493,164 +493,197 @@ module.exports = function (command) {
     switch (entity.root)
     {
       case 'Event':
-          return [
-            createFilterQuery(_.extend({}, command, {
+          return [{
+              title:'Related Results',
+              query: createFilterQuery(_.extend({}, command, {
+                filter: {
+                  name: entity.name
+                },
+                wantUnique: true,
+                sort: {
+                  type: 'date'
+                }
+              }))},
+              {
+                title:'Popular Results',
+                query:createFilterQuery(_.extend({}, command, {
+                  wantUnique: false,
+                  subtype: _.last(entity.subtypes_raw),
+                  sort: [{
+                    type: 'date'
+                  }]
+                }))
+              }];
+            break;
+      case '‌PlaceWithOpeninghours':
+        return [{
+            title: 'Related Results',
+            query: createFilterQuery(_.extend({}, command, {
+              wantUnique: false,
               filter: {
                 name: entity.name
               },
-              wantUnique: true,
               sort: {
                 type: 'date'
+              },
+              temporal: {
+                gte: 'now'
               }
-            })),
-            createFilterQuery(_.extend({}, command, {
+            }))
+          },
+          {
+            title: 'Popular Results',
+            query: createFilterQuery(_.extend({}, command, {
               wantUnique: false,
               subtype: _.last(entity.subtypes_raw),
               sort: [{
                 type: 'date'
-              }]
-            }))];
-            break;
-      case '‌PlaceWithOpeninghours':
-        return [
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            filter: {
-              name: entity.name
-            },
-            sort: {
-              type: 'date'
-            },
-            temporal: {
-              gte: 'now'
-            }
-          })),
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            subtype: _.last(entity.subtypes_raw),
-            sort: [{
-              type: 'date'
-            }],
-            temporal: {
-              gte: 'now'
-            }
-          }))];
+              }],
+              temporal: {
+                gte: 'now'
+              }
+            }))
+          }];
         break;
             break;
       case 'OrganizationOrPersion':
-        return [
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            type: 'Event',
-            filter: {
-              name: entity.name
-            },
-            sort: [
-              {
+        return [{
+            title: 'Future Events',
+            query: createFilterQuery(_.extend({}, command, {
+              wantUnique: false,
+              type: 'Event',
+              filter: {
+                name: entity.name
+              },
+              sort: [
+                {
+                  type: 'date'
+                },
+                {
+                  type: 'keyword'
+                }],
+            }))
+          },
+          {
+            title: 'Similar Future Events',
+            query: createFilterQuery(_.extend({}, command, {
+              wantUnique: false,
+              type: 'Event',
+              subtype: _.last(entity.subtype_raw),
+              filter: {
+                name: entity.name
+              },
+              sort: [
+                {
+                  type: 'keyword'
+                },
+                {
+                  type: 'date'
+                }],
+            }))
+          },
+          {
+            title: 'Related Results',
+            query: createFilterQuery(_.extend({}, command, {
+              wantUnique: false,
+              subtype: _.last(entity.subtype_raw),
+              filter: {
+                name: entity.name
+              },
+              sort: [
+                {
+                  type: 'keyword'
+                }],
+            }))
+          },
+          {
+            title: 'Past Events',
+            query: createFilterQuery(_.extend({}, command, {
+              wantUnique: false,
+              type: 'Event',
+              subtype: _.last(entity.subtype_raw),
+              filter: {
+                name: entity.name
+              },
+              sort: {
                 type: 'date'
               },
-              {
-                type: 'keyword'
-              }],
-          })),
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            type: 'Event',
-            subtype: _.last(entity.subtype_raw),
-            filter: {
-              name: entity.name
-            },
-            sort: [
-              {
-                type: 'keyword'
-              },
-              {
-                type: 'date'
-              }],
-          })),
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            subtype: _.last(entity.subtype_raw),
-            filter: {
-              name: entity.name
-            },
-            sort: [
-              {
-                type: 'keyword'
-              }],
-          })),
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            type: 'Event',
-            subtype: _.last(entity.subtype_raw),
-            filter: {
-              name: entity.name
-            },
-            sort: {
-              type: 'date'
-            },
-            temporal: {
-              lte: 'now'
-            }
-          }))];
+              temporal: {
+                lte: 'now'
+              }
+            }))
+          }];
       case 'Creativework':
-        return [
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            type: 'Event',
-            filter: {
-              name: entity.name
-            },
-            sort: [
-              {
+        return [{
+            title: 'Future Events',
+            query: createFilterQuery(_.extend({}, command, {
+              wantUnique: false,
+              type: 'Event',
+              filter: {
+                name: entity.name
+              },
+              sort: [
+                {
+                  type: 'date'
+                }],
+            }))
+          },
+          {
+            title: 'Similar Future Events',
+            query: createFilterQuery(_.extend({}, command, {
+              wantUnique: false,
+              type: 'Event',
+              subtype: _.last(entity.subtype_raw),
+              filter: {
+                name: entity.name
+              },
+              sort: [
+                {
+                  type: 'date'
+                }],
+            }))
+          },
+          {
+            title: 'Related Results',
+            query: createFilterQuery(_.extend({}, command, {
+              wantUnique: false,
+              subtype: _.last(entity.subtype_raw),
+              filter: {
+                name: entity.name
+              },
+              sort: [
+                {
+                  type: 'keyword'
+                }],
+            }))
+          },
+          {
+            title: 'Past Events',
+            query: createFilterQuery(_.extend({}, command, {
+              wantUnique: false,
+              type: 'Event',
+              subtype: _.last(entity.subtype_raw),
+              filter: {
+                name: entity.name
+              },
+              sort: {
                 type: 'date'
-              }],
-          })),
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            type: 'Event',
-            subtype: _.last(entity.subtype_raw),
-            filter: {
-              name: entity.name
-            },
-            sort: [
-              {
-                type: 'date'
-              }],
-          })),
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            subtype: _.last(entity.subtype_raw),
-            filter: {
-              name: entity.name
-            },
-            sort: [
-              {
-                type: 'keyword'
-              }],
-          })),
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            type: 'Event',
-            subtype: _.last(entity.subtype_raw),
-            filter: {
-              name: entity.name
-            },
-            sort: {
-              type: 'date'
-            },
-            temporal: {
-              lte: 'now'
-            }
-          }))];
+              },
+              temporal: {
+                lte: 'now'
+              }
+            }))
+          }];
       default:
-        return [
-          createFilterQuery(_.extend({}, command, {
-            wantUnique: false,
-            filter: {
-              name: entity.name
-            }
-          }))];
+        return [{
+            title: 'Related Results',
+            query: createFilterQuery(_.extend({}, command, {
+              wantUnique: false,
+              filter: {
+                name: entity.name
+              }
+            }))
+          }];
           break;
     }
   }
