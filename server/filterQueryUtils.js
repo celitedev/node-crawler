@@ -508,6 +508,7 @@ module.exports = function (command) {
                 title:'Popular Results',
                 query:createFilterQuery(_.extend({}, command, {
                   wantUnique: false,
+                  type: 'Event',
                   subtype: _.last(entity.subtypes_raw),
                   sort: [{
                     type: 'date'
@@ -535,6 +536,7 @@ module.exports = function (command) {
             title: 'Popular Results',
             query: createFilterQuery(_.extend({}, command, {
               wantUnique: false,
+              type: '‌PlaceWithOpeninghours',
               subtype: _.last(entity.subtypes_raw),
               sort: [{
                 type: 'date'
@@ -647,6 +649,7 @@ module.exports = function (command) {
             title: 'Related Results',
             query: createFilterQuery(_.extend({}, command, {
               wantUnique: false,
+              type: 'Creativework',
               subtype: _.last(entity.subtype_raw),
               filter: {
                 name: entity.name
