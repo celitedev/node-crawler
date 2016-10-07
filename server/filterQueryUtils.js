@@ -499,7 +499,7 @@ module.exports = function (command) {
                 filter: {
                   name: entity.name
                 },
-                wantUnique: true,
+                wantUnique: false,
                 sort: {
                   type: 'date'
                 }
