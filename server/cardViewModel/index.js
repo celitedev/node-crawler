@@ -62,7 +62,7 @@ function getOpenhourHumandReadable(date, specArr){
     if(deltaInMinutes <= 180){ //close within 3 hours: use relative time
       return [true, dateFuture.add(deltaInMinutes, 'minutes').fromNow()];
     }else{
-      return [true, closeDate.calendar() + " - " + fromDateIntToDate(foundOpen.closes).calendar()];
+      return [true, closeDate.calendar()];
     }
   }else if(foundNext){
 
