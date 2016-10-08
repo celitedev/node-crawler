@@ -62,7 +62,7 @@ function getOpenhourHumandReadable(date, specArr){
     if(deltaInMinutes <= 180){ //close within 3 hours: use relative time
       return [true, dateFuture.add(deltaInMinutes, 'minutes').fromNow()];
     }else{
-      return [true, closeDate.calendar() + " - " + foundOpen.closes];
+      return [true, closeDate.calendar()];
     }
   }else if(foundNext){
 
@@ -90,9 +90,17 @@ var simpleCardFormatters = {
   // ///////////
 
   educationevent: function(json, expand){
+    var raw = json.raw;
+    var formatted = json.formatted;
+
     _.defaults(json.formatted, {
       category: "course event"
     });
+
+    // detail code
+    if (!json.formatted.details) json.formatted.details = [];
+    json.formatted.details = _.uniq(_(json.formatted.details).concat(raw.fact).value(),'title');
+
   }, 
 
   screeningevent: function (json, expand) {
@@ -129,11 +137,17 @@ var simpleCardFormatters = {
       databits2: _.compact([movie.contentRating].concat(movie.genre)),
       // whyshown: "SEE ALL CRITIC REVIEWS"  //if omitted space will be truncated in frontend.
     });
+
+
+    if (!json.formatted.details) json.formatted.details = [];
+    if (formatted.databits1) json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Reviews", detail: formatted.databits1 }).value(), 'title');
+
   },
 
   event: function (json, expand) {
 
     var raw = json.raw;
+
 
     //when raw.image not yet set, set if by workfeatured.image if that exists
     var workFeatured = expand[raw.workFeatured];
@@ -152,6 +166,11 @@ var simpleCardFormatters = {
     _.defaults(json.formatted, {
       headsup1: raw.startDate ? formatDateHumanReadable(raw.startDate) : "start time not known",
     });
+
+    //detail code
+    if (!json.formatted.details) json.formatted.details = [];
+    if (raw.description) json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Description", detail: raw.description }).value(), 'title');
+
   },
 
   // //////////////////
@@ -174,6 +193,10 @@ var simpleCardFormatters = {
       }())
     });
 
+    //detail code
+    if (!json.formatted.details) json.formatted.details = [];
+    if (raw.description) json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Description", detail: raw.description }).value(), 'title');
+
   },
 
 
@@ -191,6 +214,11 @@ var simpleCardFormatters = {
     _.defaults(json.formatted, {
       category: category
     });
+
+    //detail code
+    if (!json.formatted.details) json.formatted.details = [];
+    if (raw.description) json.formatted.details = _.uniq(_(json.formatted.details).concat({title: "Description", detail: raw.description }).value(), 'title');
+
   },
 
 
