@@ -67,7 +67,7 @@ var subtypeToFilterQuery = {
     label: {
       plural: "movie screenings",
       singular: "movie screening",
-      sorted: "(soonest first)"
+      //sorted: "(soonest first)"
     }
   },
 
@@ -87,7 +87,7 @@ var subtypeToFilterQuery = {
     label: {
       plural: "concerts",
       singular: "concert",
-      sorted: "(soonest first)"
+      //sorted: "(soonest first)"
     }
   },
 
@@ -177,7 +177,7 @@ var subtypeToFilterQuery = {
     label: {
       plural: "movie screenings",
       singular: "movie screening",
-      sorted: "(soonest first)"
+      //sorted: "(soonest first)"
     }
   }, {
     type: "CreativeWork",
