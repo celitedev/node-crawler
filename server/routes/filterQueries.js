@@ -3,7 +3,7 @@ var Promise = require("bluebird");
 
 var cardViewModel = require("../cardViewModel");
 
-var subtypeToFilterQuery = require("../fakeNLP").subtypeToFilterQuery;
+var subtypeToFilterQueryBase = require("../fakeNLP").subtypeToFilterQuery;
 var searchQueryParser = require('../search_query_parser');
 
 
@@ -14,11 +14,6 @@ var searchQueryParser = require('../search_query_parser');
 
 var middleware = {
   createFilterContextsFromQuestion: function (command) {
-
-    var filterQueryUtils = command.filterQueryUtils;
-
-    var question;
-    var parsedQuestion;
 
     //todo jim: abstract these out of the routes and into utils or something, once I'm done tearing them up
     var ensureQuestion = function(query, next){
@@ -37,14 +32,14 @@ var middleware = {
       }
     };
 
-    var parsedQuestionHasData = function(){
+    var parsedQuestionHasData = function(parsedQuestion){
       return parsedQuestion
         && parsedQuestion.questions
         && parsedQuestion.questions.length > 0
     };
 
-    var getDateFilter = function(){
-      if ( parsedQuestionHasData()
+    var getDateFilter = function(parsedQuestion){
+      if ( parsedQuestionHasData(parsedQuestion)
         && parsedQuestion.questions[0].temporal_query_info
         && parsedQuestion.questions[0].temporal_query_info.length > 0)
       {
@@ -52,8 +47,8 @@ var middleware = {
       }
     };
 
-    var getFilteredKeyword = function(){
-      if ( parsedQuestionHasData()
+    var getFilteredKeyword = function(parsedQuestion){
+      if ( parsedQuestionHasData(parsedQuestion)
         && parsedQuestion.questions[0].other_text
         && parsedQuestion.questions[0].other_text.length > 0
         && parsedQuestion.questions[0].other_text[0].text)
@@ -62,7 +57,9 @@ var middleware = {
       }
     };
 
-    var createFilterContexts = function(){
+    var createFilterContexts = function(parsedQuestion){
+
+      var filterQueryUtils = command.filterQueryUtils;
 
       //Let's add the default rows
       var rootsInOrder = [].concat(filterQueryUtils.fixedTypesInOrder); //clone
@@ -85,13 +82,16 @@ var middleware = {
 
       //ngrams from large to small and from back to front.
 
-      var filteredKeyword = getFilteredKeyword();
+
+      var filteredKeyword = getFilteredKeyword(parsedQuestion);
       var ngrams = getNGramsInSizeOrder(filteredKeyword);
-      var dateFilter = getDateFilter();
+      var dateFilter = getDateFilter(parsedQuestion);
       var nlpContexts = [];
 
-      var nlpFilterContextProtos,
-        matchingNgram;
+      var nlpFilterContextProtos = null;
+      var matchingNgram = null;
+
+      var subtypeToFilterQuery = _.cloneDeep(subtypeToFilterQueryBase);
 
       //We try to match the ngram against all defined subtype aliases
       //If ngram ends in an 'n' we assume it's plural and also try to match to naive singular 'ngram - s'
@@ -210,13 +210,11 @@ var middleware = {
     };
 
     return function (req, res, next) {
-      question = req.body.question.toLowerCase().trim();
       ensureQuestion(req.body, next); //check that we have a question or a type / filtercontext - if we have a type but no question, we move on from here and skip the rest of this
-      searchQueryParser.parseQuestion(question)
+      searchQueryParser.parseQuestion(req.body.question.toLowerCase().trim())
         .then(function(result){
-          parsedQuestion = JSON.parse(result);
-          console.log("question: ", parsedQuestion); // DEBUG
-          req.body.filterContexts = createFilterContexts();
+          //console.log("question: ", parsedQuestion); // DEBUG
+          req.body.filterContexts = createFilterContexts(JSON.parse(result));
           //console.log(JSON.stringify(req.body.filterContexts, null, 2)); //DEBUG
           next();
         })
