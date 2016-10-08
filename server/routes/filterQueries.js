@@ -37,14 +37,28 @@ var middleware = {
       }
     };
 
+    var parsedQuestionHasData = function(){
+      return parsedQuestion
+        && parsedQuestion.questions
+        && parsedQuestion.questions.length > 0
+    };
+
     var getDateFilter = function(){
-      if ( parsedQuestion
-        && parsedQuestion.sentences
-        && parsedQuestion.sentences.length > 0
-        && parsedQuestion.sentences[0].temporal_query_info
-        && parsedQuestion.sentences[0].temporal_query_info.length > 0)
+      if ( parsedQuestionHasData()
+        && parsedQuestion.questions[0].temporal_query_info
+        && parsedQuestion.questions[0].temporal_query_info.length > 0)
       {
-        return parsedQuestion.sentences[0].temporal_query_info[0];
+        return parsedQuestion.questions[0].temporal_query_info[0];
+      }
+    };
+
+    var getFilteredKeyword = function(){
+      if ( parsedQuestionHasData()
+        && parsedQuestion.questions[0].other_text
+        && parsedQuestion.questions[0].other_text.length > 0
+        && parsedQuestion.questions[0].other_text[0].text)
+      {
+        return parsedQuestion.questions[0].other_text[0].text;
       }
     };
 
@@ -71,7 +85,8 @@ var middleware = {
 
       //ngrams from large to small and from back to front.
 
-      var ngrams = getNGramsInSizeOrder(question);
+      var filteredKeyword = getFilteredKeyword();
+      var ngrams = getNGramsInSizeOrder(filteredKeyword);
       var dateFilter = getDateFilter();
       var nlpContexts = [];
 
@@ -96,7 +111,7 @@ var middleware = {
 
       //Get the question without the matched nlp. The reamining stuff is the keyword search
       //This is used for queries that filter on actual subtype
-      var questionWithPossiblyRemovedType = matchingNgram ? question.replace(matchingNgram, "").trim() : question;
+      var questionWithPossiblyRemovedType = matchingNgram ? filteredKeyword.replace(matchingNgram, "").trim() : filteredKeyword;
 
       var reorderFallbackTypes = [];
 
@@ -166,13 +181,13 @@ var middleware = {
           wantUnique: false,
         }, subtypeToFilterQuery[root.toLowerCase()]);
 
-        if (question) {
-          filterContext.filter.name = question;
+        if (filteredKeyword) {
+          filterContext.filter.name = filteredKeyword;
 
           filterContext.humanContext = {
             templateData: {
               label: subtypeToFilterQuery[root.toLowerCase()].label,
-              keyword: question
+              keyword: filteredKeyword
             },
             template: "<span class='accentColor'>{{nrOfResults}} {{label.pluralOrSingular}}</span> for <i>'{{keyword}}'</i> {{label.sorted}} in NYC"
           };
