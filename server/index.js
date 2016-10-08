@@ -98,6 +98,7 @@ require("./routes/search")(command);
 require("./routes/entities")(command);
 require("./routes/suggest")(command);
 require("./routes/share")(command);
+require("./routes/suggestions")(command);
 // require("./routes/reloadNLP")(command); //part of deprecated NLP
 
 
