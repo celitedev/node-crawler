@@ -105,69 +105,22 @@ module.exports = {
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
 
-      seedUrls: function () {
-        var urls = [];
+      seedUrls: [
+        {url:"https://coursehorse.com/nyc/classes/art/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/acting/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/cooking/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/dance/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/kids/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/life-skills/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/language/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/music/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/professional/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/tech/browse?page=1", dataType:'html'}
+      ],
 
-        var i;
-
-        //art
-        for (i = 1; i < 400; i++) {
-            urls.push({url:"https://coursehorse.com/nyc/classes/art/browse?page=" + i, dataType:'html'});
-        }
-
-        //acting
-        for (i = 1; i < 90; i++) {
-            urls.push({url:"https://coursehorse.com/nyc/classes/acting/browse?page=" + i, dataType:'html'});
-        }
-
-        //cooking
-        for (i = 1; i < 400; i++) {
-            urls.push({url:"https://coursehorse.com/nyc/classes/cooking/browse?page=" + i, dataType:'html'});
-        }
-
-        //dance
-        for (i = 1; i < 80; i++) {
-            urls.push({url:"https://coursehorse.com/nyc/classes/dance/browse?page=" + i, dataType:'html'});
-        }
-
-        //kids
-        for (i = 1; i < 220; i++) {
-            urls.push({url:"https://coursehorse.com/nyc/classes/kids/browse?page=" + i, dataType:'html'});
-        }
-
-        //life-skills
-        for (i = 1; i < 270; i++) {
-            urls.push({url:"https://coursehorse.com/nyc/classes/life-skills/browse?page=" + i, dataType:'html'});
-        }
-
-        //language
-        for (i = 1; i < 60; i++) {
-            urls.push({url:"https://coursehorse.com/nyc/classes/language/browse?page=" + i, dataType:'html'});
-        }
-
-        //music
-        for (i = 1; i < 50; i++) {
-            urls.push({url:"https://coursehorse.com/nyc/classes/music/browse?page=" + i, dataType:'html'});
-        }
-
-        //professional
-        for (i = 1; i < 300; i++) {
-            urls.push({url:"https://coursehorse.com/nyc/classes/professional/browse?page=" + i, dataType:'html'});
-        }
-
-        //tech
-        for (i = 1; i < 330; i++) {
-            urls.push({url:"https://coursehorse.com/nyc/classes/tech/browse?page=" + i, dataType:'html'});
-        }
-
-        return urls;
+      nextUrlFN: function (el) {
+        return el.find("#filter-page-container > div > div > div > a[title='Next page']").attr("href");
       },
-
-      //Not needed since we are covered completely with above seeds.
-      // nextUrlFN: function (el) {
-      //  //...
-      // },
-
 
       stop: [{
         name: "zeroResults", //zeroResults

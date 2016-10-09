@@ -106,19 +106,12 @@ module.exports = {
     requiresJS: false, //If true, use PhantomJS
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
-
-      //may be a string an array or string or a function producing any of those
-      seedUrls: function () {
-        var urls = [];
-        for (var i = 1; i < 1650; i++) {
-          urls.push({url:"http://eventful.com/performers?page_number=" + i, dataType:'html'});
-        }
-        return urls;
+      
+      seedUrls: [{url:"http://eventful.com/performers?page_number=1", dataType:'html'}],
+      
+      nextUrlFN: function (el) {
+        return el.find("#pagination > li.next a").attr("href");
       },
-
-      // nextUrlFN: function (el) {
-      //   return el.find(".next > a").attr("href");
-      // },
 
 
       // STOP CRITERIA when processing nextUrlFN
@@ -200,7 +193,7 @@ module.exports = {
           var imageArr = _.compact(_.map(val, function (imgObj) {
 
             var url = imgObj._ref.contentUrl
-              .replace("block", "block400"); //when fetching from detail page
+                .replace("block", "block400"); //when fetching from detail page
 
             if (!url) {
               return undefined;
