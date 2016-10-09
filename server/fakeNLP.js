@@ -10,7 +10,9 @@ var subtypeToFilterQuery = {
   "event": {
     type: "Event",
     "temporal": {
-      "gte": "now"
+      "startDate": {
+        "gte": "now"
+      }
     },
     "sort": [
       {"type": "keyword"},
@@ -55,7 +57,9 @@ var subtypeToFilterQuery = {
       subtypes: "screeningevent"
     },
     "temporal": {
-      "gte": "now"
+      "startDate": {
+        "gte": "now"
+      }
     },
     "sort": {
       "type": "date"
@@ -63,7 +67,7 @@ var subtypeToFilterQuery = {
     label: {
       plural: "movie screenings",
       singular: "movie screening",
-      sorted: "(soonest first)"
+      //sorted: "(soonest first)"
     }
   },
 
@@ -73,7 +77,9 @@ var subtypeToFilterQuery = {
       subtypes: "concert"
     },
     "temporal": {
-      "gte": "now"
+      "startDate": {
+        "gte": "now"
+      }
     },
     "sort": {
       "type": "date"
@@ -81,7 +87,7 @@ var subtypeToFilterQuery = {
     label: {
       plural: "concerts",
       singular: "concert",
-      sorted: "(soonest first)"
+      //sorted: "(soonest first)"
     }
   },
 
@@ -161,7 +167,9 @@ var subtypeToFilterQuery = {
       subtypes: "screeningevent"
     },
     "temporal": {
-      "gte": "now"
+      "startDate": {
+        "gte": "now"
+      }
     },
     "sort": {
       "type": "date"
@@ -169,7 +177,7 @@ var subtypeToFilterQuery = {
     label: {
       plural: "movie screenings",
       singular: "movie screening",
-      sorted: "(soonest first)"
+      //sorted: "(soonest first)"
     }
   }, {
     type: "CreativeWork",

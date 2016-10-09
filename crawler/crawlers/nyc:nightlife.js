@@ -1,4 +1,5 @@
 var _ = require("lodash");
+var config = require("../../config");
 
 var nycUtils = require("./utils/nycUtils")({
   DEBUG_OPENINGHOURS: false
@@ -6,7 +7,7 @@ var nycUtils = require("./utils/nycUtils")({
 
 var nycObj = require("../../schemas/domain/_definitions/config").statics.NYC;
 
-//crawlSchema for: 
+//crawlSchema for:
 //source: Eventful
 //type: events
 module.exports = {
@@ -23,11 +24,11 @@ module.exports = {
   scheduler: {
     runEveryXSeconds: 24 * 60 * 60 //each day
   },
-  //General logic/behavior for this crawler 
+  //General logic/behavior for this crawler
   semantics: {
 
-    //prune ENTITY URL if already processed 
-    //options: 
+    //prune ENTITY URL if already processed
+    //options:
     //- false: never prune
     //- true: prune if url already processed
     //- batch: prune if url already processed for this batch
@@ -39,19 +40,19 @@ module.exports = {
     retries: 10,
 
     // fail job if not complete in 100 seconds. This is used because a consumer/box can fail/crash
-    // In that case the job would get stuck indefinitely in 'active' state. 
+    // In that case the job would get stuck indefinitely in 'active' state.
     // With this solution, the job is placed back on the queue, and retried according to 'retries'-policy
     // This should be WAY larger then driver.timeoutMS
     ttl: 100 * 1000, //this does need to be longer then driver timeout right?
   },
   driver: {
 
-    //timeout on individual request. 
+    //timeout on individual request.
     //Result: fail job and put back in queue as oer config.job.retries
     timeoutMS: 35 * 1000,
 
     //local proxy, e.g.: TOR
-    proxy: "http://ec2-52-45-105-133.compute-1.amazonaws.com:5566",
+    proxy: 'http://' + config.proxy.host + ':' + config.proxy.port,
 
     //Default Headers for all requests
     headers: {
@@ -68,19 +69,12 @@ module.exports = {
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
 
-      //may be a string an array or string or a function producing any of those
-      seedUrls: function () {
-        var urls = [];
-        for (var i = 0; i < 55; i++) { //manual check: ~110 results -> 1100 / 20 (result per page) -> 55 pages
-          urls.push({url:"http://www.nyc.com/search/find.aspx?secid=5&pagefrom=" + (i * 20 + 1), dataType:'html'});
-        }
-        return urls;
-      },
+      seedUrls: [{url:"http://www.nyc.com/search/find.aspx?secid=5&pagefrom=1", dataType:'html'}],
 
-      //Not needed since we are covered completely with above seeds.
-      // nextUrlFN: function (el) {
-      //   return el.find(".searchnav > a:last-child").attr("href");
-      // },
+      nextUrlFN: function (el) {
+        return (el.find("body > div.container.body-container > div.col-md-9.col-md-push-3.col-sm-12.records > div > a:nth-child(2)").attr("href")||
+        el.find("body > div.container.body-container > div.col-md-9.col-md-push-3.col-sm-12.records > div > a").attr("href"));
+      },
 
       stop: [{
         name: "zeroResults", //zeroResults
@@ -142,7 +136,7 @@ module.exports = {
 
         containedInPlace: function (val) {
           return nycObj.sourceId; //always grab the sourceId not the id!
-        }, 
+        },
         _type: function (val) {
           return ["LocalBusiness"];
         },

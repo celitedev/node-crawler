@@ -105,126 +105,85 @@ module.exports = {
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
 
-      seedUrls: function () {
-        var urls = [];
-        
-        var i;
+      seedUrls: [
+        {url:"https://coursehorse.com/nyc/classes/art/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/acting/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/cooking/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/dance/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/kids/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/life-skills/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/language/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/music/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/professional/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/tech/browse?page=1", dataType:'html'}
+      ],
 
-        //art
-        for (i = 1; i < 400; i++) { 
-          urls.push({url:"https://coursehorse.com/nyc/classes/art?page=" + i, dataType:'html'});
-        }
-
-        //acting
-        for (i = 1; i < 90; i++) { 
-          urls.push({url:"https://coursehorse.com/nyc/classes/acting?page=" + i, dataType:'html'});
-        }
-        
-        //cooking
-        for (i = 1; i < 400; i++) { 
-          urls.push({url:"https://coursehorse.com/nyc/classes/cooking?page=" + i, dataType:'html'});
-        }
-        
-        //dance
-        for (i = 1; i < 80; i++) { 
-          urls.push({url:"https://coursehorse.com/nyc/classes/dance?page=" + i, dataType:'html'});
-        }
-        
-        //kids
-        for (i = 1; i < 220; i++) { 
-          urls.push({url:"https://coursehorse.com/nyc/classes/kids?page=" + i, dataType:'html'});
-        }
-        
-        //life-skills
-        for (i = 1; i < 270; i++) { 
-          urls.push({url:"https://coursehorse.com/nyc/classes/life-skills?page=" + i, dataType:'html'});
-        }
-        
-        //language
-        for (i = 1; i < 60; i++) { 
-          urls.push({url:"https://coursehorse.com/nyc/classes/language?page=" + i, dataType:'html'});
-        }
-        
-        //music
-        for (i = 1; i < 50; i++) { 
-          urls.push({url:"https://coursehorse.com/nyc/classes/music?page=" + i, dataType:'html'});
-        }
-
-        //professional
-        for (i = 1; i < 300; i++) { 
-          urls.push({url:"https://coursehorse.com/nyc/classes/professional?page=" + i, dataType:'html'});
-        }
-        
-        //tech
-        for (i = 1; i < 330; i++) { 
-          urls.push({url:"https://coursehorse.com/nyc/classes/tech?page=" + i, dataType:'html'});
-        }
-
-
-        return urls;
+      nextUrlFN: function (el) {
+        return el.find("#filter-page-container > div > div > div > a[title='Next page']").attr("href");
       },
-
-      //Not needed since we are covered completely with above seeds.
-      // nextUrlFN: function (el) {
-      //  //...
-      // },
-
 
       stop: [{
         name: "zeroResults", //zeroResults
       }]
     },
     results: {
-      selector: ".article-block", //selector for results
+      selector: "#filter-results >div >div", //selector for results
 
       detailPageAware: true,
 
       schema: function (x, detailObj) { //schema for each individual result
         return {
 
-          _courseName: ".title > span",
-          _sourceUrl: ".title@href", //see notes below
+          _courseName: ".title a > span",
+          _sourceUrl: ".title a@href", //see notes below
           location: ".school@href",
-          workFeatured: ".title@href",
-          _detail: x(".title@href", {
-             educationEvent: x("[itemprop=offers]", [{
-              startDate: "[itemprop=availabilityStarts]@content",
-              endDate: "[itemprop=availabilityEnds]@content",
-              _factPrice: "[itemprop=price]@content",
-              _factPriceCurrency: "[itemprop=priceCurrency]@content",
+          workFeatured: ".title a@href",
+          _detail: x(".title a@href", {
+            educationEvent: x("script[type='application/ld+json']", [{
+              jsonLdData: "",
             }]),
-          }, undefined, detailObj), 
+          }, undefined, detailObj),
         };
       },
 
       mapping: {
-       _type: function (val, obj) {
+        _type: function (val, obj) {
           return ['EducationEvent'];
-        }, 
+        },
       },
 
       reducer: function (obj) {
 
         if(!obj._courseName) return  null;
+
         var educationEvents = obj._detail.educationEvent;
         delete obj._detail.educationEvent;
 
+        for (var i=0; i<=educationEvents.length; i++) {
+          //jsonLdData has the json+ld content coming from schema. Getting only those with @type=Product.
+          if(educationEvents[i] && educationEvents[i].jsonLdData && educationEvents[i].jsonLdData.indexOf("\"@type\":\"Product\"")>=0) {
+            educationEvents = educationEvents[i].jsonLdData;
+            educationEvents = educationEvents.toString().replace('//<!--\n    ', '').replace('    //-->', '');
+            educationEvents = JSON.parse(educationEvents);
+            educationEvents = educationEvents.offers;
+            break;
+          }
+        }
+
         //create an eduction event for each dateTime
         var items = _.compact(_.map(educationEvents, function(educationEvent){
-
-          var id = obj.workFeatured + "--" + educationEvent.startDate;
-
+          var id = obj.workFeatured + "--" + educationEvent.availabilityStarts;
           var item =  _.defaults({
-            _sourceId: id, 
+            _sourceId: id,
 
             //NOTE: we leave this to be url to course instead of event. 
             //This works out ok: 
             //1. we create an ID per event which is in the end what matters for Kwhen internally. 
             //2. at same time _sourceUrl will make sure we prune correctly for detail pages.
-            _sourceUrl: obj._sourceUrl, 
+            _sourceUrl: obj._sourceUrl,
             name: obj._courseName,
-            startDate: dateUtils.transposeTimeToUTC(educationEvent.startDate),
-            endDate: dateUtils.transposeTimeToUTC(educationEvent.endDate)
+            startDate: dateUtils.transposeTimeToUTC(educationEvent.availabilityStarts),
+            endDate: dateUtils.transposeTimeToUTC(educationEvent.availabilityEnds)
           },obj);
 
           item.fact = [];
@@ -232,23 +191,23 @@ module.exports = {
           //just for conciceness testing. It's removed anyway
           delete item._htmlDetail;
 
-          if(educationEvent._factPrice){
+          if(educationEvent.price){
             item.fact.push({
               name: "price",
-              val: [educationEvent._factPriceCurrency + educationEvent._factPrice]
+              val: [educationEvent.priceCurrency + educationEvent.price]
             });
           }
-          
+
           if (!item.fact.length) {
             delete item.fact;
           }
 
-          return item; 
+          return item;
 
         }));
         return items;
       },
-      
+
       //NOTE: pruner always applies to a single item even if reducer returned an array
       pruner: function (singleResult) {
         if(!singleResult.startDate) return undefined;
