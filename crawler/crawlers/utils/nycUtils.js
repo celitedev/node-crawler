@@ -134,8 +134,8 @@ module.exports = function (options) {
         splitHours[1] = "00:00am";
       }
 
-      startHour = moment(splitHours[0], 'HH:mm').format('HH:mm');
-      endHour = moment(splitHours[1], 'HH:mm').format('HH:mm');
+      startHour = moment(splitHours[0], ['h:mm A']).format('HH:mm');
+      endHour = moment(splitHours[1], ['h:mm A']).format('HH:mm');
 
       if (!~startHour.indexOf(":") || !~endHour.indexOf(":")) {
         err = new Error("startHour or endHour could not be parsed: " + el);
