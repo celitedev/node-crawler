@@ -193,8 +193,6 @@ module.exports = function (command) {
       return {};
     }
 
-    //PRE: temporal defined;
-
     if (this.getRoot() === "PlaceWithOpeninghours") {
 
       //check on openinghours
@@ -258,7 +256,7 @@ module.exports = function (command) {
     return {
       query: {
         bool: {
-          must: filterQueryUtils.performTemporalQuery(this.temporal, "startDate")
+          must: filterQueryUtils.performTemporalQuery(this.temporal)
         }
       }
     };

@@ -106,70 +106,22 @@ module.exports = {
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
 
-      seedUrls: function () {
-        var urls = [];
-        
-        var i;
+      seedUrls: [
+        {url:"https://coursehorse.com/nyc/classes/art/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/acting/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/cooking/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/dance/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/kids/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/life-skills/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/language/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/music/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/professional/browse?page=1", dataType:'html'},
+        {url:"https://coursehorse.com/nyc/classes/tech/browse?page=1", dataType:'html'}
+      ],
 
-        //art
-        for (i = 1; i < 400; i++) {
-          urls.push({url:"https://coursehorse.com/nyc/classes/art/browse?page=" + i, dataType:'html'});
-        }
-
-        //acting
-        for (i = 1; i < 90; i++) {
-          urls.push({url:"https://coursehorse.com/nyc/classes/acting/browse?page=" + i, dataType:'html'});
-        }
-
-        //cooking
-        for (i = 1; i < 400; i++) {
-          urls.push({url:"https://coursehorse.com/nyc/classes/cooking/browse?page=" + i, dataType:'html'});
-        }
-
-        //dance
-        for (i = 1; i < 80; i++) {
-          urls.push({url:"https://coursehorse.com/nyc/classes/dance/browse?page=" + i, dataType:'html'});
-        }
-
-        //kids
-        for (i = 1; i < 220; i++) {
-          urls.push({url:"https://coursehorse.com/nyc/classes/kids/browse?page=" + i, dataType:'html'});
-        }
-
-        //life-skills
-        for (i = 1; i < 270; i++) {
-          urls.push({url:"https://coursehorse.com/nyc/classes/life-skills/browse?page=" + i, dataType:'html'});
-        }
-
-        //language
-        for (i = 1; i < 60; i++) {
-          urls.push({url:"https://coursehorse.com/nyc/classes/language/browse?page=" + i, dataType:'html'});
-        }
-
-        //music
-        for (i = 1; i < 50; i++) {
-          urls.push({url:"https://coursehorse.com/nyc/classes/music/browse?page=" + i, dataType:'html'});
-        }
-
-        //professional
-        for (i = 1; i < 300; i++) {
-          urls.push({url:"https://coursehorse.com/nyc/classes/professional/browse?page=" + i, dataType:'html'});
-        }
-
-        //tech
-        for (i = 1; i < 330; i++) {
-          urls.push({url:"https://coursehorse.com/nyc/classes/tech/browse?page=" + i, dataType:'html'});
-        }
-
-
-        return urls;
+      nextUrlFN: function (el) {
+        return el.find("#filter-page-container > div > div > div > a[title='Next page']").attr("href");
       },
-
-      //Not needed since we are covered completely with above seeds.
-      // nextUrlFN: function (el) {
-      //  //...
-      // },
-
 
       stop: [{
         name: "zeroResults", //zeroResults
@@ -200,7 +152,7 @@ module.exports = {
               ratingValue: 0,
               ratingCount: "div div.course-review.five.wide.column.right.aligned span:nth-child(2)",
             },
-            _tag: ["div  div.course-level.five.wide.column.center.aligned a@href"]
+            _tag: [".title a@href"]
           }, undefined, detailObj),
 
           image: x(".image-wrapper a img", [{
@@ -214,11 +166,11 @@ module.exports = {
       },
 
       mapping: {
-       subtypes: function (val, obj) {
+        subtypes: function (val, obj) {
           //pending in http://pending.schema.org/Course
           //Which is why we define it as subtypes instead of _type
           return ['Course'];
-        }, 
+        },
         "_detail.aggregateRating.ratingCount": function (val) {
           if (val === undefined) return val;
           return +val;
@@ -270,10 +222,10 @@ module.exports = {
           if(~url.indexOf("?")){
             url = url.substring(0,url.indexOf("?"));
           }
-          var urlParts = url.split("/"); 
+          var urlParts = url.split("/");
 
           var specialCheckByType,
-            arrByType = [];
+              arrByType = [];
 
           //special cases
           if(~url.indexOf("tech/by-brand")){
@@ -287,7 +239,7 @@ module.exports = {
             arrByType = ["course_tech"];
           }
 
-          var indexOfClasses = urlParts.indexOf(specialCheckByType || "classes"); 
+          var indexOfClasses = urlParts.indexOf(specialCheckByType || "classes");
           if(~indexOfClasses){
             //[indexOfClasses+1, Math.min(length-1, indexOfClasses+3)]
             var genres = arrByType.concat(_.map(urlParts.slice(indexOfClasses+1, Math.min(indexOfClasses+3, urlParts.length)), function(genre){
@@ -303,7 +255,7 @@ module.exports = {
         if(genres.length){
 
           obj.fact = [{
-            name: "genre", 
+            name: "genre",
             val: _.uniq(genres)
           }];
         }
@@ -311,7 +263,7 @@ module.exports = {
 
         return obj;
       },
-      
+
 
     }
   }

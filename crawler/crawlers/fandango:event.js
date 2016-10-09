@@ -1,8 +1,9 @@
 var _ = require("lodash");
 var moment = require("moment");
 var dateUtils = require("./utils/dateUtils");
+var config = require("../../config");
 
-//crawlSchema for: 
+//crawlSchema for:
 //source: Eventful
 //type: events
 module.exports = {
@@ -19,49 +20,49 @@ module.exports = {
   scheduler: {
     runEveryXSeconds: 24 * 60 * 60 //each day
   },
-  //General logic/behavior for this crawler 
+  //General logic/behavior for this crawler
   semantics: {
 
-    //prune ENTITY URL if already processed 
-    //options: 
+    //prune ENTITY URL if already processed
+    //options:
     //- false: never prune
     //- true: prune if url already processed
     //- batch: prune if url already processed for this batch
     pruneEntity: true,
 
     //How to check entity is updated since last processed
-    // - string (templated functions) 
+    // - string (templated functions)
     // - custom function. Signature: function(el, cb)
     //
-    //template options: 
+    //template options:
     //- hash: hash of detail contents
     //- headers: based on cache headers
     dirtyCheckEntity: "hash",
 
 
-    //Examples: 
+    //Examples:
     //
-    //pruneList = batch + pruntEntity = true -> 
-    //Each batch run prunes lists pages when done within the same batch. 
+    //pruneList = batch + pruntEntity = true ->
+    //Each batch run prunes lists pages when done within the same batch.
     //However, the next batch run lists aren't pruned to stay up-to-date with changed contents (new entities?)
-    //of these list pages. 
-    //Regardless, due to pruneEntity=true, the crawler will not recheck entities if they're already processed. 
-    //This is the default (and fastest) mode, based on the rationale that entities do not change often if at all. 
-    //I.e.: a Place-page on Eventful will rarely update it's contents. 
+    //of these list pages.
+    //Regardless, due to pruneEntity=true, the crawler will not recheck entities if they're already processed.
+    //This is the default (and fastest) mode, based on the rationale that entities do not change often if at all.
+    //I.e.: a Place-page on Eventful will rarely update it's contents.
     //
-    //Prunelist = batch + pruneEntity = batch -> 
+    //Prunelist = batch + pruneEntity = batch ->
     //recheck already processed entities for each new batch.
     //
-    //A good setting may be: 
-    //- EACH HOUR: Run pruneList = batch + pruntEntity = true 
-    //- EACH DAY: Run pruneList = batch + pruntEntity = batch 
+    //A good setting may be:
+    //- EACH HOUR: Run pruneList = batch + pruntEntity = true
+    //- EACH DAY: Run pruneList = batch + pruntEntity = batch
   },
   job: {
     //x concurrent kue jobs
     //
-    //NOTE: depending on the type of crawl this can be a master page, which 
-    //within that job will set off concurrent detail-page fetches. 
-    //In that case total concurrency is higher than specified here. 
+    //NOTE: depending on the type of crawl this can be a master page, which
+    //within that job will set off concurrent detail-page fetches.
+    //In that case total concurrency is higher than specified here.
     //
     //#6: distribute concurrency per <source,type> or <source>
     //for more controlled throttling.
@@ -69,26 +70,26 @@ module.exports = {
     retries: 5,
 
     // fail job if not complete in 100 seconds. This is used because a consumer/box can fail/crash
-    // In that case the job would get stuck indefinitely in 'active' state. 
+    // In that case the job would get stuck indefinitely in 'active' state.
     // With this solution, the job is placed back on the queue, and retried according to 'retries'-policy
     ttl: 100 * 1000,
   },
   driver: {
 
-    //timeout on individual request. 
+    //timeout on individual request.
     //Result: fail job and put back in queue as oer config.job.retries
     timeoutMS: 40 * 1000, //40 sec
 
     //local proxy, e.g.: TOR
-    proxy: "http://ec2-52-45-105-133.compute-1.amazonaws.com:5566",
+    proxy: 'http://' + config.proxy.host + ':' + config.proxy.port,
 
     //Default Headers for all requests
     headers: {
       "Accept-Encoding": 'gzip, deflate'
     },
 
-    //cache to simple fileCache. 
-    //NOT FIT FOR PRODUCTION SINCE This doesn't do any TTL or whatever  
+    //cache to simple fileCache.
+    //NOT FIT FOR PRODUCTION SINCE This doesn't do any TTL or whatever
     doCache: false
   },
   schema: {
@@ -140,9 +141,9 @@ module.exports = {
 
       detailPageAware: false,
 
-      //Indicate screeningEVents should not create refNorms. 
-      //This prohibits other sourceEntities from ever linking to it which is okay here. 
-      //This saves: 
+      //Indicate screeningEVents should not create refNorms.
+      //This prohibits other sourceEntities from ever linking to it which is okay here.
+      //This saves:
       //- mem/disk: by not having to create/ maintain refnorms
       //- time: by not having to find sourceEntities that refer to a refNorm that this
       //screeningEvent completes (since this never happens.)
@@ -174,10 +175,10 @@ module.exports = {
         };
       },
 
-      //Reducer is called after all fieldMappings are called, 
-      //and just before postsMappings are called. 
+      //Reducer is called after all fieldMappings are called,
+      //and just before postsMappings are called.
       //
-      //You can use this to do a complete custom mapping. 
+      //You can use this to do a complete custom mapping.
       //Also going from 1 to several items is supported. This therefore implements #31.
       reducer: function (doc) {
 
@@ -187,8 +188,8 @@ module.exports = {
           _.each(movie.screeningEvent, function (screeningEvent) {
 
             //Fandango correctly uses isoTime with correct tz -> translate to UTC
-            var time = dateUtils.transposeTimeToUTC(screeningEvent.startDate); 
-            
+            var time = dateUtils.transposeTimeToUTC(screeningEvent.startDate);
+
             //Id is required so make it up. 
             //NOTE: we can't use _sourceId = _sourceUrl, since _sourceUrl doesn't
             //always exist.
