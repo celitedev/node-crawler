@@ -127,6 +127,11 @@ var config = {
       }],
       buffer: 50,
       max: 1000
+    },
+
+    search_query_parser: {
+      host: "ec2-23-22-187-201.compute-1.amazonaws.com",
+      port: 9000
     }
   },
   prod_remote: {
@@ -164,6 +169,10 @@ var config = {
       }],
       buffer: 50,
       max: 1000
+    },
+    search_query_parser: {
+      host: "ec2-52-44-138-56.compute-1.amazonaws.com",
+      port: 9000
     }
   },
   prod: {
@@ -201,6 +210,10 @@ var config = {
       }],
       buffer: 50,
       max: 1000
+    },
+    search_query_parser: {
+      host: "ec2-52-44-138-56.compute-1.amazonaws.com",
+      port: 9000
     }
   }
 };
