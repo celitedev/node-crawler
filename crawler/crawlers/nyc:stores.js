@@ -66,19 +66,12 @@ module.exports = {
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
 
-      //may be a string an array or string or a function producing any of those
-      seedUrls: function () {
-        var urls = [];
-        for (var i = 0; i < 60; i++) { //manual check: ~1200 results -> 1200 / 20 (result per page) -> 60 pages
-          urls.push({url:"http://www.nyc.com/search/find.aspx?secid=7&pagefrom=" + (i * 20 + 1), dataType:'html'});
-        }
-        return urls;
-      },
+      seedUrls: [{url:"http://www.nyc.com/search/find.aspx?secid=7&pagefrom=1", dataType:'html'}],
 
-      //Not needed since we are covered completely with above seeds.
-      // nextUrlFN: function (el) {
-      //   return el.find(".searchnav > a:last-child").attr("href");
-      // },
+      nextUrlFN: function (el) {
+        return (el.find("body > div.container.body-container > div.col-md-9.col-md-push-3.col-sm-12.records > div > a:nth-child(2)").attr("href")||
+        el.find("body > div.container.body-container > div.col-md-9.col-md-push-3.col-sm-12.records > div > a").attr("href"));
+      },
 
       stop: [{
         name: "zeroResults", //zeroResults

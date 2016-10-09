@@ -105,19 +105,11 @@ module.exports = {
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
 
-      seedUrls: function () {
-        var urls = [];
-        for (var i = 1; i < 700; i++) { //
-          urls.push({url:"https://seatgeek.com/search?search=new+york&page=" + i, dataType:'html'});
-        }
-        return urls;
+      seedUrls: [{url:"https://seatgeek.com/search?search=new+york&page=1", dataType:'html'}],
+
+      nextUrlFN: function (el) {
+        return el.find("body > div > div > div > div > div > section > div > div> ul > li.page.next-template > a").attr("href");
       },
-
-      //Not needed since we are covered completely with above seeds.
-      // nextUrlFN: function (el) {
-      //  //...
-      // },
-
 
       stop: [{
         name: "zeroResults", //zeroResults

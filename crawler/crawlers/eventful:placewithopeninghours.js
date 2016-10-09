@@ -107,23 +107,12 @@ module.exports = {
     requiresJS: false, //If true, use PhantomJS
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
-
-      //may be a string an array or string or a function producing any of those
-      seedUrls: function () {
-        var urls = [];
-
-        //NOTE: 200 pages is not all, but it seems about all places when pictures 
-        //are still available. Since we filter out the rest, downloading them 
-        //would be moot.
-        for (var i = 1; i < 200; i++) {
-          urls.push({url:"http://newyorkcity.eventful.com/venues?page_number=" + i, dataType:'html'});
-        }
-        return urls;
+      
+      seedUrls: [{url:"http://newyorkcity.eventful.com/venues?page_number=1", dataType:'html'}],
+      
+      nextUrlFN: function (el) {
+        return el.find("#pagination > li.next a").attr("href");
       },
-
-      // nextUrlFN: function (el) {
-      //   return el.find(".next > a").attr("href");
-      // },
 
 
       // STOP CRITERIA when processing nextUrlFN

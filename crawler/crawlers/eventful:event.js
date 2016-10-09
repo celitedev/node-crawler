@@ -115,19 +115,11 @@ module.exports = {
     seed: {
       disable: false, //for testing. Disabled nextUrl() call
 
-      //may be a string an array or string or a function producing any of those
-      seedUrls: function () {
-        var urls = [];
-        for (var i = 1; i < 1000; i++) { //array to kickstart the lot
-          urls.push({url:"http://newyorkcity.eventful.com/events/categories?page_number=" + i, dataType:'html'});
-        }
-        return urls;
+      seedUrls: [{url:"http://newyorkcity.eventful.com/events/categories?page_number=1", dataType:'html'}],
+      
+      nextUrlFN: function (el) {
+        return el.find("#pagination > li.next a").attr("href");
       },
-
-
-      // nextUrlFN: function (el) {
-      //   return el.find(".next > a").attr("href");
-      // },
 
 
       // STOP CRITERIA when processing nextUrlFN
