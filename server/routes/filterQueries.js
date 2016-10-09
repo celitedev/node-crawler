@@ -48,12 +48,18 @@ var middleware = {
     };
 
     var getFilteredKeyword = function(parsedQuestion){
-      if ( parsedQuestionHasData(parsedQuestion)
-        && parsedQuestion.questions[0].other_text
-        && parsedQuestion.questions[0].other_text.length > 0
-        && parsedQuestion.questions[0].other_text[0].text)
-      {
-        return parsedQuestion.questions[0].other_text[0].text;
+      if ( parsedQuestionHasData(parsedQuestion)) {
+
+        if (getDateFilter(parsedQuestion)
+          && parsedQuestion.questions[0].other_text
+          && parsedQuestion.questions[0].other_text.length > 0
+          && parsedQuestion.questions[0].other_text[0].text) {
+          return _.map(parsedQuestion.questions[0].other_text, function (part) {
+            return part.text
+          }).join(' ');
+        }else{
+          return parsedQuestion.questions[0].text;
+        }
       }
     };
 
@@ -168,7 +174,6 @@ var middleware = {
         });
       }
 
-      //todo jim left off here, the plan is:
       // look for temporal query info, add to filter context (will require changing the filter context structure most likely
       // if temporal query info, replace label.sorted with entity mention text, ask taylor for possible types
       // don't worry about removing the ner mentions yet, taylor will handle that
