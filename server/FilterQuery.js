@@ -7,7 +7,7 @@ require("moment-timezone");
 var domainConfig = require("../schemas/domain/_definitions/config");
 var roots = domainConfig.domain.roots;
 
-var DEFAULT_PAGESIZE = 10;
+var DEFAULT_PAGESIZE = 12;
 module.exports = function (command) {
 
   var r = command.r,
