@@ -70,7 +70,7 @@ module.exports = {
     //
     //#6: distribute concurrency per <source,type> or <source>
     //for more controlled throttling.
-    concurrentJobs: 1,
+    concurrentJobs: 4,
 
 
     //job-level retries before fail.

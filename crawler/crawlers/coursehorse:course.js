@@ -69,7 +69,7 @@ module.exports = {
   },
   job: {
 
-    concurrentJobs: 1,
+    concurrentJobs: 4,
 
     //job-level retries before fail. 
     //This is completely seperate for urls that are individually retried by driver
