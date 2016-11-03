@@ -97,7 +97,18 @@ var utils = module.exports = {
     getCrawlerQueueName: function (crawlConfig) {
       return "crawl-" + crawlConfig.name;
     }
+  },
+  generateSchemas: function() {
+    return require("../schemas/domain/createDomainSchemas.js")({
+      checkSoundness: true,
+      config: require("../schemas/domain/_definitions/config"),
+      properties: require("../schemas/domain/_definitions").properties,
+      types: require("../schemas/domain/_definitions").types,
+      schemaOrgDef: require("../schemas/domain/_definitions/schemaOrgDef")
+    });
   }
+
+
 };
 
 function noop() {}

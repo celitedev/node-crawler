@@ -46,6 +46,12 @@ var config = {
     search_query_parser: {
       host: "localhost",
       port: 9000
+    },
+
+    agenda: {
+      db: {
+        address: "mongodb://127.0.0.1/agenda"
+      }
     }
   },
   staging: {
@@ -90,6 +96,12 @@ var config = {
     search_query_parser: {
       host: "localhost",
       port: 9000
+    },
+
+    agenda: {
+      db: {
+        address: "mongodb://127.0.0.1/agendaStaging"
+      }
     }
   },
   staging_remote: {
@@ -132,6 +144,11 @@ var config = {
     search_query_parser: {
       host: "ec2-23-22-187-201.compute-1.amazonaws.com",
       port: 9000
+    },
+    agenda: {
+      db: {
+        address: "mongodb://127.0.0.1/agendaStaging"
+      }
     }
   },
   prod_remote: {
@@ -173,6 +190,11 @@ var config = {
     search_query_parser: {
       host: "ec2-52-44-138-56.compute-1.amazonaws.com",
       port: 9000
+    },
+    agenda: {
+      db: {
+        address: "mongodb://127.0.0.1/agendaProd"
+      }
     }
   },
   prod: {
