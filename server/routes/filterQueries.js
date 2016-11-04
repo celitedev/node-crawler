@@ -146,7 +146,7 @@ var middleware = {
                 label: nlpFilterContextProto.label,
                 keyword: questionWithPossiblyRemovedType
               },
-              template: "<span class='accentColor'>{{nrOfResults}} <i>'{{keyword}}'</i>&nbsp;{{label.pluralOrSingular}}</span> {{label.sorted}} in NYC"
+              template: "<span class='accentColor'>{{nrOfResults}} <i>'{{keyword}}'</i>&nbsp;{{label.pluralOrSingular}}</span> {{label.sorted}}"
             };
 
           } else {
@@ -155,7 +155,7 @@ var middleware = {
               templateData: {
                 label: nlpFilterContextProto.label,
               },
-              template: "Showing all <span class='accentColor'>{{nrOfResults}} {{label.pluralOrSingular}}</span> {{label.sorted}} in NYC"
+              template: "Showing all <span class='accentColor'>{{nrOfResults}} {{label.pluralOrSingular}}</span> {{label.sorted}}"
             };
           }
 
@@ -194,7 +194,7 @@ var middleware = {
               label: subtypeToFilterQuery[root.toLowerCase()].label,
               keyword: filteredKeyword
             },
-            template: "<span class='accentColor'>{{nrOfResults}} {{label.pluralOrSingular}}</span> for <i>'{{keyword}}'</i> {{label.sorted}} in NYC"
+            template: "<span class='accentColor'>{{nrOfResults}} {{label.pluralOrSingular}}</span> for <i>'{{keyword}}'</i> {{label.sorted}}"
           };
 
         } else {
@@ -203,7 +203,7 @@ var middleware = {
             templateData: {
               label: subtypeToFilterQuery[root.toLowerCase()].label,
             },
-            template: "Showing all <span class='accentColor'>{{nrOfResults}} {{label.pluralOrSingular}}</span>  {{label.sorted}} in NYC"
+            template: "Showing all <span class='accentColor'>{{nrOfResults}} {{label.pluralOrSingular}}</span>  {{label.sorted}}"
           };
         }
 
