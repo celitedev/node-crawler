@@ -222,7 +222,7 @@ module.exports = function (generatedSchemas) {
       location: {
         exclude: false,
         expand: {
-          fields: ["name", "geo", "containedInPlace", "containedInPlace--name",  "genre", "subtypes", "tagsFromFact"],
+          fields: ["name", "geo", "containedInPlace", "containedInPlace--name",  "genre", "subtypes", "tagsFromFact", "address"],
           // postPruneFields: ["containedInPlace"], //used to create containedInPlace--name
           includeId: false,
         }
