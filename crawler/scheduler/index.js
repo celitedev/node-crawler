@@ -1,29 +1,59 @@
 var _ = require('lodash');
-var Agenda = require("agenda");
+var argv = require("yargs").argv;
+var utils = require('./utils');
 
-var config = require("../../config");
-var schedule = require('./schedule').schedule;
-
-var agenda = new Agenda(config.agenda);
-agenda.defaultConcurrency(1);
-agenda.maxConcurrency(1);
-agenda.defaultLockLifetime(86400000);
-
-agenda.on('start', function(job){console.log('starting agenda job: ', job.attrs.name)});
-agenda.on('complete', function(job){console.log('completed agenda job: ', job.attrs.name)});
-
-agenda.on('error', function(err){
-  console.log('Agenda Error: ', err);
-});
+var agenda = utils.configuredAgenda();
 
 agenda.on('ready', function() {
-  _.each(schedule, function(job){
-    console.log('scheduling: ', job.name);
-    agenda.define(job.name, require('./jobs/'+job.template));
-    agenda.every(job.frequency, job.name, job.data);
-  });
-  agenda.start();
+
+  if (argv.start || Object.keys(argv).length === 2) {
+    console.log("Starting Agenda");
+    utils.defineAllJobs(agenda);
+    agenda.start();
+  }
+
+  if (argv.stop) {
+    graceful();
+  }
+
+  if (argv.stopJob) {
+    agenda.cancel({name: argv.stopJob}, function(err, numRemoved){
+      if (err) {
+        console.log('ERROR: ', err);
+      } else {
+        console.log('Cancelled job');
+      }
+      process.exit(0);
+    });
+  }
+
+  if (argv.startJob) {
+    utils.startJob(agenda, argv.startJob);
+  }
+
+  if (argv.reset) {
+    console.log('CLEARING ALL DEFINED JOBS');
+    agenda.cancel({}, function(err, numRemoved) {
+      console.log('Removed ' + numRemoved + ' jobs');
+      process.exit(0);
+    });
+  }
+
+  if (argv.list) {
+    agenda.jobs({}, function(err, jobs) {
+      console.log(JSON.stringify(jobs, null, 4));
+    });
+  }
 });
+
+function graceful() {
+  agenda.stop(function() {
+    process.exit(0);
+  });
+}
+
+process.on('SIGTERM', graceful);
+process.on('SIGINT' , graceful);
 
 
 

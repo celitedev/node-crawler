@@ -73,7 +73,7 @@ var utils = module.exports = {
     }
     var crawlerQueueName = utils.calculated.getCrawlerQueueName(crawlConfig);
 
-    return queue.create(crawlerQueueName, {
+    crawlJob = queue.create(crawlerQueueName, {
         name: crawlConfig.name,
         batchId: batchId,
         jobId: uuid.v4(), //id of this specific mini batch
@@ -91,6 +91,11 @@ var utils = module.exports = {
       .attempts(crawlConfig.job.retries)
       .removeOnComplete(true)
       .save(cb || noop);
+    crawlJob.on('failed', function() {
+      console.warn('JOB FAILED, SETTING STATE TO INACTIVE'); //DEBUG
+      job.state('inactive').save();
+    });
+    return crawlJob;
   },
   calculated: {
 
