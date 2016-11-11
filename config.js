@@ -11,7 +11,7 @@ var config = {
     },
 
     proxy: {
-      host: "localhost",
+      host: "ec2-52-45-105-133.compute-1.amazonaws.com",
       port: 5566
     },
 
