@@ -5,7 +5,7 @@ var config = require("../../config");
 
 var searchQueryParserUrl = "http://" + config.search_query_parser.host + ":" + config.search_query_parser.port;
 
-function parseQuestion(question){
+function parseQuestion( question ){
   return new Promise(function(resolve, reject) {
     request.post({
         url: searchQueryParserUrl,
