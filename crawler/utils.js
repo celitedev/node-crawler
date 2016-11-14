@@ -93,7 +93,7 @@ var utils = module.exports = {
       .save(cb || noop);
     crawlJob.on('failed', function() {
       console.warn('JOB FAILED, SETTING STATE TO INACTIVE'); //DEBUG
-      job.state('inactive').save();
+      crawlJob.state('inactive').save();
     });
     return crawlJob;
   },
