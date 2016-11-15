@@ -142,7 +142,7 @@ var config = {
     },
 
     search_query_parser: {
-      host: 'localhost',// TODO JIM"ec2-23-22-187-201.compute-1.amazonaws.com",
+      host: "ec2-23-22-187-201.compute-1.amazonaws.com",
       port: 9000
     },
     agenda: {
