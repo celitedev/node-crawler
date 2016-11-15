@@ -56,7 +56,7 @@ function getFilteredKeyword( parsedQuestion ){
 
 function getRawKeyword( parsedQuestion ){
   if( parsedQuestionHasData(parsedQuestion) ){
-    //todo jim, this is not quite right, when there is a date recognized it should be filtered out, see slack #392
+    //TODO SEARCH QUERY PARSER this is not quite right, when there is a date recognized it should be filtered out, see slack #392
     return parsedQuestion.questions[0].text.slice(0,-1); //TODO JIM HACK TO FIX SEARCH QUERY PARSER ISSUE #6
   }
 }
