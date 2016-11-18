@@ -3,7 +3,6 @@ var colors = require("colors");
 
 //simply the most fantastic NLP stuff evarrr..
 var subtypeToFilterQuery = {
-
   ///////////////
   //TOP LEVEL
   //top level types
@@ -20,8 +19,7 @@ var subtypeToFilterQuery = {
     ],
     label: {
       plural: "events",
-      singular: "event"//,
-      //sorted: "(soonest first)" todo re #328 no longer true
+      singular: "event"
     }
   },
   "placewithopeninghours": {
@@ -46,7 +44,6 @@ var subtypeToFilterQuery = {
     }
   },
 
-
   //////////////
   //EVENT
 
@@ -54,7 +51,11 @@ var subtypeToFilterQuery = {
   "screeningevent": {
     type: "Event",
     filter: {
-      subtypes: "screeningevent"
+      subtypes: {
+        text: "screeningevent",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     "temporal": {
       "startDate": {
@@ -74,7 +75,11 @@ var subtypeToFilterQuery = {
   "concert": {
     type: "Event",
     filter: {
-      subtypes: "concert"
+      subtypes: {
+        text: "concert",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     "temporal": {
       "startDate": {
@@ -96,7 +101,11 @@ var subtypeToFilterQuery = {
   restaurant: {
     type: "PlaceWithOpeninghours",
     filter: {
-      subtypes: "restaurant"
+      subtypes: {
+        text: "restaurant",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     label: {
       plural: "restaurants",
@@ -106,7 +115,11 @@ var subtypeToFilterQuery = {
   bar: {
     type: "PlaceWithOpeninghours",
     filter: {
-      subtypes: "bar"
+      subtypes: {
+        text: "bar",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     label: {
       plural: "bars",
@@ -116,7 +129,11 @@ var subtypeToFilterQuery = {
   pub: {
     type: "PlaceWithOpeninghours",
     filter: {
-      subtypes: "pub"
+      subtypes: {
+        text: "pub",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     label: {
       plural: "pubs",
@@ -126,7 +143,11 @@ var subtypeToFilterQuery = {
   club: {
     type: "PlaceWithOpeninghours",
     filter: {
-      subtypes: "club"
+      subtypes: {
+        text: "club",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     label: {
       plural: "clubs",
@@ -136,7 +157,11 @@ var subtypeToFilterQuery = {
   store: {
     type: "PlaceWithOpeninghours",
     filter: {
-      subtypes: "store"
+      subtypes: {
+        text: "store",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     label: {
       plural: "stores",
@@ -146,7 +171,11 @@ var subtypeToFilterQuery = {
   movietheater: {
     type: "PlaceWithOpeninghours",
     filter: {
-      subtypes: "movietheater"
+      subtypes: {
+        text: "movietheater",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     label: {
       plural: "movie theaters",
@@ -164,7 +193,11 @@ var subtypeToFilterQuery = {
   "movie": [{
     type: "Event",
     filter: {
-      subtypes: "screeningevent"
+      subtypes:{
+        text: "screeningevent",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     "temporal": {
       "startDate": {
@@ -182,7 +215,11 @@ var subtypeToFilterQuery = {
   }, {
     type: "CreativeWork",
     filter: {
-      subtypes: "movie"
+      subtypes: {
+        text: "movie",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     "sort": {
       "type": "field",
@@ -200,7 +237,11 @@ var subtypeToFilterQuery = {
   performer: {
     type: "OrganizationAndPerson",
     filter: {
-      tag: "performer"
+      tag: {
+        text: "performer",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     label: {
       plural: "performers",
