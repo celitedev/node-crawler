@@ -548,7 +548,7 @@ module.exports = function (command) {
           }];
         break;
             break;
-      case 'OrganizationOrPersion':
+      case 'OrganizationOrPerson':
         return [{
             title: 'Future Events',
             query: createFilterQuery(_.extend({}, command, {
