@@ -41,7 +41,6 @@ var rootsLowerCaseMap = _.reduce(fixedTypesInOrder, function (agg, root) {
 }, {});
 
 
-
 module.exports = function (command) {
 
   var generatedSchemas = command.generatedSchemas;
@@ -398,39 +397,56 @@ module.exports = function (command) {
   }
 
 
-  function performTextQuery(v, k, isFuzzy) {
-
+  function performTextQuery(v, k, options) {
     var matchQuery = {
       match: {}
     };
     matchQuery.match[k] = {
       query: v,
-
-      //this requires all terms to be found. This is default (since only 1 term) for exact matches
-      //and we require this for free text (e.g.: name) as well for now. 
-      //
-      //More info
-      //- https://www.elastic.co/guide/en/elasticsearch/guide/current/match-multi-word.html
-      //- https://www.elastic.co/guide/en/elasticsearch/guide/current/bool-query.html#_controlling_precision
       operator: "and"
     };
 
-    //allow fuzziness.
-    if (isFuzzy) {
-      matchQuery.match[k].fuzziness = "AUTO";
+    if (options) {
+      //allow fuzziness.
+      if (options.isFuzzy) {
+        matchQuery.match[k].fuzziness = "AUTO";
+      }
+      if (options.boost) {
+        matchQuery.match[k].boost = options.boost;
+      }
+    }
+    return wrapWithNestedQueryIfNeeed(matchQuery, k);
+  }
+
+  function performPrefixQuery(v, k, options){
+
+    var prefixFilter = {};
+    prefixFilter[k] = v.toLowerCase();
+    var prefixQuery = { prefix: prefixFilter };
+
+    if (options) {
+      if (options.boost) {
+        prefixQuery.prefix.boost = options.boost;
+      }
     }
 
-    return wrapWithNestedQueryIfNeeed(matchQuery, k);
+    return wrapWithNestedQueryIfNeeed(prefixQuery, k);
   }
 
 
   //verbatim copy of range filter structure. Allowed keys: gt, gte, lt, lte
-  function performRangeQuery(v, k) {
+  function performRangeQuery(v, k, options) {
 
     var rangeQuery = {
       range: {}
     };
     rangeQuery.range[k] = v;
+
+    if (options) {
+      if (options.boost) {
+        rangeQuery.range[k].boost = options.boost;
+      }
+    }
 
     return wrapWithNestedQueryIfNeeed(rangeQuery, k);
   }
@@ -548,7 +564,7 @@ module.exports = function (command) {
           }];
         break;
             break;
-      case 'OrganizationOrPersion':
+      case 'OrganizationOrPerson':
         return [{
             title: 'Future Events',
             query: createFilterQuery(_.extend({}, command, {
@@ -793,6 +809,7 @@ module.exports = function (command) {
     performTemporalQuery: performTemporalQuery,
     performRangeQuery: performRangeQuery,
     performTextQuery: performTextQuery,
+    performPrefixQuery: performPrefixQuery,
     performSpatialPointQuery: performSpatialPointQuery,
     performSpatialLookupQuery: performSpatialLookupQuery,
     getPathForCompoundKey: getPathForCompoundKey,
