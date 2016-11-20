@@ -513,7 +513,11 @@ module.exports = function (command) {
               title:'Related Results',
               query: createFilterQuery(_.extend({}, command, {
                 filter: {
-                  name: entity.name
+                  name: {
+                    text: entity.name,
+                    typeOfQuery: "FreeText",
+                    typeOfMatch: "must"
+                  }
                 },
                 wantUnique: false,
                 sort: {
@@ -538,7 +542,11 @@ module.exports = function (command) {
             query: createFilterQuery(_.extend({}, command, {
               wantUnique: false,
               filter: {
-                name: entity.name
+                name: {
+                  text: entity.name,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                }
               },
               sort: {
                 type: 'date'
@@ -571,7 +579,11 @@ module.exports = function (command) {
               wantUnique: false,
               type: 'Event',
               filter: {
-                name: entity.name
+                name: {
+                  text: entity.name,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                }
               },
               sort: [
                 {
@@ -589,7 +601,11 @@ module.exports = function (command) {
               type: 'Event',
               subtype: _.last(entity.subtype_raw),
               filter: {
-                name: entity.name
+                name: {
+                  text: entity.name,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                }
               },
               sort: [
                 {
@@ -606,7 +622,11 @@ module.exports = function (command) {
               wantUnique: false,
               subtype: _.last(entity.subtype_raw),
               filter: {
-                name: entity.name
+                name: {
+                  text: entity.name,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                }
               },
               sort: [
                 {
@@ -621,7 +641,11 @@ module.exports = function (command) {
               type: 'Event',
               subtype: _.last(entity.subtype_raw),
               filter: {
-                name: entity.name
+                name: {
+                  text: entity.name,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                }
               },
               sort: {
                 type: 'date'
@@ -638,7 +662,11 @@ module.exports = function (command) {
               wantUnique: false,
               type: 'Event',
               filter: {
-                name: entity.name
+                name: {
+                  text: entity.name,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                }
               },
               sort: [
                 {
@@ -653,7 +681,11 @@ module.exports = function (command) {
               type: 'Event',
               subtype: _.last(entity.subtype_raw),
               filter: {
-                name: entity.name
+                name: {
+                  text: entity.name,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                }
               },
               sort: [
                 {
@@ -668,7 +700,11 @@ module.exports = function (command) {
               type: 'Creativework',
               subtype: _.last(entity.subtype_raw),
               filter: {
-                name: entity.name
+                name: {
+                  text: entity.name,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                }
               },
               sort: [
                 {
@@ -683,7 +719,11 @@ module.exports = function (command) {
               type: 'Event',
               subtype: _.last(entity.subtype_raw),
               filter: {
-                name: entity.name
+                name: {
+                  text: entity.name,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                }
               },
               sort: {
                 type: 'date'
@@ -699,7 +739,11 @@ module.exports = function (command) {
             query: createFilterQuery(_.extend({}, command, {
               wantUnique: false,
               filter: {
-                name: entity.name
+                name: {
+                  text: entity.name,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                }
               }
             }))
           }];
