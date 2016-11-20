@@ -156,21 +156,20 @@ module.exports = function (command) {
           break;
         case "keyword":
           _.each(self.filter, function (v, compoundKey) {
-            if (compoundKey !== "name") {
-              throw new Error("keyword sort only supports name sorting at this time!");
-            }
-            var filter = {
-              filter: {
-                bool: {
-                  must: {
-                    match_phrase: {}
+            if (compoundKey == "name") {
+              var filter = {
+                filter: {
+                  bool: {
+                    must: {
+                      match_phrase: {}
+                    }
                   }
-                }
-              },
-              weight: 1000
-            };
-            filter.filter.bool.must.match_phrase[compoundKey] = v;
-            esFunctions.push(filter)
+                },
+                weight: 1000
+              };
+              filter.filter.bool.must.match_phrase[compoundKey] = v.text;
+              esFunctions.push(filter)
+            }
           });
           break;
         default:
@@ -312,22 +311,11 @@ module.exports = function (command) {
       query: {
         bool: {
           must: [],
+          should: [],
           filter: []
         }
-      },
+      }
     };
-
-    //All types except events are filtered if no image exists. 
-    //Events often get their image transplanted from either location / performer / 
-    //workFeatured, (out of bound info at this moment) so we won't filter on this for events.
-    // if (this.type !== "Event") {
-    //   query.query.bool.filter.push({
-    //     "exists": {
-    //       "field": "image"
-    //     }
-    //   });
-    // }
-
 
     if (!this.filter) {
       return query;
@@ -336,91 +324,62 @@ module.exports = function (command) {
     var root = this.getRoot();
 
     _.each(this.filter, function (v, compoundKey) {
-
       var splitSymbols = _.difference(compoundKey.split(/\.|--/), ["expand"]); //remove 'expand'
-      var path = filterQueryUtils.getPathForCompoundKey(root, splitSymbols);
+      var path = compoundKey == "name.raw" ? compoundKey : filterQueryUtils.getPathForCompoundKey(root, splitSymbols);
       var typeOfQuery;
-
-      //HACK: We misuse this code-path to construct a prefix-query...
-      if (compoundKey === "name.raw") {
-        path = compoundKey;
-        typeOfQuery = "PrefixName";
-      }
 
       if (!path) {
         throw new Error("following filter key not allowed: " + compoundKey);
       }
 
-      //TODO: #183 - if compoundkey is an entity or valueObject and `v` is an object, allow
-      //deep filtering inside nested object (which is either type = nested (multival) || type=object (singleval))
-      typeOfQuery = typeOfQuery || (_.isObject(v) ? "Range" : "Text");
-
-      //special path for name: free-text
-      if (compoundKey === "name") {
-        //TODO: should we allow other free text fields such as address?
-        typeOfQuery = "FreeText";
-      } else if (compoundKey === "subtypes" || compoundKey === "tagsFromFact" || compoundKey === "genre") {
-        //TODO: we should look at ES_mapping instead or something this is not dry
-        typeOfQuery = "Enum";
-      }
-
-      var propFilter;
-
+      typeOfQuery = v.typeOfQuery || "Text";
       switch (typeOfQuery) {
+        case "Text":
+          propFilter = filterQueryUtils.performTextQuery(v.text.toLowerCase(), path, {boost: v.boost});
+          break;
+        case "FreeText":
+          //todo this is a bit of a hack, we ignore the actual key and override it with a set of hardcode fields, should be more flexible;
+          propFilter ={
+            "multi_match": {
+              "query":  v.text,
+              "type":   "most_fields",
+              "fields": [ "name^10", "subtypes^3", "genres^2", "tagsFromFact" ]
+            }
+          };
+          if (v.boost) {
+            propFilter["multi_match"].boost = v.boost;
+          }
+          break;
+        case "Prefix":
+          propFilter = filterQueryUtils.performPrefixQuery(v.text, path, {boost: v.boost});
+          break;
         case "Enum":
-
-          //terms filter for exact matching
+          if (v.boost) {
+            throw "Cannot apply boost to Enum filter!";
+          }
           propFilter = {
             bool: {
-              must: _.map(_.isArray(v) ? v : [v], function (singleVal) {
+              must: _.map(_.isArray(v.text) ? v.text : [v.text], function (singleVal) {
                 var singleFilter = {
                   term: {}
                 };
-
                 singleFilter.term[compoundKey] = singleVal;
                 return singleFilter;
               })
             }
           };
-
           break;
-        case "PrefixName":
-          propFilter = {
-            prefix: {
-              "name.raw": v
-            }
-          };
-          break;
-        case "FreeText":
-
-
-          //Probably some improvements to be made: 
-          //1. better scoring: shingles on name to take ordering into account
-          //2. better recall: stemming of subtypes, genres, tagsFromFact
-          //Also see ES Guide starting at: https://www.elastic.co/guide/en/elasticsearch/guide/2.x/most-fields.html
-          propFilter ={
-              "multi_match": {
-                  "query":  v,
-                  "type":   "most_fields", 
-                  "fields": [ "name^10", "subtypes^3", "genres^2", "tagsFromFact" ]
-              }
-          };
-          break;
-
-        case "Text":
-          propFilter = filterQueryUtils.performTextQuery(v, path);
-          break;
-
         case "Range":
-          propFilter = filterQueryUtils.performRangeQuery(v, path);
+          propFilter = filterQueryUtils.performRangeQuery(v.text, path, {boost: v.boost});
           break;
       }
+      if (v.typeOfMatch && v.typeOfMatch == "should"){
+        query.query.bool.should.push(propFilter);
+      } else {
+        query.query.bool.must.push(propFilter);
+      }
 
-
-      //add filter to AND
-      query.query.bool.must.push(propFilter);
     });
-
 
     return query;
   };
@@ -461,7 +420,7 @@ module.exports = function (command) {
         searchQuery.body.query.function_score = functionScore;
         _.merge(searchQuery.body, self.getPage());
 
-        //console.log(JSON.stringify(searchQuery, null,2)); //DEBUG
+        console.log(JSON.stringify(searchQuery, null,2)); //DEBUG
 
         return esClient.search(searchQuery);
       })
