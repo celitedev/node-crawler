@@ -5,11 +5,11 @@ var config = require("../../config");
 
 var searchQueryParserUrl = "http://" + config.search_query_parser.host + ":" + config.search_query_parser.port;
 
-function parseQuestion( question ){
+function parseQuestion(question){
   return new Promise(function(resolve, reject) {
     request.post({
         url: searchQueryParserUrl,
-        form: { text: question, utcOffset:-5}}, //TODO SEARCH QUERY PARSER add real offset from client side
+        form: { text: question, utcOffset:-5}}, //todo jim add real offset from client side
       function (err, res, body) {
         if(err){
           return reject(err);

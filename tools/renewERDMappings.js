@@ -23,11 +23,10 @@ var indexMapping = erdMappingConfig.indexMapping;
 
 Promise.resolve()
   .then(function () {
-    //validate mappings
+
     var nonExistPropNames = [],
       enumOnNonDatatypes = [];
 
-    // Compare domain props with Schema.org props
     _.each(_.keys(erdMappingConfig.properties), function (propName) {
       if (!~_.keys(generatedSchemas.properties).indexOf(propName)) {
         nonExistPropNames.push(propName);
@@ -76,13 +75,12 @@ Promise.resolve()
   .then(function () {
 
     return Promise.all(_.map(getAllIndexNames(), function (obj) {
-      //for each index
+
       var root = obj.root,
         indexName = obj.indexName;
 
       return Promise.resolve()
         .then(function deleteIndex() {
-          //delete each index
 
           return Promise.resolve()
             .then(function () {
@@ -98,7 +96,6 @@ Promise.resolve()
             });
         })
         .then(function createIndex() {
-          //create each index
           return client.indices.create({
             method: "PUT",
             index: indexName,
