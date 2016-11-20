@@ -940,7 +940,6 @@ var runConsumer = function(argv) {
       //If all resources are set to isDone -> we're done with everything
       //and can gracefully shutdown the entire process:
       //1. shutdown queue (which is shared between crawlers)
-      //2. process.exit()
 
       var resources = _.values(resourcesPerCrawlerType),
         resourcesDone = _.filter(resources, {
@@ -950,7 +949,9 @@ var runConsumer = function(argv) {
       if (resources.length !== resourcesDone.length) {
         setTimeout(manageShutdown, 1000);
       } else {
-        redisClient.quit();
+        if(redisClient.connected) {
+          redisClient.quit();
+        }
         r.getPoolMaster().drain();
         queue.shutdown(5000, function (err) {
           console.log("CONSUMER DONE");
