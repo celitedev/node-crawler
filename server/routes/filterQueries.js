@@ -5,8 +5,6 @@ var cardViewModel = require("../cardViewModel");
 
 var subtypeToFilterQueryBase = require("../fakeNLP").subtypeToFilterQuery;
 var searchQueryParser = require('../search_query_parser');
-var searchQueryParserUtils = require('../search_query_parser/utils');
-var humanContextHelper = require('../humanContextHelper');
 
 
 /**
@@ -17,6 +15,7 @@ var humanContextHelper = require('../humanContextHelper');
 var middleware = {
   createFilterContextsFromQuestion: function (command) {
 
+    //todo jim: abstract these out of the routes and into utils or something, once I'm done tearing them up
     var ensureQuestion = function(query, next){
       if (query.filterContexts || query.type) {
         if (query.filterContexts && query.type) {
@@ -33,261 +32,193 @@ var middleware = {
       }
     };
 
+    var parsedQuestionHasData = function(parsedQuestion){
+      return parsedQuestion
+        && parsedQuestion.questions
+        && parsedQuestion.questions.length > 0
+    };
+
+    var getDateFilter = function(parsedQuestion){
+      if ( parsedQuestionHasData(parsedQuestion)
+        && parsedQuestion.questions[0].temporal_query_info
+        && parsedQuestion.questions[0].temporal_query_info.length > 0)
+      {
+        return parsedQuestion.questions[0].temporal_query_info[0];
+      }
+    };
+
+    var getFilteredKeyword = function(parsedQuestion){
+      if ( parsedQuestionHasData(parsedQuestion)) {
+
+        if (getDateFilter(parsedQuestion)
+          && parsedQuestion.questions[0].other_text
+          && parsedQuestion.questions[0].other_text.length > 0
+          && parsedQuestion.questions[0].other_text[0].text) {
+          return _.map(parsedQuestion.questions[0].other_text, function (part) {
+            return part.text
+          }).join(' ');
+        }else{
+          return parsedQuestion.questions[0].text;
+        }
+      }
+    };
+
     var createFilterContexts = function(parsedQuestion){
 
       var filterQueryUtils = command.filterQueryUtils;
 
+      //Let's add the default rows
+      var rootsInOrder = [].concat(filterQueryUtils.fixedTypesInOrder); //clone
+
       //PRE: Based on question we generate multiple FilterContexts.
+      //Strategy is as follows:
+      //
+      // 1. we ALWAYS show 4 keyword-search based rows,
+      //for type= Event, PlaceWithOpeninghours, CreativeWork, OrganizationAndPerson in this order.
+      //
+      // 2. If the question contains one of the 4 above roots (or an alias) =>
+      //Show the row for said root first. The remaining 3 rows are shown in fixed order
+      //
+      // 3. If the question contains a subtype (or an alias) =>
+      //Show an ADDITIONAL row on top of the 4 rows, filtered on subtype.
+      //
+      // 4. Parse the data from search_query_parser, which at the moment only contains data information,
+      // and add it to each of the filter contexts so it can be utilized in the query down the line
 
-      // Get the query components we know about from Search Query Parser
-      var filteredKeyword = searchQueryParserUtils.getFilteredKeyword(parsedQuestion);
-      var rawKeyword = searchQueryParserUtils.getRawKeyword(parsedQuestion);
-      var dateFilter = searchQueryParserUtils.getDateFilter(parsedQuestion);
-      var organizationAndPersonFilter = searchQueryParserUtils.getOrganizationAndPersonFilter(parsedQuestion);
-      var placeWithOpeningHoursFilter = searchQueryParserUtils.getPlaceWithOpeningHoursFilter(parsedQuestion);
-      var locationFilter = searchQueryParserUtils.getLocationFilter(parsedQuestion);
 
-      var hasNLPFilter = organizationAndPersonFilter || placeWithOpeningHoursFilter || locationFilter ;
+      //ngrams from large to small and from back to front.
+
+
+      var filteredKeyword = getFilteredKeyword(parsedQuestion);
+      var ngrams = getNGramsInSizeOrder(filteredKeyword);
+      var dateFilter = getDateFilter(parsedQuestion);
+      var nlpContexts = [];
+
+      var nlpFilterContextProtos = null;
+      var matchingNgram = null;
 
       var subtypeToFilterQuery = _.cloneDeep(subtypeToFilterQueryBase);
-      var defaultRoots = [].concat(filterQueryUtils.fixedTypesInOrder);
-      var rootsInOrder = hasNLPFilter ? _.filter(defaultRoots, function(root) {
-        var rootType = subtypeToFilterQuery[root.toLowerCase()];
-        var includeType = true;
-        if( organizationAndPersonFilter ){
-          //this is really crude, but the schema calls for all kinds of data we don't have, so we are hardcoding this to check for a performer subtype
-          includeType = rootType.type == 'OrganizationAndPerson' || filterQueryUtils.getRootMap(rootType.type).performer;
-        }
-        if( placeWithOpeningHoursFilter ){
-          // another hack, the schema defines OrganizationAndPerson as having a location, but we do not index any location information for this type
-          includeType = rootType.type == "PlaceWithOpeninghours" ||
-            (filterQueryUtils.getRootMap(rootType.type).location && rootType.type != "OrganizationAndPerson") ||
-            (rootType.type == "OrganizationAndPerson" && organizationAndPersonFilter);
-        }
 
-        return includeType;
-      }) : defaultRoots;
+      //We try to match the ngram against all defined subtype aliases
+      //If ngram ends in an 'n' we assume it's plural and also try to match to naive singular 'ngram - s'
+      //the first match found is the one we're going with.
+      //Based on ordening we favour (1) large subtypes that (2) sit at the end of the question
+      _.each(ngrams, function (ngram) {
+        var ngramSingular = ngram[ngram.length - 1] = 's' && ngram.substring(0, ngram.length - 1);
+        _.each(subtypeToFilterQuery, function (subtypeFilterContext, subtypeAlias) {
+          if (nlpFilterContextProtos) return;
+          if (ngram === subtypeAlias || (ngramSingular && ngramSingular === subtypeAlias)) {
+            nlpFilterContextProtos = subtypeFilterContext;
+            matchingNgram = ngram;
+          }
+        });
+        if (nlpFilterContextProtos) return;
+      });
 
-      var nlpContexts = [];
+      //Get the question without the matched nlp. The reamining stuff is the keyword search
+      //This is used for queries that filter on actual subtype
+      var questionWithPossiblyRemovedType = matchingNgram ? filteredKeyword.replace(matchingNgram, "").trim() : filteredKeyword;
+
       var reorderFallbackTypes = [];
 
-      if( filteredKeyword ){
-        var nlpFilterContextProtos = null;
-        var matchingNgram = null;
+      if (nlpFilterContextProtos) {
 
-        //We try to match the ngram against all defined subtype aliases
-        //If ngram ends in an 'n' we assume it's plural and also try to match to naive singular 'ngram - s'
-        //the first match found is the one we're going with.
-        //Based on ordening we favour (1) large subtypes that (2) sit at the end of the question
-        _.each(getNGramsInSizeOrder(filteredKeyword.toLowerCase()), function (ngram) {
-          var ngramSingular = ngram[ngram.length - 1] = 's' && ngram.substring(0, ngram.length - 1);
-          _.each(subtypeToFilterQuery, function (subtypeFilterContext, subtypeAlias) {
-            if (nlpFilterContextProtos) return;
-            if (ngram === subtypeAlias || (ngramSingular && ngramSingular === subtypeAlias)) {
-              nlpFilterContextProtos = subtypeFilterContext;
-              matchingNgram = ngram;
-            }
-          });
-          if (nlpFilterContextProtos) return;
-        });
+        //can be array! E.g.: for movies, which would show movies as well as movie events
+        nlpFilterContextProtos = _.isArray(nlpFilterContextProtos) ? nlpFilterContextProtos : [nlpFilterContextProtos];
 
-        //Get the question without the matched nlp. The reamining stuff is the keyword search
-        //This is used for queries that filter on actual subtype
-        var questionWithPossiblyRemovedType = matchingNgram ? filteredKeyword.toLowerCase().replace(matchingNgram, "").trim() : filteredKeyword;
-        var rawQuestionWithPossiblyRemovedType = matchingNgram ? rawKeyword.toLowerCase().replace(matchingNgram, "").trim() : rawKeyword;
+        _.each(nlpFilterContextProtos, function (nlpFilterContextProto) {
 
-        if (nlpFilterContextProtos) {
-          //can be array! E.g.: for movies, which would show movies as well as movie events
-          nlpFilterContextProtos = _.isArray(nlpFilterContextProtos) ? nlpFilterContextProtos : [nlpFilterContextProtos];
-          _.each(nlpFilterContextProtos, function (nlpFilterContextProto) {
-            var nlpFilterContext = {
-              filter: {},
-              wantUnique: false
+          var nlpFilterContext = {
+            filter: {},
+            wantUnique: false,
+          };
+
+          //get subtype if exists or type otherwise to use in human feedback
+          var typeOrSubtype = nlpFilterContextProto.filter.subtypes || nlpFilterContextProto.filter.type;
+          typeOrSubtype = _.isArray(typeOrSubtype) ? typeOrSubtype[0] : typeOrSubtype;
+
+          if (questionWithPossiblyRemovedType) { //if there's still a keyword left...
+
+            nlpFilterContext.filter.name = questionWithPossiblyRemovedType;
+
+            nlpFilterContext.humanContext = {
+              templateData: {
+                label: nlpFilterContextProto.label,
+                keyword: questionWithPossiblyRemovedType
+              },
+              template: "<span class='accentColor'>{{nrOfResults}} <i>'{{keyword}}'</i>&nbsp;{{label.pluralOrSingular}}</span> {{label.sorted}}"
             };
 
-            //set final question (may override)
-            var finalQuestion = questionWithPossiblyRemovedType;
+          } else {
 
-            //add date filter
-            if( dateFilter && nlpFilterContextProto.temporal ) nlpFilterContextProto.temporal = dateFilter;
+            nlpFilterContext.humanContext = {
+              templateData: {
+                label: nlpFilterContextProto.label,
+              },
+              template: "Showing all <span class='accentColor'>{{nrOfResults}} {{label.pluralOrSingular}}</span> {{label.sorted}}"
+            };
+          }
 
-            //add organizationandperson filter
-            if( organizationAndPersonFilter ){
-              //again we have to hardcode this instead of building it dynamically, because our ES schema only contains the organizationandperson
-              // subtype of performer even though our entity schema contains many subtypes that are organizationandperson
-              if( nlpFilterContextProto.type == 'OrganizationAndPerson' ){
-                nlpFilterContext.filter['name.raw'] = {
-                  text: organizationAndPersonFilter,
-                  typeOfQuery: "Prefix",
-                  typeOfMatch: "must"
-                };
-              } else if( filterQueryUtils.getRootMap(nlpFilterContextProto.type).performer ){
-                nlpFilterContext.filter['performer--expand.name'] = {
-                  text: organizationAndPersonFilter,
-                  typeOfQuery: "Text",
-                  typeOfMatch: "must"
-                };
-              } else {
-                finalQuestion = rawQuestionWithPossiblyRemovedType;
-              }
-            }
-            if( placeWithOpeningHoursFilter ){
-              //again we have to hardcode this instead of building it dynamically
-              if( nlpFilterContextProto.type == 'PlaceWithOpeninghours' ){
-                nlpFilterContext.filter['name.raw'] = {
-                  text: placeWithOpeningHoursFilter,
-                  typeOfQuery: "Prefix",
-                  typeOfMatch: "must"
-                };
-              } else if( filterQueryUtils.getRootMap(nlpFilterContextProto.type).location && nlpFilterContextProto.type != 'OrganizationAndPerson' ){
-                nlpFilterContext.filter['location--expand.name'] = {
-                  text: placeWithOpeningHoursFilter,
-                  typeOfQuery: "Text",
-                  typeOfMatch: "must"
-                };
-              } else {
-                finalQuestion = rawQuestionWithPossiblyRemovedType;
-              }
-            }
+          if (dateFilter && nlpFilterContextProto.temporal) nlpFilterContextProto.temporal = dateFilter;
 
-            //add default freetext filter if none defined
+          nlpContexts.push(_.merge({}, nlpFilterContext, nlpFilterContextProto));
 
-            if(finalQuestion != ""){ //if there's still a keyword left...
-              nlpFilterContext.filter.name = {
-                text: finalQuestion,
-                typeOfQuery: "FreeText",
-                typeOfMatch: "must"
-              };
-              nlpFilterContext.humanContext = humanContextHelper.keywordTemplate(nlpFilterContextProto.label, finalQuestion);
-            } else {
-              nlpFilterContext.humanContext = humanContextHelper.typeTemplate(nlpFilterContextProto.label);
-            }
+          //Get the fallback type that matches the nlpFilterContextProto
+          //1. if nlpFilterContextProto DOES NOT contain a subtype (and thus matches a root) we'll remove the fallback
+          //2. if nlpFilterContextProto DOES contain a subtype, we'll be sure to move the fallback row up in the order.
+          var fallbackOfSameType = rootsInOrder.splice(rootsInOrder.indexOf(nlpFilterContextProto.type), 1)[0];
 
-            nlpContexts.push(_.merge({}, nlpFilterContext, nlpFilterContextProto));
-
-            //Get the fallback type that matches the nlpFilterContextProto
-            //1. if nlpFilterContextProto DOES NOT contain a subtype (and thus matches a root) we'll remove the fallback
-            //2. if nlpFilterContextProto DOES contain a subtype, we'll be sure to move the fallback row up in the order.
-            var fallbackOfSameType = rootsInOrder.splice(rootsInOrder.indexOf(nlpFilterContextProto.type), 1)[0];
-
-            if(nlpFilterContextProto.filter.subtypes){
-              reorderFallbackTypes.push(fallbackOfSameType);
-            }
-          });
-        }
+          if(nlpFilterContextProto.filter.subtypes){
+            reorderFallbackTypes.push(fallbackOfSameType);
+          }
+        });
       }
 
-      //The ordinary/fallback rows
-      var filterContexts = nlpContexts.concat(_.map(reorderFallbackTypes.concat(rootsInOrder), function (root) {
+      // look for temporal query info, add to filter context (will require changing the filter context structure most likely
+      // if temporal query info, replace label.sorted with entity mention text, ask taylor for possible types
+      // don't worry about removing the ner mentions yet, taylor will handle that
 
-        //build filter context object template
+      //The ordinary/fallback rows
+      return nlpContexts.concat(_.map(reorderFallbackTypes.concat(rootsInOrder), function (root) {
+
         var filterContext = _.merge({
           filter: {},
           wantUnique: false,
         }, subtypeToFilterQuery[root.toLowerCase()]);
 
-        if( dateFilter && filterContext.temporal ) filterContext.temporal = dateFilter;
-        if( organizationAndPersonFilter ){
-          //again we have to hardcode this instead of building it dynamically, because our ES schema only contains the organizationandperson
-          // subtype of performer even though our entity schema contains many subtypes that are organizationandperson
-          if( filterContext.type == 'OrganizationAndPerson' ){
-            filterContext.filter['name.raw'] = {
-              text: organizationAndPersonFilter,
-              typeOfQuery: "Prefix",
-              typeOfMatch: "must"
-            };
-          } else if( filterQueryUtils.getRootMap(filterContext.type).performer ){
-            filterContext.filter['performer--expand.name'] = {
-              text: organizationAndPersonFilter,
-              typeOfQuery: "Text",
-              typeOfMatch: "must"
-            };
-          }
-        }
-        if( placeWithOpeningHoursFilter ){
-          if( filterContext.type == 'PlaceWithOpeninghours' ){
-            filterContext.filter['name.raw'] = {
-              text: placeWithOpeningHoursFilter,
-              typeOfQuery: "Prefix",
-              typeOfMatch: "must"
-            };
-          } else if( filterQueryUtils.getRootMap(filterContext.type).location && filterContext.type != 'OrganizationAndPerson' ){
-            filterContext.filter['location--expand.name'] = {
-              text: placeWithOpeningHoursFilter,
-              typeOfQuery: "Text",
-              typeOfMatch: "must"
-            };
-          }
-        }
-        if( locationFilter ){
-          if( filterContext.type == 'PlaceWithOpeninghours' ){
-            filterContext.filter['address.neighborhood'] = {
-              text: locationFilter,
-              typeOfQuery: "Text",
-              typeOfMatch: "should",
-              boost: 1000
-            };
-            filterContext.filter['address.addressLocality'] = {
-              text: locationFilter,
-              typeOfQuery: "Text",
-              typeOfMatch: "should",
-              boost: 1000
-            };
-          } else if( filterQueryUtils.getRootMap(filterContext.type).location && filterContext.type != 'OrganizationAndPerson' ){
-            filterContext.filter['location--expand.address.neighborhood'] = {
-              text: locationFilter,
-              typeOfQuery: "Text",
-              typeOfMatch: "should",
-              boost: 1000
-            };
-            filterContext.filter['location--expand.address.addressLocality'] = {
-              text: locationFilter,
-              typeOfQuery: "Text",
-              typeOfMatch: "should",
-              boost: 1000
-            };
-          }
+        if (filteredKeyword) {
+          filterContext.filter.name = filteredKeyword;
+
+          filterContext.humanContext = {
+            templateData: {
+              label: subtypeToFilterQuery[root.toLowerCase()].label,
+              keyword: filteredKeyword
+            },
+            template: "<span class='accentColor'>{{nrOfResults}} {{label.pluralOrSingular}}</span> for <i>'{{keyword}}'</i> {{label.sorted}}"
+          };
+
+        } else {
+
+          filterContext.humanContext = {
+            templateData: {
+              label: subtypeToFilterQuery[root.toLowerCase()].label,
+            },
+            template: "Showing all <span class='accentColor'>{{nrOfResults}} {{label.pluralOrSingular}}</span>  {{label.sorted}}"
+          };
         }
 
-        if( filteredKeyword && !((organizationAndPersonFilter && filterContext.type == 'OrganizationAndPerson') || ((placeWithOpeningHoursFilter || locationFilter) && filterContext.type == 'PlaceWithOpeninghours')) ){
-          matchType = "must";
-          boost = 1;
-          if ( _.some(nlpFilterContextProtos, {type: filterContext.type}) ) {
-            matchType = "should";
-            boost = 1000;
-          }
-          filterContext.filter.name = {
-            text: filteredKeyword,
-            typeOfQuery: "FreeText",
-            typeOfMatch: matchType,
-            boost: boost
-          };
-          filterContext.humanContext = humanContextHelper.keywordTemplate( subtypeToFilterQuery[root.toLowerCase()].label, filteredKeyword );
-        } else {
-          filterContext.humanContext = humanContextHelper.typeTemplate( subtypeToFilterQuery[root.toLowerCase()].label );
-        }
+        if (dateFilter && filterContext.temporal) filterContext.temporal = dateFilter;
 
         return filterContext;
       }));
 
-      //re-order for NER if no named types are present
-      if( hasNLPFilter && !nlpFilterContextProtos ){
-          if( organizationAndPersonFilter && !placeWithOpeningHoursFilter ){
-            filterContexts.splice(0,0,filterContexts.splice(filterContexts.indexOf(_.find(filterContexts, {'type': "OrganizationAndPerson"})),1)[0])
-          }
-          if( placeWithOpeningHoursFilter && !organizationAndPersonFilter ){
-            filterContexts.splice(0,0,filterContexts.splice(filterContexts.indexOf(_.find(filterContexts, {'type': "PlaceWithOpeninghours"})),1)[0])
-          }
-      }
-
-      return filterContexts;
     };
 
     return function (req, res, next) {
       ensureQuestion(req.body, next); //check that we have a question or a type / filtercontext - if we have a type but no question, we move on from here and skip the rest of this
-      searchQueryParser.parseQuestion(req.body.question.trim())
+      searchQueryParser.parseQuestion(req.body.question.toLowerCase().trim())
         .then(function(result){
-          console.log("question: ", result); // DEBUG
+          //console.log("question: ", parsedQuestion); // DEBUG
           req.body.filterContexts = createFilterContexts(JSON.parse(result));
           //console.log(JSON.stringify(req.body.filterContexts, null, 2)); //DEBUG
           next();
