@@ -119,7 +119,7 @@ module.exports = {
       ],
 
       nextUrlFN: function (el) {
-        return el.find("#filter-page-container > div > div > div > a[title='Next page']").attr("href");
+        return el.find("#filter-page-container a[title='Next page']").attr("href");
       },
 
       stop: [{
