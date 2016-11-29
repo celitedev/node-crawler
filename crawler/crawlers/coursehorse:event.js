@@ -1,6 +1,8 @@
 var _ = require("lodash");
 var moment = require("moment");
 var dateUtils = require("./utils/dateUtils");
+var config = require("../../config");
+
 
 module.exports = {
   _meta: {
@@ -87,11 +89,12 @@ module.exports = {
     timeoutMS: 50 * 1000,
 
     //local proxy, e.g.: TOR
-    // proxy: "http://localhost:5566",
+    //proxy: 'http://' + config.proxy.host + ':' + config.proxy.port,
 
     //Default Headers for all requests
     headers: {
-      "Accept-Encoding": 'gzip, deflate'
+      "Accept-Encoding": 'gzip, deflate',
+      "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36" //coursehorse rejects default user agent "node-superagent"
     },
 
     //cache to simple fileCache. 
@@ -123,7 +126,7 @@ module.exports = {
       },
 
       stop: [{
-        name: "zeroResults", //zeroResults
+        name: "zeroResults",
       }]
     },
     results: {
@@ -139,9 +142,18 @@ module.exports = {
           location: ".school@href",
           workFeatured: ".title a@href",
           _detail: x(".title a@href", {
-            educationEvent: x("script[type='application/ld+json']", [{
-              jsonLdData: "",
+            educationEvent: x("div#new-course-start-dates-layout tr.section-row", [{
+              id: "@data-section-id",
+              startDate: ".ui.radio.checkbox label",
+              times: "td:nth-child(2)",
+              price: "td:nth-child(5)"
             }]),
+            otherSections: x("div#new-course-start-dates-layout tr.other-sections", [{
+              classes: "@class",
+              startDate: "td:nth-child(1)",
+              times: "td:nth-child(2)",
+              price: "td:nth-child(5)"
+            }])
           }, undefined, detailObj),
         };
       },
@@ -159,20 +171,37 @@ module.exports = {
         var educationEvents = obj._detail.educationEvent;
         delete obj._detail.educationEvent;
 
-        for (var i=0; i<=educationEvents.length; i++) {
-          //jsonLdData has the json+ld content coming from schema. Getting only those with @type=Product.
-          if(educationEvents[i] && educationEvents[i].jsonLdData && educationEvents[i].jsonLdData.indexOf("\"@type\":\"Product\"")>=0) {
-            educationEvents = educationEvents[i].jsonLdData;
-            educationEvents = educationEvents.toString().replace('//<!--\n    ', '').replace('    //-->', '');
-            educationEvents = JSON.parse(educationEvents);
-            educationEvents = educationEvents.offers;
-            break;
-          }
-        }
+        var otherSections = obj._detail.otherSections;
+        delete obj._detail.otherSections;
 
         //create an eduction event for each dateTime
         var items = _.compact(_.map(educationEvents, function(educationEvent){
-          var id = obj.workFeatured + "--" + educationEvent.availabilityStarts;
+          var endDate;
+
+          var myOtherSections = _.filter(otherSections, function(otherSection){
+            return otherSection.classes.includes(educationEvent.id);
+          });
+          var startDate = moment(educationEvent.startDate + " " + educationEvent.times.split("-")[0].replace("pm", " pm").replace("am", " am").trim());
+          var monthNow = moment().month();
+          if (monthNow > startDate.month()) {
+            startDate.year(moment().year() + 1);
+          } else {
+            startDate.year(moment().year());
+          }
+
+          if( myOtherSections.length > 0 ){
+            var lastSection = myOtherSections[myOtherSections.length - 1];
+            endDate = moment(lastSection.startDate + " " + lastSection.times.split("-")[1].replace("pm", " pm").replace("am", " am").trim());
+          } else {
+            endDate = moment(educationEvent.startDate + " " + educationEvent.times.split("-")[1].replace("pm", " pm").replace("am", " am").trim());
+          }
+          if (monthNow > endDate.month()) {
+            endDate.year(moment().year() + 1);
+          } else {
+            endDate.year(moment().year());
+          }
+
+          var id = obj.workFeatured + "--" + educationEvent.id;
           var item =  _.defaults({
             _sourceId: id,
 
@@ -182,8 +211,8 @@ module.exports = {
             //2. at same time _sourceUrl will make sure we prune correctly for detail pages.
             _sourceUrl: obj._sourceUrl,
             name: obj._courseName,
-            startDate: dateUtils.transposeTimeToUTC(educationEvent.availabilityStarts),
-            endDate: dateUtils.transposeTimeToUTC(educationEvent.availabilityEnds)
+            startDate: dateUtils.transposeTimeToUTC(startDate.format()),
+            endDate: dateUtils.transposeTimeToUTC(endDate.format())
           },obj);
 
           item.fact = [];
@@ -194,7 +223,7 @@ module.exports = {
           if(educationEvent.price){
             item.fact.push({
               name: "price",
-              val: [educationEvent.priceCurrency + educationEvent.price]
+              val: [educationEvent.price]
             });
           }
 
