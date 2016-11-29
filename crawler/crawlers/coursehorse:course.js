@@ -92,7 +92,8 @@ module.exports = {
 
     //Default Headers for all requests
     headers: {
-      "Accept-Encoding": 'gzip, deflate'
+      "Accept-Encoding": 'gzip, deflate',
+      "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36" //coursehorse rejects default user agent "node-superagent"
     },
 
     //cache to simple fileCache. 
