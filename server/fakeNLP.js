@@ -50,6 +50,26 @@ var subtypeToFilterQuery = {
   //////////////
   //EVENT
 
+  //educationevent
+  "educationevent": {
+    type: "Event",
+    filter: {
+      subtypes: "educationevent"
+    },
+    "temporal": {
+      "startDate": {
+        "gte": "now"
+      }
+    },
+    "sort": {
+      "type": "date"
+    },
+    label: {
+      plural: "courses",
+      singular: "course",
+    }
+  },
+
   //movie showing
   "screeningevent": {
     type: "Event",
@@ -239,6 +259,8 @@ subtypeToFilterQuery["showing"] = subtypeToFilterQuery.screeningevent;
 subtypeToFilterQuery["movie showing"] = subtypeToFilterQuery.screeningevent;
 subtypeToFilterQuery["movie screening"] = subtypeToFilterQuery.screeningevent;
 subtypeToFilterQuery.moviescreening = subtypeToFilterQuery.screeningevent;
+
+subtypeToFilterQuery.course = subtypeToFilterQuery.educationevent;
 
 subtypeToFilterQuery["movie theater"] = subtypeToFilterQuery.movietheater;
 subtypeToFilterQuery.theater = subtypeToFilterQuery.movietheater;
