@@ -89,7 +89,7 @@ module.exports = {
     timeoutMS: 50 * 1000,
 
     //local proxy, e.g.: TOR
-    //proxy: 'http://' + config.proxy.host + ':' + config.proxy.port,
+    proxy: 'http://' + config.proxy.host + ':' + config.proxy.port,
 
     //Default Headers for all requests
     headers: {
