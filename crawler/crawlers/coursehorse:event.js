@@ -89,11 +89,13 @@ module.exports = {
     timeoutMS: 50 * 1000,
 
     //local proxy, e.g.: TOR
-    proxy: 'http://' + config.proxy.host + ':' + config.proxy.port,
+    //proxy: 'http://' + config.proxy.host + ':' + config.proxy.port,
 
     //Default Headers for all requests
     headers: {
       "Accept-Encoding": 'gzip, deflate',
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+      "Accept-Language":"en-US,en;q=0.8",
       "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.71 Safari/537.36" //coursehorse rejects default user agent "node-superagent"
     },
 
@@ -106,7 +108,7 @@ module.exports = {
     type: "masterDetail", //signifies overall type of scroll. For now: only 'masterDetail'
     requiresJS: false, //If true, use PhantomJS
     seed: {
-      disable: false, //for testing. Disabled nextUrl() call
+      disable: true, //for testing. Disabled nextUrl() call
 
       seedUrls: [
         {url:"https://coursehorse.com/nyc/classes/art/browse?page=1", dataType:'html'},
