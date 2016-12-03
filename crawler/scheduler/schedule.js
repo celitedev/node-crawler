@@ -16,22 +16,22 @@ var schedule = [
       crawler: '1iota:event'
     }
   },
-  { //expected duration: ?? hours
-    template: 'runCrawler',
-    name: 'runCrawler:coursehorse:course:weekly',
-    frequency: '0 1 * * MON',
-    data: {
-      crawler: 'coursehorse:course'
-    }
-  },
-  { //expected duration: ?? hours
-    template: 'runCrawler',
-    name: 'runCrawler:coursehorse:event:weekly',
-    frequency: '0 12 * * MON',
-    data: {
-      crawler: 'coursehorse:event'
-    }
-  },
+  // { //expected duration: ?? hours //TODO moved to coursehorse_only_crawler_config branch for now
+  //   template: 'runCrawler',
+  //   name: 'runCrawler:coursehorse:course:weekly',
+  //   frequency: '0 1 * * MON',
+  //   data: {
+  //     crawler: 'coursehorse:course'
+  //   }
+  // },
+  // { //expected duration: ?? hours
+  //   template: 'runCrawler',
+  //   name: 'runCrawler:coursehorse:event:weekly',
+  //   frequency: '0 12 * * MON',
+  //   data: {
+  //     crawler: 'coursehorse:event'
+  //   }
+  // },
   { //expected duration: 48 hours
     template: 'runCrawler',
     name: 'runCrawler:eventful:event:weekly',
