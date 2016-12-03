@@ -108,7 +108,7 @@ module.exports = {
     type: "masterDetail", //signifies overall type of scroll. For now: only 'masterDetail'
     requiresJS: false, //If true, use PhantomJS
     seed: {
-      disable: true, //for testing. Disabled nextUrl() call
+      disable: false, //for testing. Disabled nextUrl() call
 
       seedUrls: [
         {url:"https://coursehorse.com/nyc/classes/art/browse?page=1", dataType:'html'},
