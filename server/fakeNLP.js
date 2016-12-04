@@ -51,7 +51,11 @@ var subtypeToFilterQuery = {
   "educationevent": {
     type: "Event",
     filter: {
-      subtypes: "educationevent"
+      subtypes: {
+        text: "educationevent",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
     },
     "temporal": {
       "startDate": {
@@ -63,7 +67,7 @@ var subtypeToFilterQuery = {
     },
     label: {
       plural: "courses",
-      singular: "course",
+      singular: "course"
     }
   },
 
