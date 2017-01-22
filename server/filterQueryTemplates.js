@@ -70,6 +70,28 @@ var subtypeToFilterQuery = {
       singular: "course"
     }
   },
+  "festivals_parades": {
+    type: "Event",
+    filter: {
+      subtypes: {
+        text: "festivals_parades",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
+    },
+    "temporal": {
+      "startDate": {
+        "gte": "now"
+      }
+    },
+    "sort": {
+      "type": "date"
+    },
+    label: {
+      plural: "festivals",
+      singular: "festival"
+    }
+  },
 
   //movie showing
   "screeningevent": {
@@ -119,6 +141,31 @@ var subtypeToFilterQuery = {
       //sorted: "(soonest first)"
     }
   },
+
+  "theaterevent": {
+    type: "Event",
+    filter: {
+      subtypes: {
+        text: "theaterevent",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
+    },
+    "temporal": {
+      "startDate": {
+        "gte": "now"
+      }
+    },
+    "sort": {
+      "type": "date"
+    },
+    label: {
+      plural: "shows",
+      singular: "show",
+      //sorted: "(soonest first)"
+    }
+  },
+
 
   /////////////////
   //PLACE
@@ -292,31 +339,7 @@ if (labelsNotDefined.length) {
   throw new Error("LABELS NOT DEFINED FOR ABOVE (SUB)TYPES");
 }
 
-/////////////
-//synonyms //
-/////////////
-
 subtypeToFilterQuery["place"] = subtypeToFilterQuery.placewithopeninghours;
-subtypeToFilterQuery["local businesses"] = subtypeToFilterQuery.place;
-subtypeToFilterQuery["local business"] = subtypeToFilterQuery.place;
-
-subtypeToFilterQuery["showing"] = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery["movie showing"] = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery["movie screening"] = subtypeToFilterQuery.screeningevent;
-subtypeToFilterQuery.moviescreening = subtypeToFilterQuery.screeningevent;
-
-subtypeToFilterQuery.course = subtypeToFilterQuery.educationevent;
-
-subtypeToFilterQuery["movie theater"] = subtypeToFilterQuery.movietheater;
-subtypeToFilterQuery.theater = subtypeToFilterQuery.movietheater;
-
-//person
-subtypeToFilterQuery.person = subtypeToFilterQuery.organizationandperson;
-subtypeToFilterQuery.organization = subtypeToFilterQuery.organizationandperson;
-
-//performer
-subtypeToFilterQuery.artist = subtypeToFilterQuery.performer;
-subtypeToFilterQuery.singer = subtypeToFilterQuery.performer;
 
 
 
