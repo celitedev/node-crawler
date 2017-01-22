@@ -3,16 +3,10 @@ var Promise = require("bluebird");
 
 var cardViewModel = require("../cardViewModel");
 
-var subtypeToFilterQueryBase = require("../fakeNLP").subtypeToFilterQuery;
+var subtypeToFilterQueryBase = require("../filterQueryTemplates").subtypeToFilterQuery;
 var searchQueryParser = require('../search_query_parser');
 var searchQueryParserUtils = require('../search_query_parser/utils');
 var humanContextHelper = require('../humanContextHelper');
-
-
-/**
- * Each FilterContext is shown are 1 row. 
- * @type {Object}
- */
 
 var middleware = {
   createFilterContextsFromQuestion: function (command) {
@@ -42,7 +36,10 @@ var middleware = {
       // Get the query components we know about from Search Query Parser
       var filteredKeyword = searchQueryParserUtils.getFilteredKeyword(parsedQuestion);
       var rawKeyword = searchQueryParserUtils.getRawKeyword(parsedQuestion);
+      var filterKeywordWithoutType = searchQueryParserUtils.getFilteredKeywordWithoutType(parsedQuestion);
+      var rawKeywordWithoutType = searchQueryParserUtils.getRawKeywordWithoutType(parsedQuestion);
       var dateFilter = searchQueryParserUtils.getDateFilter(parsedQuestion);
+      var typeFilter = searchQueryParserUtils.getTypeFilter(parsedQuestion);
       var organizationAndPersonFilter = searchQueryParserUtils.getOrganizationAndPersonFilter(parsedQuestion);
       var placeWithOpeningHoursFilter = searchQueryParserUtils.getPlaceWithOpeningHoursFilter(parsedQuestion);
       var locationFilter = searchQueryParserUtils.getLocationFilter(parsedQuestion);
@@ -71,30 +68,30 @@ var middleware = {
       var nlpContexts = [];
       var reorderFallbackTypes = [];
 
-      if( filteredKeyword ){
-        var nlpFilterContextProtos = null;
-        var matchingNgram = null;
+      if( typeFilter ){
+        var nlpFilterContextProtos = subtypeToFilterQuery[typeFilter];
+        // var matchingNgram = null;
 
         //We try to match the ngram against all defined subtype aliases
         //If ngram ends in an 'n' we assume it's plural and also try to match to naive singular 'ngram - s'
         //the first match found is the one we're going with.
         //Based on ordening we favour (1) large subtypes that (2) sit at the end of the question
-        _.each(getNGramsInSizeOrder(filteredKeyword.toLowerCase()), function (ngram) {
-          var ngramSingular = ngram[ngram.length - 1] = 's' && ngram.substring(0, ngram.length - 1);
-          _.each(subtypeToFilterQuery, function (subtypeFilterContext, subtypeAlias) {
-            if (nlpFilterContextProtos) return;
-            if (ngram === subtypeAlias || (ngramSingular && ngramSingular === subtypeAlias)) {
-              nlpFilterContextProtos = subtypeFilterContext;
-              matchingNgram = ngram;
-            }
-          });
-          if (nlpFilterContextProtos) return;
-        });
+        // _.each(getNGramsInSizeOrder(filteredKeyword.toLowerCase()), function (ngram) {
+        //   var ngramSingular = ngram[ngram.length - 1] = 's' && ngram.substring(0, ngram.length - 1);
+        //   _.each(subtypeToFilterQuery, function (subtypeFilterContext, subtypeAlias) {
+        //     if (nlpFilterContextProtos) return;
+        //     if (ngram === subtypeAlias || (ngramSingular && ngramSingular === subtypeAlias)) {
+        //       nlpFilterContextProtos = subtypeFilterContext;
+        //       matchingNgram = ngram;
+        //     }
+        //   });
+        //   if (nlpFilterContextProtos) return;
+        // });
 
         //Get the question without the matched nlp. The reamining stuff is the keyword search
         //This is used for queries that filter on actual subtype
-        var questionWithPossiblyRemovedType = matchingNgram ? filteredKeyword.toLowerCase().replace(matchingNgram, "").trim() : filteredKeyword;
-        var rawQuestionWithPossiblyRemovedType = matchingNgram ? rawKeyword.toLowerCase().replace(matchingNgram, "").trim() : rawKeyword;
+        // var questionWithPossiblyRemovedType = matchingNgram ? filteredKeyword.toLowerCase().replace(matchingNgram, "").trim() : filteredKeyword;
+        // var rawQuestionWithPossiblyRemovedType = matchingNgram ? rawKeyword.toLowerCase().replace(matchingNgram, "").trim() : rawKeyword;
 
         if (nlpFilterContextProtos) {
           //can be array! E.g.: for movies, which would show movies as well as movie events
@@ -106,7 +103,7 @@ var middleware = {
             };
 
             //set final question (may override)
-            var finalQuestion = questionWithPossiblyRemovedType;
+            var finalQuestion = filterKeywordWithoutType;
 
             //add date filter
             if( dateFilter && nlpFilterContextProto.temporal ) nlpFilterContextProto.temporal = dateFilter;
@@ -128,7 +125,7 @@ var middleware = {
                   typeOfMatch: "must"
                 };
               } else {
-                finalQuestion = rawQuestionWithPossiblyRemovedType;
+                finalQuestion = rawKeywordWithoutType;
               }
             }
             if( placeWithOpeningHoursFilter ){
@@ -146,7 +143,7 @@ var middleware = {
                   typeOfMatch: "must"
                 };
               } else {
-                finalQuestion = rawQuestionWithPossiblyRemovedType;
+                finalQuestion = rawKeywordWithoutType;
               }
             }
 
@@ -299,53 +296,53 @@ var middleware = {
   }
 };
 
-function getNGramsInSizeOrder(text) {
-
-  var atLeast = 1; // Show results with at least .. occurrences
-  var numWords = 20; // Show statistics for one to .. words (20 should be enough)
-  var ignoreCase = true; // Case-sensitivity
-  var REallowedChars = /[^a-zA-Z'\-]+/g;
-
-
-  var i, j, k, textlen, len, s;
-  // Prepare key hash
-  var keys = [null]; //"keys[0] = null", a word boundary with length zero is empty
-  var results = [];
-  numWords++; //for human logic, we start counting at 1 instead of 0
-  for (i = 1; i <= numWords; i++) {
-    keys.push({});
-  }
-
-  // Remove all irrelevant characters
-  text = text.replace(REallowedChars, " ").replace(/^\s+/, "").replace(/\s+$/, "");
-
-  // Create a hash
-  if (ignoreCase) text = text.toLowerCase();
-  text = text.split(/\s+/);
-  for (i = 0, textlen = text.length; i < textlen; i++) {
-    s = text[i];
-    keys[1][s] = (keys[1][s] || 0) + 1;
-    for (j = 2; j <= numWords; j++) {
-      if (i + j <= textlen) {
-        s += " " + text[i + j - 1];
-        keys[j][s] = (keys[j][s] || 0) + 1;
-      } else break;
-    }
-  }
-
-  // Prepares results for advanced analysis
-  for (var k = 1; k <= numWords; k++) {
-    var key = keys[k];
-    for (var i in key) {
-      if (key[i] >= atLeast) {
-        results.push(i);
-      }
-    }
-  }
-
-  results.reverse();
-  return results;
-}
+// function getNGramsInSizeOrder(text) {
+//
+//   var atLeast = 1; // Show results with at least .. occurrences
+//   var numWords = 20; // Show statistics for one to .. words (20 should be enough)
+//   var ignoreCase = true; // Case-sensitivity
+//   var REallowedChars = /[^a-zA-Z'\-]+/g;
+//
+//
+//   var i, j, k, textlen, len, s;
+//   // Prepare key hash
+//   var keys = [null]; //"keys[0] = null", a word boundary with length zero is empty
+//   var results = [];
+//   numWords++; //for human logic, we start counting at 1 instead of 0
+//   for (i = 1; i <= numWords; i++) {
+//     keys.push({});
+//   }
+//
+//   // Remove all irrelevant characters
+//   text = text.replace(REallowedChars, " ").replace(/^\s+/, "").replace(/\s+$/, "");
+//
+//   // Create a hash
+//   if (ignoreCase) text = text.toLowerCase();
+//   text = text.split(/\s+/);
+//   for (i = 0, textlen = text.length; i < textlen; i++) {
+//     s = text[i];
+//     keys[1][s] = (keys[1][s] || 0) + 1;
+//     for (j = 2; j <= numWords; j++) {
+//       if (i + j <= textlen) {
+//         s += " " + text[i + j - 1];
+//         keys[j][s] = (keys[j][s] || 0) + 1;
+//       } else break;
+//     }
+//   }
+//
+//   // Prepares results for advanced analysis
+//   for (var k = 1; k <= numWords; k++) {
+//     var key = keys[k];
+//     for (var i in key) {
+//       if (key[i] >= atLeast) {
+//         results.push(i);
+//       }
+//     }
+//   }
+//
+//   results.reverse();
+//   return results;
+// }
 
 
 module.exports = function (command) {

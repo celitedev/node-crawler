@@ -11,7 +11,16 @@ function getEntityMentions( type, parsedQuestion ){
     && parsedQuestion.questions[0].entitymentions
     && _.some(parsedQuestion.questions[0].entitymentions, 'ner', type) )
   {
-    return _.filter(parsedQuestion.questions[0].entitymentions, 'ner', type)[0].text;
+    return _.filter(parsedQuestion.questions[0].entitymentions, 'ner', type)[0].text.replace(getTypeFilterText(parsedQuestion), '');
+  }
+}
+
+function getTypeFilterText( parsedQuestion ){
+  if ( parsedQuestionHasData(parsedQuestion)
+    && parsedQuestion.questions[0].eventtypes
+    && parsedQuestion.questions[0].eventtypes.length > 0 )
+  {
+    return parsedQuestion.questions[0].eventtypes[parsedQuestion.questions[0].eventtypes.length-1].text;
   }
 }
 
@@ -23,6 +32,15 @@ function getDateFilter( parsedQuestion ){
     && parsedQuestion.questions[0].temporal_query_info.length > 0 )
   {
     return parsedQuestion.questions[0].temporal_query_info[0];
+  }
+}
+
+function getTypeFilter( parsedQuestion ){
+  if ( parsedQuestionHasData(parsedQuestion)
+    && parsedQuestion.questions[0].eventtypes
+    && parsedQuestion.questions[0].eventtypes.length > 0 )
+  {
+    return parsedQuestion.questions[0].eventtypes[parsedQuestion.questions[0].eventtypes.length-1].event_type;
   }
 }
 
@@ -45,12 +63,20 @@ function getFilteredKeyword( parsedQuestion ){
         && parsedQuestion.questions[0].other_text.length > 0
         && parsedQuestion.questions[0].other_text[0].text ) {
         return _.map(parsedQuestion.questions[0].other_text, function (part) {
-          return part.text
+          if (part.text != '') return part.text;
         }).join(' ');
       }
     }else{
       return parsedQuestion.questions[0].text.slice(0,-1); //TODO JIM HACK TO FIX SEARCH QUERY PARSER ISSUE #6
     }
+  }
+}
+
+function getFilteredKeywordWithoutType( parsedQuestion ){
+  if ( getFilteredKeyword(parsedQuestion) ){
+    return getFilteredKeyword(parsedQuestion).replace(getTypeFilterText(parsedQuestion), '').trim();
+  } else {
+    return "";
   }
 }
 
@@ -61,11 +87,22 @@ function getRawKeyword( parsedQuestion ){
   }
 }
 
+function getRawKeywordWithoutType( parsedQuestion ){
+  if( getRawKeyword(parsedQuestion) ) {
+    return getRawKeyword(parsedQuestion).replace(getTypeFilterText(parsedQuestion), '').trim();
+  } else {
+    return "";
+  }
+}
+
 module.exports = {
   getDateFilter: getDateFilter,
+  getTypeFilter: getTypeFilter,
   getOrganizationAndPersonFilter: getOrganizationAndPersonFilter,
   getPlaceWithOpeningHoursFilter: getPlaceWithOpeningHoursFilter,
   getLocationFilter: getLocationFilter,
   getFilteredKeyword: getFilteredKeyword,
-  getRawKeyword: getRawKeyword
+  getFilteredKeywordWithoutType: getFilteredKeywordWithoutType,
+  getRawKeyword: getRawKeyword,
+  getRawKeywordWithoutType: getRawKeywordWithoutType
 };
