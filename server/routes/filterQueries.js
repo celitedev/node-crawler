@@ -284,7 +284,8 @@ var middleware = {
       ensureQuestion(req.body, next); //check that we have a question or a type / filtercontext - if we have a type but no question, we move on from here and skip the rest of this
       searchQueryParser.parseQuestion(req.body.question.trim())
         .then(function(result){
-          console.log("question: ", result); // DEBUG
+          //console.log("question: ", result); // DEBUG
+          command.filterQueryUtils.saveSearchQueryHistory(req.body.question.trim(), result);
           req.body.filterContexts = createFilterContexts(JSON.parse(result));
           //console.log(JSON.stringify(req.body.filterContexts, null, 2)); //DEBUG
           next();
