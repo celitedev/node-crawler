@@ -218,6 +218,7 @@ module.exports = _.extend({}, require("./utilsForSchemaGeneration"), {
     CANONICALTABLE: "entities",
     ERDTABLE: "erd",
     REFNORMS: "refNorms",
-    REFX: "refX"
+    REFX: "refX",
+    QUERYHISTORYTABLE: "searchQueryHistory"
   }
 });

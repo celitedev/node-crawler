@@ -80,6 +80,7 @@ var command = {
   redisClient: redisClient,
   erdEntityTable: r.table(domainUtils.statics.ERDTABLE),
   sourceEntityTable: r.table(domainUtils.statics.SOURCETABLE),
+  queryHistoryTable: r.table(domainUtils.statics.QUERYHISTORYTABLE),
   erdMappingConfig: require("../schemas/es_schema")(generatedSchemas),
   rootUtils: require("../schemas/domain/utils/rootUtils")(generatedSchemas),
   cacheUtils: null, //require("./_nlp_deprecated/cacheUtils").loadCache(redisClient)
