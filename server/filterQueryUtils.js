@@ -852,8 +852,8 @@ module.exports = function (command) {
       parsedQuestion: JSON.parse(parsedQuestion),
       timestamp: new Date()
     };
-    queryHistoryTable.insert([data]).then((result) => { 
-      console.log(JSON.stringify(result, null, 2));
+    queryHistoryTable.insert([data]).then((result) => {
+      //console.log(JSON.stringify(result, null, 2));  //DEBUG
     });
   }
 
