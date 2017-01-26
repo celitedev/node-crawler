@@ -47,6 +47,7 @@ module.exports = function (command) {
   var r = command.r;
   var erdConfig = command.erdMappingConfig;
   var erdEntityTable = command.erdEntityTable;
+  var queryHistoryTable = command.queryHistoryTable;
 
   var rootUtils = command.rootUtils;
 
@@ -845,6 +846,16 @@ module.exports = function (command) {
       });
   }
 
+  function saveSearchQueryHistory(question, parsedQuestion){
+    var data = {
+      question: question,
+      parsedQuestion: JSON.parse(parsedQuestion),
+      timestamp: new Date()
+    };
+    queryHistoryTable.insert([data]).then((result) => {
+      //console.log(JSON.stringify(result, null, 2));  //DEBUG
+    });
+  }
 
   //inject properties in filterQueryUtils and return
   return _.extend(filterQueryUtils, {
@@ -863,6 +874,7 @@ module.exports = function (command) {
     calcPathSuffix: calcPathSuffix,
     getValuesForPaths: getValuesForPaths,
     recurseReferencesToExpand: recurseReferencesToExpand,
+    saveSearchQueryHistory: saveSearchQueryHistory,
     getRootMap: getRootMap,
     erdConfig: erdConfig,
 
