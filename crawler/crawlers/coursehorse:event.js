@@ -190,6 +190,7 @@ module.exports = {
           } else {
             startDate.year(moment().year());
           }
+          startDate.tz("America/New_York");
 
           if( myOtherSections.length > 0 ){
             var lastSection = myOtherSections[myOtherSections.length - 1];
@@ -202,6 +203,7 @@ module.exports = {
           } else {
             endDate.year(moment().year());
           }
+          endDate.tz("America/New_York");
 
           var id = obj.workFeatured + "--" + educationEvent.id;
           var item =  _.defaults({
