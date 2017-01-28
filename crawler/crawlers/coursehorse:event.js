@@ -183,27 +183,25 @@ module.exports = {
           var myOtherSections = _.filter(otherSections, function(otherSection){
             return otherSection.classes.includes(educationEvent.id);
           });
-          var startDate = moment(educationEvent.startDate + " " + educationEvent.times.split("-")[0].replace("pm", " pm").replace("am", " am").trim());
+          var startDate = moment(educationEvent.startDate + " " + educationEvent.times.split("-")[0].replace("pm", " pm").replace("am", " am").trim(), "America/New_York");
           var monthNow = moment().month();
           if (monthNow > startDate.month()) {
             startDate.year(moment().year() + 1);
           } else {
             startDate.year(moment().year());
           }
-          startDate.tz("America/New_York");
 
           if( myOtherSections.length > 0 ){
             var lastSection = myOtherSections[myOtherSections.length - 1];
-            endDate = moment(lastSection.startDate + " " + lastSection.times.split("-")[1].replace("pm", " pm").replace("am", " am").trim());
+            endDate = moment(lastSection.startDate + " " + lastSection.times.split("-")[1].replace("pm", " pm").replace("am", " am", "America/New_York").trim());
           } else {
-            endDate = moment(educationEvent.startDate + " " + educationEvent.times.split("-")[1].replace("pm", " pm").replace("am", " am").trim());
+            endDate = moment(educationEvent.startDate + " " + educationEvent.times.split("-")[1].replace("pm", " pm").replace("am", " am", "America/New_York").trim());
           }
           if (monthNow > endDate.month()) {
             endDate.year(moment().year() + 1);
           } else {
             endDate.year(moment().year());
           }
-          endDate.tz("America/New_York");
 
           var id = obj.workFeatured + "--" + educationEvent.id;
           var item =  _.defaults({
