@@ -70,7 +70,7 @@ module.exports = {
   },
   job: {
 
-    concurrentJobs: 4,
+    concurrentJobs: 1, //TODO JIM
 
     //job-level retries before fail. 
     //This is completely seperate for urls that are individually retried by driver
@@ -108,7 +108,7 @@ module.exports = {
     type: "masterDetail", //signifies overall type of scroll. For now: only 'masterDetail'
     requiresJS: false, //If true, use PhantomJS
     seed: {
-      disable: false, //for testing. Disabled nextUrl() call
+      disable: true, //for testing. Disabled nextUrl() call //TODO JIM
 
       seedUrls: [
         {url:"https://coursehorse.com/nyc/classes/art/browse?page=1", dataType:'html'},
@@ -183,25 +183,35 @@ module.exports = {
           var myOtherSections = _.filter(otherSections, function(otherSection){
             return otherSection.classes.includes(educationEvent.id);
           });
-          var startDate = moment(educationEvent.startDate + " " + educationEvent.times.split("-")[0].replace("pm", " pm").replace("am", " am").trim(), "America/New_York");
+          var startDateParts = educationEvent.startDate.split(" ");
+          var startYear = moment().year();
           var monthNow = moment().month();
-          if (monthNow > startDate.month()) {
-            startDate.year(moment().year() + 1);
-          } else {
-            startDate.year(moment().year());
+          if (monthNow > moment().month(startDateParts[1]).format("MMM")) {
+            startYear = (moment().year() + 1);
           }
+          var startDate = moment.utc(startDateParts[1] + " " + startDateParts[2] + " " + startYear + " " + educationEvent.times.split("-")[0].replace("pm", " pm").replace("am", " am").trim(), "MMM DD YYYY HH:mm a");
+          var startTzOffset = startDate.clone().tz("America/New_York").utcOffset();
+          startDate.add(-startTzOffset, 'minutes');
+          startDate.utcOffset(startTzOffset);
 
+          var endDateParts;
+          var endTime;
           if( myOtherSections.length > 0 ){
             var lastSection = myOtherSections[myOtherSections.length - 1];
-            endDate = moment(lastSection.startDate + " " + lastSection.times.split("-")[1].replace("pm", " pm").replace("am", " am", "America/New_York").trim());
+            endDateParts = lastSection.startDate.split(" ");
+            endTime = lastSection.times.split("-")[1].replace("pm", " pm").replace("am", " am");
           } else {
-            endDate = moment(educationEvent.startDate + " " + educationEvent.times.split("-")[1].replace("pm", " pm").replace("am", " am", "America/New_York").trim());
+            endDateParts = educationEvent.startDate.split(" ");
+            endTime = educationEvent.times.split("-")[1].replace("pm", " pm").replace("am", " am");
           }
-          if (monthNow > endDate.month()) {
-            endDate.year(moment().year() + 1);
-          } else {
-            endDate.year(moment().year());
+          var endYear = moment().year();
+          if (monthNow > moment().month(endDateParts[1]).format("MMM")) {
+            endYear = (moment().year() + 1);
           }
+          endDate = moment.utc(endDateParts[1] + " " + endDateParts[2] + " " + endYear + " " + endTime, "MMM DD YYYY HH:mm a" );
+          var endTzOffset = endDate.clone().tz("America/New_York").utcOffset();
+          endDate.add(-endTzOffset, 'minutes');
+          endDate.utcOffset(endTzOffset);
 
           var id = obj.workFeatured + "--" + educationEvent.id;
           var item =  _.defaults({
