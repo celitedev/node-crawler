@@ -49,12 +49,13 @@ return Promise.resolve()
 
 
         Promise.all(_.map(results, (row) => {
-          return tableErd.get(row.id).pluck("root").run().then(result => {
+          return tableErd.get(row.id).run().then(result => {
             if (result) {
               data.push({
                 id: row.id,
                 root: result.root
               });
+            }else{
               justIds.push(row.id);
             }
           })
@@ -86,13 +87,13 @@ return Promise.resolve()
         })
       })
     })
-    .catch(function (err) {
-      throw err;
-    })
-    .finally(function () {
-      console.log("QUITTING");
-      r.getPoolMaster().drain(); //quit
-    });
+      .catch(function (err) {
+        throw err;
+      })
+      .finally(function () {
+        console.log("QUITTING");
+        r.getPoolMaster().drain(); //quit
+      });
   });
 
 
