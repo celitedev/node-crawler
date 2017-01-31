@@ -39,51 +39,51 @@ return Promise.resolve()
     const tableRefNorms = r.table(domainUtils.statics.REFNORMS);
 
     let data = [];
+    let justIds = [];
     return new Promise((resolve, reject) => {
       if (!source) return reject('YOU MUST DEFINE A SOURCE');
       console.log(`Removing all ${source} data`);
-      tableSourceEntity.filter({'_sourceType': source}).pluck("id").run().then(results=>{
+      tableSourceEntity.filter({'_sourceType': source}).pluck("id").run().then(results=> {
         console.log(`Found ${results.length} source entities`);
         if (results.length == 0) return resolve();
 
 
-        Promise.all(_.map(results, (row) =>  {
-           return tableErd.get(row.id).pluck("root").run().then(result=>{
+        Promise.all(_.map(results, (row) => {
+          return tableErd.get(row.id).pluck("root").run().then(result => {
             if (result) {
               data.push({
                 id: row.id,
                 root: result.root
-              })
+              });
+              justIds.push(row.id);
             }
           })
-        })).then(()=>{
-          esBulkDelete(data).then(()=>{
+        })).then(() => {
+          justIds = r.args(justIds);
+          esBulkDelete(data).then(() => {
             console.log('Removed ES Data');
-            Promise.all(_.map(data, (row) =>  {
-              return tableErd.get(row.id).delete().run();
-            })).then(()=>{
-              console.log("Removed ERD");
-              Promise.all(_.map(data, (row) =>  {
-                return tableCanonicalEntities.get(row.id).delete().run();
-            })).then(()=>{
-                console.log('Removed Canonical Entities');
-                Promise.all(_.map(data, (row) =>  {
-                  tableRefNorms.get(row.id).delete().run().then(()=>{
-                    return tableRefNorms.filter({"_sourceRefId":row.id}).delete().run();
+            tableErd.getAll(justIds).delete().run()
+              .then(() => {
+                console.log("Removed ERD");
+                tableCanonicalEntities.getAll(justIds).delete().run()
+                  .then(() => {
+                    console.log('Removed Canonical Entities');
+                    tableRefNorms.getAll(justIds).delete().run()
+                      .then(() => {
+                        tableRefNorms.getAll(justIds, {index: "_sourceRefId"}).delete().run()
+                          .then(() => {
+                            console.log('Removed RefNorms');
+                            tableSourceEntity.getAll(justIds).delete().run()
+                              .then(() => {
+                                console.log('Removed Source Entities, DONE!');
+                                return resolve();
+                              })
+                          })
+                      })
                   })
-              })).then(()=>{
-                  console.log('Removed RefNorms');
-                  Promise.all(_.map(data, (row) =>  {
-                    return tableSourceEntity.get(row.id).delete().run();
-                })).then(()=>{
-                    console.log('Removed Source Entities, DONE!');
-                    return resolve();
-                  })
-                })
               })
-            })
-          });
-        });
+          })
+        })
       })
     })
     .catch(function (err) {
