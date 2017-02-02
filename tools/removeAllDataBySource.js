@@ -69,6 +69,7 @@ return Promise.resolve()
                 tableCanonicalEntities.getAll(justIds).delete().run()
                   .then(() => {
                     console.log('Removed Canonical Entities');
+                    //TODO this is not completely removing refnorms, haven't figured out why
                     tableRefNorms.getAll(justIds).delete().run()
                       .then(() => {
                         tableRefNorms.getAll(justIds, {index: "_sourceRefId"}).delete().run()
