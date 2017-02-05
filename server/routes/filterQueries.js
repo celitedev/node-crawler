@@ -268,14 +268,14 @@ var middleware = {
       }));
 
       //re-order for NER if no named types are present
-      if( hasNLPFilter && !nlpFilterContextProtos ){
-          if( organizationAndPersonFilter && !placeWithOpeningHoursFilter ){
-            filterContexts.splice(0,0,filterContexts.splice(filterContexts.indexOf(_.find(filterContexts, {'type': "OrganizationAndPerson"})),1)[0])
-          }
-          if( placeWithOpeningHoursFilter && !organizationAndPersonFilter ){
-            filterContexts.splice(0,0,filterContexts.splice(filterContexts.indexOf(_.find(filterContexts, {'type': "PlaceWithOpeninghours"})),1)[0])
-          }
-      }
+      // if( hasNLPFilter && !nlpFilterContextProtos ){
+      //     if( organizationAndPersonFilter && !placeWithOpeningHoursFilter ){
+      //       filterContexts.splice(0,0,filterContexts.splice(filterContexts.indexOf(_.find(filterContexts, {'type': "OrganizationAndPerson"})),1)[0])
+      //     }
+      //     if( placeWithOpeningHoursFilter && !organizationAndPersonFilter ){
+      //       filterContexts.splice(0,0,filterContexts.splice(filterContexts.indexOf(_.find(filterContexts, {'type': "PlaceWithOpeninghours"})),1)[0])
+      //     }
+      // }
 
       return filterContexts;
     };
