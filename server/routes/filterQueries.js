@@ -70,28 +70,6 @@ var middleware = {
 
       if( typeFilter ){
         var nlpFilterContextProtos = subtypeToFilterQuery[typeFilter];
-        // var matchingNgram = null;
-
-        //We try to match the ngram against all defined subtype aliases
-        //If ngram ends in an 'n' we assume it's plural and also try to match to naive singular 'ngram - s'
-        //the first match found is the one we're going with.
-        //Based on ordening we favour (1) large subtypes that (2) sit at the end of the question
-        // _.each(getNGramsInSizeOrder(filteredKeyword.toLowerCase()), function (ngram) {
-        //   var ngramSingular = ngram[ngram.length - 1] = 's' && ngram.substring(0, ngram.length - 1);
-        //   _.each(subtypeToFilterQuery, function (subtypeFilterContext, subtypeAlias) {
-        //     if (nlpFilterContextProtos) return;
-        //     if (ngram === subtypeAlias || (ngramSingular && ngramSingular === subtypeAlias)) {
-        //       nlpFilterContextProtos = subtypeFilterContext;
-        //       matchingNgram = ngram;
-        //     }
-        //   });
-        //   if (nlpFilterContextProtos) return;
-        // });
-
-        //Get the question without the matched nlp. The reamining stuff is the keyword search
-        //This is used for queries that filter on actual subtype
-        // var questionWithPossiblyRemovedType = matchingNgram ? filteredKeyword.toLowerCase().replace(matchingNgram, "").trim() : filteredKeyword;
-        // var rawQuestionWithPossiblyRemovedType = matchingNgram ? rawKeyword.toLowerCase().replace(matchingNgram, "").trim() : rawKeyword;
 
         if (nlpFilterContextProtos) {
           //can be array! E.g.: for movies, which would show movies as well as movie events
@@ -103,7 +81,7 @@ var middleware = {
             };
 
             //set final question (may override)
-            var finalQuestion = filterKeywordWithoutType;
+            var finalQuestion = searchQueryParserUtils.getFilteredKeywordWithoutType(parsedQuestion, nlpFilterContextProto.type);
 
             //add date filter
             if( dateFilter && nlpFilterContextProto.temporal ) nlpFilterContextProto.temporal = dateFilter;
@@ -246,7 +224,7 @@ var middleware = {
           }
         }
 
-        if( filteredKeyword && !((organizationAndPersonFilter && filterContext.type == 'OrganizationAndPerson') || ((placeWithOpeningHoursFilter || locationFilter) && filterContext.type == 'PlaceWithOpeninghours')) ){
+        if( searchQueryParserUtils.getFilteredKeyword(parsedQuestion, filterContext.type) && !((organizationAndPersonFilter && filterContext.type == 'OrganizationAndPerson') || ((placeWithOpeningHoursFilter || locationFilter) && filterContext.type == 'PlaceWithOpeninghours')) ){
           matchType = "must";
           boost = 1;
           if ( _.some(nlpFilterContextProtos, {type: filterContext.type}) ) {
@@ -259,7 +237,7 @@ var middleware = {
             typeOfMatch: matchType,
             boost: boost
           };
-          filterContext.humanContext = humanContextHelper.keywordTemplate( subtypeToFilterQuery[root.toLowerCase()].label, filteredKeyword );
+          filterContext.humanContext = humanContextHelper.keywordTemplate( subtypeToFilterQuery[root.toLowerCase()].label, searchQueryParserUtils.getFilteredKeyword(parsedQuestion, filterContext.type) );
         } else {
           filterContext.humanContext = humanContextHelper.typeTemplate( subtypeToFilterQuery[root.toLowerCase()].label );
         }
@@ -284,10 +262,10 @@ var middleware = {
       ensureQuestion(req.body, next); //check that we have a question or a type / filtercontext - if we have a type but no question, we move on from here and skip the rest of this
       searchQueryParser.parseQuestion(req.body.question.trim())
         .then(function(result){
-          //console.log("question: ", result); // DEBUG
+          console.log("question: ", result); // DEBUG
           command.filterQueryUtils.saveSearchQueryHistory(req.body.question.trim(), result);
           req.body.filterContexts = createFilterContexts(JSON.parse(result));
-          //console.log(JSON.stringify(req.body.filterContexts, null, 2)); //DEBUG
+          console.log(JSON.stringify(req.body.filterContexts, null, 2)); //DEBUG
           next();
         })
         .catch(function(err){
@@ -296,55 +274,6 @@ var middleware = {
     };
   }
 };
-
-// function getNGramsInSizeOrder(text) {
-//
-//   var atLeast = 1; // Show results with at least .. occurrences
-//   var numWords = 20; // Show statistics for one to .. words (20 should be enough)
-//   var ignoreCase = true; // Case-sensitivity
-//   var REallowedChars = /[^a-zA-Z'\-]+/g;
-//
-//
-//   var i, j, k, textlen, len, s;
-//   // Prepare key hash
-//   var keys = [null]; //"keys[0] = null", a word boundary with length zero is empty
-//   var results = [];
-//   numWords++; //for human logic, we start counting at 1 instead of 0
-//   for (i = 1; i <= numWords; i++) {
-//     keys.push({});
-//   }
-//
-//   // Remove all irrelevant characters
-//   text = text.replace(REallowedChars, " ").replace(/^\s+/, "").replace(/\s+$/, "");
-//
-//   // Create a hash
-//   if (ignoreCase) text = text.toLowerCase();
-//   text = text.split(/\s+/);
-//   for (i = 0, textlen = text.length; i < textlen; i++) {
-//     s = text[i];
-//     keys[1][s] = (keys[1][s] || 0) + 1;
-//     for (j = 2; j <= numWords; j++) {
-//       if (i + j <= textlen) {
-//         s += " " + text[i + j - 1];
-//         keys[j][s] = (keys[j][s] || 0) + 1;
-//       } else break;
-//     }
-//   }
-//
-//   // Prepares results for advanced analysis
-//   for (var k = 1; k <= numWords; k++) {
-//     var key = keys[k];
-//     for (var i in key) {
-//       if (key[i] >= atLeast) {
-//         results.push(i);
-//       }
-//     }
-//   }
-//
-//   results.reverse();
-//   return results;
-// }
-
 
 module.exports = function (command) {
 

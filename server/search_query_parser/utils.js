@@ -1,4 +1,4 @@
-var _ = require("lodash");
+const _ = require("lodash");
 
 function parsedQuestionHasData( parsedQuestion ){
   return parsedQuestion
@@ -8,19 +8,23 @@ function parsedQuestionHasData( parsedQuestion ){
 
 function getEntityMentions( type, parsedQuestion ){
   if ( parsedQuestionHasData(parsedQuestion)
-    && parsedQuestion.questions[0].entitymentions
-    && _.some(parsedQuestion.questions[0].entitymentions, 'ner', type) )
+    && parsedQuestion.questions[0].specific_pattern_mentions )
   {
-    return _.filter(parsedQuestion.questions[0].entitymentions, 'ner', type)[0].text.replace(getTypeFilterText(parsedQuestion), '');
+    const filteredMentions =  _.filter(parsedQuestion.questions[0].specific_pattern_mentions.reverse(), (mention) => {
+      if (mention.type != type) return false;
+      const mentionWithoutType = mention.text.replace(getTypeFilterText(parsedQuestion), '');
+      return mentionWithoutType != '';
+    });
+    if (filteredMentions.length > 0) return filteredMentions[0].text.replace(getTypeFilterText(parsedQuestion), '');
   }
 }
 
 function getTypeFilterText( parsedQuestion ){
   if ( parsedQuestionHasData(parsedQuestion)
-    && parsedQuestion.questions[0].eventtypes
-    && parsedQuestion.questions[0].eventtypes.length > 0 )
+    && parsedQuestion.questions[0].generic_pattern_mentions
+    && parsedQuestion.questions[0].generic_pattern_mentions.length > 0 )
   {
-    return parsedQuestion.questions[0].eventtypes[parsedQuestion.questions[0].eventtypes.length-1].text;
+    return parsedQuestion.questions[0].generic_pattern_mentions[parsedQuestion.questions[0].generic_pattern_mentions.length-1].text;
   }
 }
 
@@ -37,10 +41,10 @@ function getDateFilter( parsedQuestion ){
 
 function getTypeFilter( parsedQuestion ){
   if ( parsedQuestionHasData(parsedQuestion)
-    && parsedQuestion.questions[0].eventtypes
-    && parsedQuestion.questions[0].eventtypes.length > 0 )
+    && parsedQuestion.questions[0].generic_pattern_mentions
+    && parsedQuestion.questions[0].generic_pattern_mentions.length > 0 )
   {
-    return parsedQuestion.questions[0].eventtypes[parsedQuestion.questions[0].eventtypes.length-1].event_type;
+    return parsedQuestion.questions[0].generic_pattern_mentions[parsedQuestion.questions[0].generic_pattern_mentions.length-1].type;
   }
 }
 
@@ -49,32 +53,30 @@ function getOrganizationAndPersonFilter( parsedQuestion ){
 }
 
 function getPlaceWithOpeningHoursFilter( parsedQuestion ){
-  return getEntityMentions('PlaceWithOpeninghours', parsedQuestion);
+  let pwohMention = getEntityMentions('PlaceWithOpeninghours', parsedQuestion);
+  let locationMention = getLocationFilter(parsedQuestion)
+  if (pwohMention != locationMention) return pwohMention;
 }
 
 function getLocationFilter( parsedQuestion ){
   return getEntityMentions('LOCATION', parsedQuestion);
 }
 
-function getFilteredKeyword( parsedQuestion ){
+function getFilteredKeyword( parsedQuestion, type = null ){
   if ( parsedQuestionHasData(parsedQuestion) ) {
-    if ( (getDateFilter(parsedQuestion) || getOrganizationAndPersonFilter(parsedQuestion)) || getPlaceWithOpeningHoursFilter(parsedQuestion) || getLocationFilter(parsedQuestion) ){
-      if ( parsedQuestion.questions[0].other_text
-        && parsedQuestion.questions[0].other_text.length > 0
-        && parsedQuestion.questions[0].other_text[0].text ) {
-        return _.map(parsedQuestion.questions[0].other_text, function (part) {
-          if (part.text != '') return part.text;
-        }).join(' ');
-      }
-    }else{
-      return parsedQuestion.questions[0].text.slice(0,-1); //TODO JIM HACK TO FIX SEARCH QUERY PARSER ISSUE #6
+    let keyword = getDateFilter(parsedQuestion) ? parsedQuestion.questions[0].timeless_text.slice(0,-1) : parsedQuestion.questions[0].text.slice(0,-1);
+    if (type && getEntityMentions(type, parsedQuestion)) {
+      keyword = keyword.replace(getEntityMentions(type, parsedQuestion), '').slice(0,-1);
     }
+    return keyword;
+  } else {
+    return parsedQuestion.questions[0].text.slice(0,-1); //TODO JIM HACK TO FIX SEARCH QUERY PARSER ISSUE #6
   }
 }
 
-function getFilteredKeywordWithoutType( parsedQuestion ){
-  if ( getFilteredKeyword(parsedQuestion) ){
-    return getFilteredKeyword(parsedQuestion).replace(getTypeFilterText(parsedQuestion), '').trim();
+function getFilteredKeywordWithoutType( parsedQuestion, type = null ){
+  if ( getFilteredKeyword(parsedQuestion, type) ){
+    return getFilteredKeyword(parsedQuestion, type).replace(getTypeFilterText(parsedQuestion), '').trim();
   } else {
     return "";
   }
@@ -82,8 +84,7 @@ function getFilteredKeywordWithoutType( parsedQuestion ){
 
 function getRawKeyword( parsedQuestion ){
   if( parsedQuestionHasData(parsedQuestion) ){
-    //TODO SEARCH QUERY PARSER this is not quite right, when there is a date recognized it should be filtered out, see slack #392
-    return parsedQuestion.questions[0].text.slice(0,-1); //TODO JIM HACK TO FIX SEARCH QUERY PARSER ISSUE #6
+    return parsedQuestion.questions[0].timeless_text.slice(0,-1); //TODO JIM HACK TO FIX SEARCH QUERY PARSER ISSUE #6
   }
 }
 
