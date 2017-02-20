@@ -11,7 +11,7 @@ function getEntityMentions( type, parsedQuestion ){
     && parsedQuestion.questions[0].specific_pattern_mentions )
   {
     const filteredMentions =  _.filter(parsedQuestion.questions[0].specific_pattern_mentions.reverse(), (mention) => {
-      if (mention.type != type) return false;
+      if (type && mention.type != type) return false;
       const mentionWithoutType = mention.text.replace(getTypeFilterText(parsedQuestion), '');
       return mentionWithoutType != '';
     });
@@ -33,7 +33,8 @@ function getTypeFilterText( parsedQuestion ){
 function getDateFilter( parsedQuestion ){
   if ( parsedQuestionHasData(parsedQuestion)
     && parsedQuestion.questions[0].temporal_query_info
-    && parsedQuestion.questions[0].temporal_query_info.length > 0 )
+    && parsedQuestion.questions[0].temporal_query_info.length > 0
+    && !parsedQuestion.questions[0].temporal_query_info[0]["TimeParseFailure"])
   {
     return parsedQuestion.questions[0].temporal_query_info[0];
   }
@@ -65,8 +66,12 @@ function getLocationFilter( parsedQuestion ){
 function getFilteredKeyword( parsedQuestion, type = null ){
   if ( parsedQuestionHasData(parsedQuestion) ) {
     let keyword = getDateFilter(parsedQuestion) ? parsedQuestion.questions[0].timeless_text.slice(0,-1) : parsedQuestion.questions[0].text.slice(0,-1);
-    if (type && getEntityMentions(type, parsedQuestion)) {
-      keyword = keyword.replace(getEntityMentions(type, parsedQuestion), '').slice(0,-1);
+    if (getEntityMentions(type, parsedQuestion)) {
+      if (type) {
+        keyword = keyword.replace(getEntityMentions(type, parsedQuestion), '');
+      } else {
+        keyword = keyword.replace(getOrganizationAndPersonFilter(parsedQuestion), '').replace(getPlaceWithOpeningHoursFilter(parsedQuestion), '').replace(getLocationFilter(parsedQuestion), '');
+      }
     }
     return keyword;
   } else {

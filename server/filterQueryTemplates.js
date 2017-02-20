@@ -70,6 +70,28 @@ var subtypeToFilterQuery = {
       singular: "course"
     }
   },
+  "comedyevent": {
+    type: "Event",
+    filter: {
+      subtypes: {
+        text: "comedyevent",
+        typeOfQuery: "Enum",
+        typeOfMatch: "must"
+      }
+    },
+    "temporal": {
+      "startDate": {
+        "gte": "now"
+      }
+    },
+    "sort": {
+      "type": "date"
+    },
+    label: {
+      plural: "comedy events",
+      singular: "comedy event"
+    }
+  },
   "festivals_parades": {
     type: "Event",
     filter: {

@@ -27,30 +27,30 @@ var middleware = {
       }
     };
 
-    var createFilterContexts = function(parsedQuestion){
+    const createFilterContexts = function(parsedQuestion){
 
-      var filterQueryUtils = command.filterQueryUtils;
+      const filterQueryUtils = command.filterQueryUtils;
 
       //PRE: Based on question we generate multiple FilterContexts.
 
       // Get the query components we know about from Search Query Parser
-      var filteredKeyword = searchQueryParserUtils.getFilteredKeyword(parsedQuestion);
-      var rawKeyword = searchQueryParserUtils.getRawKeyword(parsedQuestion);
-      var filterKeywordWithoutType = searchQueryParserUtils.getFilteredKeywordWithoutType(parsedQuestion);
-      var rawKeywordWithoutType = searchQueryParserUtils.getRawKeywordWithoutType(parsedQuestion);
-      var dateFilter = searchQueryParserUtils.getDateFilter(parsedQuestion);
-      var typeFilter = searchQueryParserUtils.getTypeFilter(parsedQuestion);
-      var organizationAndPersonFilter = searchQueryParserUtils.getOrganizationAndPersonFilter(parsedQuestion);
-      var placeWithOpeningHoursFilter = searchQueryParserUtils.getPlaceWithOpeningHoursFilter(parsedQuestion);
-      var locationFilter = searchQueryParserUtils.getLocationFilter(parsedQuestion);
+      const filteredKeyword = searchQueryParserUtils.getFilteredKeyword(parsedQuestion);
+      const rawKeyword = searchQueryParserUtils.getRawKeyword(parsedQuestion);
+      const filterKeywordWithoutType = searchQueryParserUtils.getFilteredKeywordWithoutType(parsedQuestion);
+      const rawKeywordWithoutType = searchQueryParserUtils.getRawKeywordWithoutType(parsedQuestion);
+      const dateFilter = searchQueryParserUtils.getDateFilter(parsedQuestion);
+      const typeFilter = searchQueryParserUtils.getTypeFilter(parsedQuestion);
+      const organizationAndPersonFilter = searchQueryParserUtils.getOrganizationAndPersonFilter(parsedQuestion);
+      const placeWithOpeningHoursFilter = searchQueryParserUtils.getPlaceWithOpeningHoursFilter(parsedQuestion);
+      const locationFilter = searchQueryParserUtils.getLocationFilter(parsedQuestion);
 
-      var hasNLPFilter = organizationAndPersonFilter || placeWithOpeningHoursFilter || locationFilter ;
+      const hasNLPFilter = organizationAndPersonFilter || placeWithOpeningHoursFilter || locationFilter ;
 
-      var subtypeToFilterQuery = _.cloneDeep(subtypeToFilterQueryBase);
-      var defaultRoots = [].concat(filterQueryUtils.fixedTypesInOrder);
-      var rootsInOrder = hasNLPFilter ? _.filter(defaultRoots, function(root) {
-        var rootType = subtypeToFilterQuery[root.toLowerCase()];
-        var includeType = true;
+      const subtypeToFilterQuery = _.cloneDeep(subtypeToFilterQueryBase);
+      const defaultRoots = [].concat(filterQueryUtils.fixedTypesInOrder);
+      const rootsInOrder = hasNLPFilter ? _.filter(defaultRoots, function(root) {
+        const rootType = subtypeToFilterQuery[root.toLowerCase()];
+        let includeType = true;
         if( organizationAndPersonFilter ){
           //this is really crude, but the schema calls for all kinds of data we don't have, so we are hardcoding this to check for a performer subtype
           includeType = rootType.type == 'OrganizationAndPerson' || filterQueryUtils.getRootMap(rootType.type).performer;
@@ -65,23 +65,25 @@ var middleware = {
         return includeType;
       }) : defaultRoots;
 
-      var nlpContexts = [];
-      var reorderFallbackTypes = [];
+      let nlpContexts = [];
+      let reorderFallbackTypes = [];
+
+      let nlpFilterContextProtos;
 
       if( typeFilter ){
-        var nlpFilterContextProtos = subtypeToFilterQuery[typeFilter];
+        nlpFilterContextProtos = subtypeToFilterQuery[typeFilter];
 
         if (nlpFilterContextProtos) {
           //can be array! E.g.: for movies, which would show movies as well as movie events
           nlpFilterContextProtos = _.isArray(nlpFilterContextProtos) ? nlpFilterContextProtos : [nlpFilterContextProtos];
           _.each(nlpFilterContextProtos, function (nlpFilterContextProto) {
-            var nlpFilterContext = {
+            let nlpFilterContext = {
               filter: {},
               wantUnique: false
             };
 
             //set final question (may override)
-            var finalQuestion = searchQueryParserUtils.getFilteredKeywordWithoutType(parsedQuestion, nlpFilterContextProto.type);
+            let finalQuestion = searchQueryParserUtils.getFilteredKeywordWithoutType(parsedQuestion, nlpFilterContextProto.type);
 
             //add date filter
             if( dateFilter && nlpFilterContextProto.temporal ) nlpFilterContextProto.temporal = dateFilter;
@@ -128,11 +130,20 @@ var middleware = {
             //add default freetext filter if none defined
 
             if(finalQuestion != ""){ //if there's still a keyword left...
-              nlpFilterContext.filter.name = {
-                text: finalQuestion,
-                typeOfQuery: "FreeText",
-                typeOfMatch: "must"
-              };
+              if (nlpFilterContextProto.type == "Event"){
+                nlpFilterContext.filter.name = {
+                  text: finalQuestion,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "should",
+                  boost: 1000
+                };
+              } else {
+                nlpFilterContext.filter.name = {
+                  text: finalQuestion,
+                  typeOfQuery: "FreeText",
+                  typeOfMatch: "must"
+                };
+              }
               nlpFilterContext.humanContext = humanContextHelper.keywordTemplate(nlpFilterContextProto.label, finalQuestion);
             } else {
               nlpFilterContext.humanContext = humanContextHelper.typeTemplate(nlpFilterContextProto.label);
@@ -224,19 +235,25 @@ var middleware = {
           }
         }
 
-        if( searchQueryParserUtils.getFilteredKeyword(parsedQuestion, filterContext.type) && !((organizationAndPersonFilter && filterContext.type == 'OrganizationAndPerson') || ((placeWithOpeningHoursFilter || locationFilter) && filterContext.type == 'PlaceWithOpeninghours')) ){
+        if( !((organizationAndPersonFilter && filterContext.type == 'OrganizationAndPerson') || ((placeWithOpeningHoursFilter || locationFilter) && filterContext.type == 'PlaceWithOpeninghours')) ){
+          let useKeyword = filteredKeyword;
           matchType = "must";
           boost = 1;
-          if ( _.some(nlpFilterContextProtos, {type: filterContext.type}) ) {
+          if ((filterContext.type == "Event" && filteredKeyword == "") || filterContext.type != "Event"){
+            useKeyword = searchQueryParserUtils.getFilteredKeyword(parsedQuestion, filterContext.type);
+          }
+          if ( _.some(nlpFilterContextProtos, {type: filterContext.type}) || ((organizationAndPersonFilter || placeWithOpeningHoursFilter) && filterContext.type === "Event") ) {
             matchType = "should";
             boost = 1000;
           }
-          filterContext.filter.name = {
-            text: filteredKeyword,
-            typeOfQuery: "FreeText",
-            typeOfMatch: matchType,
-            boost: boost
-          };
+          if (useKeyword != ""){
+            filterContext.filter.name = {
+              text: useKeyword,
+              typeOfQuery: "FreeText",
+              typeOfMatch: matchType,
+              boost: boost
+            };
+          }
           filterContext.humanContext = humanContextHelper.keywordTemplate( subtypeToFilterQuery[root.toLowerCase()].label, searchQueryParserUtils.getFilteredKeyword(parsedQuestion, filterContext.type) );
         } else {
           filterContext.humanContext = humanContextHelper.typeTemplate( subtypeToFilterQuery[root.toLowerCase()].label );
